@@ -353,6 +353,7 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Novo treino
     </button>
+    <button id="btn-strava" onclick="stravaAction()" style="display:none;border:none;border-radius:var(--radius-sm);padding:7px 12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;background:#FC4C02;color:#fff;">Conectar Strava</button>
     <button class="btn-theme" id="btn-theme" onclick="toggleTheme()">🌙</button>
   </div>
 </nav>
@@ -1765,6 +1766,81 @@ function toggleTheme(){
   renderAll();
 }
 
+// ── STRAVA ──────────────────────────────────────────────────────────────────
+const STRAVA_CLIENT_ID='224086';
+const STRAVA_REDIRECT_URI='https://orbi-two-xi.vercel.app/exercicios.html';
+
+function stravaAuthUrl(){
+  return `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&approval_prompt=force&scope=activity:read_all`;
+}
+
+let stravaConnected=false;
+
+async function stravaLoadStatus(){
+  if(!canUseApi())return;
+  try{
+    const d=await apiReq('/strava/status');
+    stravaConnected=d.connected;
+    const btn=document.getElementById('btn-strava');
+    if(btn){
+      btn.style.display='';
+      btn.textContent=stravaConnected?'⚡ Sincronizar Strava':'🟠 Conectar Strava';
+      btn.style.background=stravaConnected?'var(--accent)':'#FC4C02';
+    }
+  }catch(_){}
+}
+
+async function stravaAction(){
+  if(!canUseApi()){showLogin();return;}
+  if(!stravaConnected){
+    window.location.href=stravaAuthUrl();
+    return;
+  }
+  // Já conectado — sincronizar
+  const btn=document.getElementById('btn-strava');
+  const orig=btn.textContent;
+  btn.textContent='Sincronizando...';
+  btn.disabled=true;
+  try{
+    const d=await apiReq('/strava/sync',{method:'POST',body:JSON.stringify({days:60})});
+    setStatus(`✓ ${d.synced} atividades importadas do Strava`);
+    setTimeout(()=>setStatus(null),5000);
+    await bootstrapApi();
+    renderAll();
+  }catch(e){
+    setStatus('Erro ao sincronizar Strava: '+e.message,true);
+  }
+  btn.textContent=orig;
+  btn.disabled=false;
+}
+
+async function stravaHandleCallback(){
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('code');
+  const error=params.get('error');
+  if(error){setStatus('Strava: acesso negado',true);history.replaceState({},'',window.location.pathname);return;}
+  if(!code)return;
+  // Limpa a URL imediatamente
+  history.replaceState({},'',window.location.pathname);
+  if(!canUseApi()){setStatus('Faça login antes de conectar o Strava',true);return;}
+  setStatus('Conectando Strava...');
+  try{
+    const d=await apiReq('/strava/exchange-token',{method:'POST',body:JSON.stringify({code})});
+    stravaConnected=true;
+    setStatus(`✓ Strava conectado (${d.athlete})! Sincronizando atividades...`);
+    const btn=document.getElementById('btn-strava');
+    if(btn){btn.textContent='⚡ Sincronizar Strava';btn.style.background='var(--accent)';}
+    // Sincroniza automaticamente após conectar
+    const s=await apiReq('/strava/sync',{method:'POST',body:JSON.stringify({days:90})});
+    setStatus(`✓ Strava conectado — ${s.synced} atividades importadas`);
+    setTimeout(()=>setStatus(null),6000);
+    await bootstrapApi();
+    renderAll();
+  }catch(e){
+    setStatus('Erro ao conectar Strava: '+e.message,true);
+  }
+}
+
 // INIT
 (async function(){
   const theme=localStorage.getItem(SK_TH)||'dark';
@@ -1791,6 +1867,8 @@ function toggleTheme(){
     applyUserIsolation(API_USER_ID);
     await bootstrapApi();
     renderAll();
+    await stravaLoadStatus();
+    await stravaHandleCallback();
   } else {
     setStatus(null);
     // Pré-preenche campos de login se já tiver algo salvo

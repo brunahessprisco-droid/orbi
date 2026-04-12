@@ -93,6 +93,7 @@ model User {
   habitos                Habito[]
   alimentacaoRefeicoes   AlimentacaoRefeicao[]
   alimentacaoConfig      AlimentacaoConfig?
+  stravaToken            StravaToken?
 }
 
 model Session {
@@ -536,6 +537,20 @@ model InviteCode {
   usedByUser    User?     @relation(fields: [usedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@map("InviteCode")
+}
+
+model StravaToken {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  athleteId    Int
+  accessToken  String
+  refreshToken String
+  expiresAt    Int
+  scope        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model HealthWeight {

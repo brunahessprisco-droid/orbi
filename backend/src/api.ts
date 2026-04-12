@@ -1075,3 +1075,86 @@ apiRouter.post("/alimentacao/config", requireAuth, async (req: AuthedRequest, re
   const row = await prisma.alimentacaoConfig.upsert({ where: { userId: req.userId! }, update: { goals: input.goals ?? null, plan: input.plan ?? null }, create: { userId: req.userId!, goals: input.goals ?? null, plan: input.plan ?? null } });
   res.status(201).json(row);
 });
+
+// ── STRAVA ───────────────────────────────────────────────────────────────────
+
+const STRAVA_CLIENT_ID     = process.env.STRAVA_CLIENT_ID     || "";
+const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET || "";
+
+async function stravaRefreshIfNeeded(userId: string) {
+  let token = await prisma.stravaToken.findUnique({ where: { userId } });
+  if (!token) throw Object.assign(new Error("NOT_CONNECTED"), { status: 400 });
+  const now = Math.floor(Date.now() / 1000);
+  if (token.expiresAt < now + 60) {
+    const r = await fetch("https://www.strava.com/oauth/token", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET, refresh_token: token.refreshToken, grant_type: "refresh_token" }),
+    });
+    if (!r.ok) throw Object.assign(new Error("STRAVA_REFRESH_ERROR"), { status: 400 });
+    const d = await r.json() as { access_token: string; refresh_token: string; expires_at: number };
+    token = await prisma.stravaToken.update({ where: { userId }, data: { accessToken: d.access_token, refreshToken: d.refresh_token, expiresAt: d.expires_at } });
+  }
+  return token;
+}
+
+apiRouter.post("/strava/exchange-token", requireAuth, async (req: AuthedRequest, res) => {
+  const { code } = req.body as { code: string };
+  if (!code) return res.status(400).json({ error: "BAD_REQUEST" });
+  const r = await fetch("https://www.strava.com/oauth/token", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET, code, grant_type: "authorization_code" }),
+  });
+  if (!r.ok) return res.status(400).json({ error: "STRAVA_ERROR", detail: await r.text() });
+  const d = await r.json() as { access_token: string; refresh_token: string; expires_at: number; scope: string; athlete: { id: number; firstname: string; lastname: string } };
+  await prisma.stravaToken.upsert({
+    where: { userId: req.userId! },
+    update: { athleteId: d.athlete.id, accessToken: d.access_token, refreshToken: d.refresh_token, expiresAt: d.expires_at, scope: d.scope },
+    create: { userId: req.userId!, athleteId: d.athlete.id, accessToken: d.access_token, refreshToken: d.refresh_token, expiresAt: d.expires_at, scope: d.scope },
+  });
+  return res.json({ ok: true, athlete: `${d.athlete.firstname} ${d.athlete.lastname}` });
+});
+
+apiRouter.get("/strava/status", requireAuth, async (req: AuthedRequest, res) => {
+  const token = await prisma.stravaToken.findUnique({ where: { userId: req.userId! } });
+  return res.json({ connected: !!token });
+});
+
+apiRouter.delete("/strava/disconnect", requireAuth, async (req: AuthedRequest, res) => {
+  await prisma.stravaToken.deleteMany({ where: { userId: req.userId! } });
+  return res.status(204).send();
+});
+
+apiRouter.post("/strava/sync", requireAuth, async (req: AuthedRequest, res) => {
+  const token = await stravaRefreshIfNeeded(req.userId!).catch(e => { throw e; });
+  const days = Number((req.body as { days?: number }).days || 30);
+  const after = Math.floor((Date.now() - days * 24 * 60 * 60 * 1000) / 1000);
+  const ar = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=100`, { headers: { Authorization: `Bearer ${token.accessToken}` } });
+  if (!ar.ok) return res.status(400).json({ error: "STRAVA_FETCH_ERROR" });
+  const activities = await ar.json() as Array<{ id: number; name: string; type: string; sport_type?: string; start_date_local: string; moving_time: number; distance: number; total_elevation_gain?: number; average_heartrate?: number }>;
+  const catMap: Record<string, string> = {
+    Run:"cardio",VirtualRun:"cardio",TrailRun:"cardio",
+    Ride:"cardio",VirtualRide:"cardio",MountainBikeRide:"cardio",GravelRide:"cardio",EBikeRide:"cardio",EMountainBikeRide:"cardio",
+    Swim:"cardio",Walk:"cardio",Hike:"cardio",Rowing:"cardio",Kayaking:"cardio",
+    NordicSki:"cardio",AlpineSki:"cardio",BackcountrySki:"cardio",Snowboard:"cardio",
+    RollerSki:"cardio",IceSkate:"cardio",Soccer:"cardio",Tennis:"cardio",Badminton:"cardio",
+    WeightTraining:"forca",Workout:"forca",CrossFit:"forca",Yoga:"forca",Pilates:"forca",Stretching:"forca",RockClimbing:"forca",Surfing:"forca",
+  };
+  let synced = 0;
+  for (const act of activities) {
+    const clientId = `strava_${act.id}`;
+    const sportType = act.sport_type || act.type;
+    const data_str = act.start_date_local.slice(0, 10);
+    const hora = act.start_date_local.slice(11, 16);
+    const duracao = act.moving_time ? Math.round(act.moving_time / 60) : null;
+    const km = act.distance ? act.distance / 1000 : null;
+    const tipo_cat = catMap[sportType] || "cardio";
+    const extras = [
+      act.total_elevation_gain ? `${Math.round(act.total_elevation_gain)}m elevação` : null,
+      act.average_heartrate ? `FC ${Math.round(act.average_heartrate)}bpm` : null,
+    ].filter(Boolean).join(' · ');
+    const payload = { titulo: act.name, data: data_str, hora_inicio: hora, hora_fim: null as string | null, duracao, tipo_cat, tipo_ex: sportType, calorias: null as number | null, km: km != null ? toDecimal(km) : null, local_nome: null as string | null, descricao: "Importado do Strava", obs: extras || null };
+    await prisma.apiTreino.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: clientId } }, update: payload, create: { userId: req.userId!, client_id: clientId, ...payload } });
+    synced++;
+  }
+  return res.json({ ok: true, synced });
+});
