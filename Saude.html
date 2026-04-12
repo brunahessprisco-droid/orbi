@@ -1408,6 +1408,11 @@
 
         const lw=lastWeight();
         const goal=lw?.goal || state.goals.weight;
+        // Recover height from historical records if goals.height not set
+        if(!state.goals.height){
+          const wh=[...state.weights].sort((a,b)=>compareDates(b.date,a.date)).find(w=>w.height);
+          if(wh){state.goals.height=wh.height;saveState();}
+        }
         const h=lw?.height || state.goals.height;
         document.getElementById('goal-weight-card').textContent=goal?asKg(goal):'—';
         document.getElementById('current-bmi-card').textContent=lw&&h?bmi(lw.weight,h).toFixed(1):'—';
