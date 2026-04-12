@@ -701,6 +701,15 @@ apiRouter.post("/treinos", requireAuth, async (req: AuthedRequest, res) => {
 apiRouter.delete("/treinos/:id", requireAuth, async (req: AuthedRequest, res) => {
   const id = readRouteParam(req, "id");
   if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  // If it's a Strava-imported activity, record exclusion so re-sync won't bring it back
+  const treino = await prisma.apiTreino.findFirst({ where: { id, userId: req.userId! } });
+  if (treino?.client_id?.startsWith("strava_")) {
+    await prisma.stravaExcluded.upsert({
+      where: { userId_clientId: { userId: req.userId!, clientId: treino.client_id } },
+      update: {},
+      create: { userId: req.userId!, clientId: treino.client_id },
+    });
+  }
   await prisma.apiTreino.deleteMany({ where: { id, userId: req.userId! } });
   res.status(204).send();
 });
@@ -1148,9 +1157,13 @@ apiRouter.post("/strava/sync", requireAuth, async (req: AuthedRequest, res) => {
     RollerSki:"cardio",IceSkate:"cardio",Soccer:"cardio",Tennis:"cardio",Badminton:"cardio",
     WeightTraining:"forca",Workout:"forca",CrossFit:"forca",Yoga:"forca",Pilates:"forca",Stretching:"forca",RockClimbing:"forca",Surfing:"forca",
   };
+  // Load excluded strava activity IDs for this user
+  const excluded = await prisma.stravaExcluded.findMany({ where: { userId: req.userId! }, select: { clientId: true } });
+  const excludedSet = new Set(excluded.map(e => e.clientId));
   let synced = 0;
   for (const act of activities) {
     const clientId = `strava_${act.id}`;
+    if (excludedSet.has(clientId)) continue; // user deleted this, skip
     const sportType = act.sport_type || act.type;
     const data_str = act.start_date_local.slice(0, 10);
     const hora = act.start_date_local.slice(11, 16);

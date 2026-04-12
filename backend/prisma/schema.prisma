@@ -94,6 +94,7 @@ model User {
   alimentacaoRefeicoes   AlimentacaoRefeicao[]
   alimentacaoConfig      AlimentacaoConfig?
   stravaToken            StravaToken?
+  stravaExcluded         StravaExcluded[]
 }
 
 model Session {
@@ -552,6 +553,18 @@ model StravaToken {
   updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StravaExcluded {
+  id        String   @id @default(uuid())
+  userId    String
+  clientId  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([userId])
 }
 
 model HealthWeight {
