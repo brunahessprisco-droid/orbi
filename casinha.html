@@ -54,6 +54,12 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
 .nav-tab:hover{color:var(--text);background:var(--surface2);}
 .nav-tab.active{color:var(--purple);background:var(--pl);}
 .nav-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;}
+.btn-hamburger{display:none;border:none;background:none;color:var(--text);font-size:22px;padding:6px 8px;cursor:pointer;line-height:1;flex-shrink:0;}
+.nav-menu{display:none;position:fixed;top:56px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:99;flex-direction:column;padding:8px 12px;gap:2px;}
+.nav-menu.open{display:flex;}
+.nav-menu-item{padding:11px 14px;font-size:14px;font-weight:500;color:var(--muted);border-radius:8px;cursor:pointer;border:none;background:none;font-family:inherit;text-align:left;width:100%;}
+.nav-menu-item:hover{background:var(--surface2);color:var(--text);}
+.nav-menu-item.active{color:var(--purple);background:var(--pl);}
 .btn-theme{width:34px;height:34px;border:1px solid var(--border);background:var(--surface2);border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 .btn-new-task{display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--purple);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
 .btn-new-task:hover{opacity:.88;}
@@ -336,6 +342,8 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
   .modal-body{padding:14px 16px;}
   .modal-footer{padding:12px 16px 16px;}
   .btn{min-height:40px;}
+  .nav-tabs{display:none;}
+  .btn-hamburger{display:flex;align-items:center;justify-content:center;}
 }
 </style>
 </head>
@@ -353,11 +361,19 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
     <button class="nav-tab" onclick="showPage('rotinas')">Rotinas</button>
     <button class="nav-tab" onclick="showPage('cadastros')">Cadastros</button>
   </div>
+  <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-actions">
     <button class="btn-new-task" onclick="openTarefaModal()">＋ <span>Nova Tarefa</span></button>
     <button class="btn-theme" id="btn-theme" onclick="toggleTheme()">☀️</button>
   </div>
 </nav>
+<div class="nav-menu" id="nav-menu">
+  <button class="nav-menu-item active" data-page="dashboard" onclick="showPage('dashboard');closeNavMenu()">Dashboard</button>
+  <button class="nav-menu-item" data-page="calendario" onclick="showPage('calendario');closeNavMenu()">Calendário</button>
+  <button class="nav-menu-item" data-page="tarefas" onclick="showPage('tarefas');closeNavMenu()">Tarefas</button>
+  <button class="nav-menu-item" data-page="rotinas" onclick="showPage('rotinas');closeNavMenu()">Rotinas</button>
+  <button class="nav-menu-item" data-page="cadastros" onclick="showPage('cadastros');closeNavMenu()">Cadastros</button>
+</div>
 
 <div id="main">
 
@@ -670,6 +686,9 @@ function toggleTheme(){
 }
 
 // ===== NAVIGATION =====
+function toggleNavMenu(){ document.getElementById('nav-menu').classList.toggle('open'); }
+function closeNavMenu(){ document.getElementById('nav-menu').classList.remove('open'); }
+
 function showPage(p){
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
@@ -677,6 +696,7 @@ function showPage(p){
   document.querySelectorAll('.nav-tab').forEach(el=>{
     if(el.getAttribute('onclick')&&el.getAttribute('onclick').includes("'"+p+"'"))el.classList.add('active');
   });
+  document.querySelectorAll('.nav-menu-item').forEach(x=>{x.classList.remove('active');if(x.dataset.page===p)x.classList.add('active');});
   curPage=p;
   renderPage(p);
 }

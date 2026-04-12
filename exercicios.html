@@ -45,6 +45,12 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .nav-btn.active{background:var(--accent-bg);color:var(--accent);}
 .nav-btn:hover:not(.active){color:var(--text);background:var(--surface2);}
 .nav-right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-shrink:0;}
+.btn-hamburger{display:none;border:none;background:none;color:var(--text);font-size:22px;padding:6px 8px;cursor:pointer;line-height:1;flex-shrink:0;}
+.nav-menu{display:none;position:fixed;top:56px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:39;flex-direction:column;padding:8px 12px;gap:2px;}
+.nav-menu.open{display:flex;}
+.nav-menu-item{padding:11px 14px;font-size:14px;font-weight:500;color:var(--muted);border-radius:8px;cursor:pointer;border:none;background:none;font-family:inherit;text-align:left;width:100%;}
+.nav-menu-item:hover{background:var(--surface2);color:var(--text);}
+.nav-menu-item.active{background:var(--accent-bg);color:var(--accent);}
 .btn-hub{border:1px solid var(--border);background:none;color:var(--muted);border-radius:var(--radius-sm);padding:7px 12px;font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;}
 .btn-hub:hover{color:var(--text);border-color:var(--border2);}
 .btn-theme{border:1px solid var(--border);background:none;color:var(--muted);width:32px;height:32px;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .15s;}
@@ -292,7 +298,7 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
 .btn-save:hover{opacity:.88;}
 
 @media(max-width:900px){.summary{grid-template-columns:repeat(2,1fr);}.dash-grid{grid-template-columns:1fr;}}
-@media(max-width:680px){.app{padding:12px 10px 40px;}.summary{grid-template-columns:1fr 1fr;}.form-row,.form-row.triple{grid-template-columns:1fr;}.row-actions{opacity:1;}}
+@media(max-width:680px){.app{padding:12px 10px 40px;}.summary{grid-template-columns:1fr 1fr;}.form-row,.form-row.triple{grid-template-columns:1fr;}.row-actions{opacity:1;}.nav > .nav-btn{display:none;}.btn-hamburger{display:flex;align-items:center;justify-content:center;}}
 @media(max-width:480px){
   .app{padding:10px 8px 40px;}
   .summary{grid-template-columns:1fr;}
@@ -360,6 +366,7 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
   <button class="nav-btn" onclick="showPage('locais',this)">Locais</button>
   <button class="nav-btn" onclick="showPage('tipos',this)">Tipos</button>
   <button class="nav-btn" onclick="showPage('planejamento',this)">Planejamento</button>
+  <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-right">
     <div class="nav-month">
       <button class="btn-nav" onclick="changeMonth(-1)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -385,6 +392,14 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
     <button class="btn-theme" id="btn-theme" onclick="toggleTheme()">🌙</button>
   </div>
 </nav>
+<div class="nav-menu" id="nav-menu">
+  <button class="nav-menu-item active" data-page="dashboard" onclick="showPage('dashboard',document.querySelector('.nav-btn[onclick*=\'dashboard\']'));closeNavMenu()">Dashboard</button>
+  <button class="nav-menu-item" data-page="calendario" onclick="showPage('calendario',document.querySelector('.nav-btn[onclick*=\'calendario\']'));closeNavMenu()">Calendário</button>
+  <button class="nav-menu-item" data-page="treinos" onclick="showPage('treinos',document.querySelector('.nav-btn[onclick*=\'treinos\']'));closeNavMenu()">Treinos</button>
+  <button class="nav-menu-item" data-page="locais" onclick="showPage('locais',document.querySelector('.nav-btn[onclick*=\'locais\']'));closeNavMenu()">Locais</button>
+  <button class="nav-menu-item" data-page="tipos" onclick="showPage('tipos',document.querySelector('.nav-btn[onclick*=\'tipos\']'));closeNavMenu()">Tipos</button>
+  <button class="nav-menu-item" data-page="planejamento" onclick="showPage('planejamento',document.querySelector('.nav-btn[onclick*=\'planejamento\']'));closeNavMenu()">Planejamento</button>
+</div>
 <div class="app">
 
 <div id="sync-status" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--red);margin-bottom:12px;"></div>
@@ -987,11 +1002,15 @@ document.addEventListener('click',e=>{
   if(picker&&wrap&&!wrap.contains(e.target))picker.classList.remove('open');
 });
 
+function toggleNavMenu(){ document.getElementById('nav-menu').classList.toggle('open'); }
+function closeNavMenu(){ document.getElementById('nav-menu').classList.remove('open'); }
+
 function showPage(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
+  document.querySelectorAll('.nav-menu-item').forEach(x=>{x.classList.remove('active');if(x.dataset.page===id)x.classList.add('active');});
   renderAll();
 }
 function changeMonth(n){

@@ -85,6 +85,12 @@
     }
     .nav-btn.active{background:var(--surface3);color:var(--text)}
     .nav-right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-shrink:0}
+    .btn-hamburger{display:none;border:none;background:none;color:var(--text);font-size:22px;padding:6px 8px;cursor:pointer;line-height:1;flex-shrink:0;}
+    .nav-menu{display:none;position:fixed;top:56px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:29;flex-direction:column;padding:8px 12px;gap:2px;}
+    .nav-menu.open{display:flex;}
+    .nav-menu-item{padding:11px 14px;font-size:14px;font-weight:500;color:var(--muted);border-radius:8px;cursor:pointer;border:none;background:none;font-family:inherit;text-align:left;width:100%;}
+    .nav-menu-item:hover{background:var(--surface2);color:var(--text);}
+    .nav-menu-item.active{background:var(--surface3);color:var(--text);}
 
     .btn{
       border:1px solid var(--border);
@@ -505,6 +511,8 @@
       .month-label{min-width:120px;font-size:13px}
       .modal{max-width:calc(100% - 24px);margin:12px}
       .btn-primary{padding:8px 10px;font-size:12px}
+      .nav-tabs{display:none;}
+      .btn-hamburger{display:flex;align-items:center;justify-content:center;}
     }
     @media(max-width:480px){
       .summary{grid-template-columns:1fr}
@@ -620,11 +628,18 @@
       <button class="nav-btn" onclick="showPage('habitos',this)">Hábitos</button>
       <button class="nav-btn" onclick="showPage('estatisticas',this)">Estatísticas</button>
     </div>
+    <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <button class="btn btn-primary" onclick="openHabitModal()">+ Novo hábito</button>
       <button class="btn btn-icon" onclick="toggleTheme()" id="btn-theme" title="Tema">🌙</button>
     </div>
   </nav>
+  <div class="nav-menu" id="nav-menu">
+    <button class="nav-menu-item active" data-page="dashboard" onclick="showPage('dashboard',document.querySelector('.nav-btn[onclick*=\'dashboard\']'));closeNavMenu()">Dashboard</button>
+    <button class="nav-menu-item" data-page="calendario" onclick="showPage('calendario',document.querySelector('.nav-btn[onclick*=\'calendario\']'));closeNavMenu()">Calendário</button>
+    <button class="nav-menu-item" data-page="habitos" onclick="showPage('habitos',document.querySelector('.nav-btn[onclick*=\'habitos\']'));closeNavMenu()">Hábitos</button>
+    <button class="nav-menu-item" data-page="estatisticas" onclick="showPage('estatisticas',document.querySelector('.nav-btn[onclick*=\'estatisticas\']'));closeNavMenu()">Estatísticas</button>
+  </div>
 
   <div class="app">
     <div id="page-dashboard" class="page active">
@@ -1021,11 +1036,15 @@
       window.location.href='index.html';
     }
 
+    function toggleNavMenu(){ document.getElementById('nav-menu').classList.toggle('open'); }
+    function closeNavMenu(){ document.getElementById('nav-menu').classList.remove('open'); }
+
     function showPage(id,el){
       document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
       document.getElementById('page-'+id).classList.add('active');
       document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
       if(el) el.classList.add('active');
+      document.querySelectorAll('.nav-menu-item').forEach(x=>{x.classList.remove('active');if(x.dataset.page===id)x.classList.add('active');});
       if(id==='estatisticas') renderStatsPage();
       if(id==='calendario') renderCalendario();
       if(id==='habitos') renderHabitsPage();
