@@ -99,8 +99,6 @@ apiRouter.get("/health", async (_req, res) => {
 
 apiRouter.post("/auth/register", async (req, res) => {
   try {
-    console.log("REGISTER BODY:", req.body);
-
     const schema = z.object({
       nome: z.string().min(1),
       email: z.string().email(),
@@ -109,12 +107,10 @@ apiRouter.post("/auth/register", async (req, res) => {
     });
 
     const input = schema.parse(req.body);
-    console.log("INPUT OK:", input);
 
     const invite = await prisma.inviteCode.findUnique({
       where: { code: input.inviteCode },
     });
-    console.log("INVITE:", invite);
 
     if (!invite) {
       return res.status(400).json({ error: "INVITE_CODE_NOT_FOUND" });
@@ -138,7 +134,6 @@ apiRouter.post("/auth/register", async (req, res) => {
     const existingUser = await prisma.user.findUnique({
       where: { email: input.email.toLowerCase() },
     });
-    console.log("EXISTING USER:", existingUser);
 
     if (existingUser) {
       return res.status(400).json({ error: "EMAIL_ALREADY_EXISTS" });
@@ -151,7 +146,6 @@ apiRouter.post("/auth/register", async (req, res) => {
         senhaHash: hashPassword(input.senha),
       },
     });
-    console.log("USER CREATED:", user);
 
     await prisma.inviteCode.update({
       where: { id: invite.id },
@@ -160,18 +154,16 @@ apiRouter.post("/auth/register", async (req, res) => {
         usedByUserId: user.id,
       },
     });
-    console.log("INVITE UPDATED");
 
     const token = crypto.randomBytes(32).toString("hex");
     await prisma.session.create({ data: { userId: user.id, token } });
-    console.log("SESSION CREATED");
 
     res.status(201).json({
       token,
       user: { id: user.id, nome: user.nome, email: user.email },
     });
   } catch (error) {
-    console.error("REGISTER ERROR FULL:", error);
+    console.error("REGISTER ERROR:", (error as Error).message);
     return res.status(500).json({
       error: "INTERNAL_SERVER_ERROR",
       detail: String(error),
