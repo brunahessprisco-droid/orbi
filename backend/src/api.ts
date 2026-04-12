@@ -65,6 +65,18 @@ function toDecimal(value: unknown) {
 
 export const apiRouter = express.Router();
 
+apiRouter.post("/admin/create-invite", async (req, res) => {
+  const { adminSecret, code, intendedEmail, intendedName } = req.body as Record<string, string>;
+  if (!adminSecret || adminSecret !== (process.env.ADMIN_SECRET || "orbi-admin-2025")) {
+    return res.status(403).json({ error: "FORBIDDEN" });
+  }
+  const inviteCode = code || ("ORBI-" + Math.random().toString(36).slice(2, 8).toUpperCase());
+  await prisma.inviteCode.create({
+    data: { id: crypto.randomUUID(), code: inviteCode, intendedEmail: intendedEmail || null, intendedName: intendedName || null, isActive: true },
+  });
+  return res.json({ ok: true, code: inviteCode });
+});
+
 apiRouter.get("/health", async (_req, res) => {
   const rows = await prisma.$queryRaw<Array<{ db: string; schema: string }>>`
     SELECT current_database() as db, current_schema() as schema
