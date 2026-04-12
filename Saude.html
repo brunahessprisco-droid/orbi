@@ -229,7 +229,7 @@
     <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <button class="btn-primary" id="quick-add-btn" type="button">+ Novo registro</button>
-      <button class="btn-icon" id="btn-privacy" type="button" onclick="togglePrivacy()" title="Ocultar valores sensíveis">👁️</button>
+      <button class="btn-icon" id="btn-privacy" type="button" title="Ocultar valores sensíveis">👁️</button>
       <button class="btn-icon" id="btn-theme" type="button">🌙</button>
     </div>
   </nav>
@@ -926,6 +926,7 @@
       function bind(){
         document.querySelectorAll('.nav-btn').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.page,btn)));
         document.getElementById('btn-theme').addEventListener('click',toggleTheme);
+        document.getElementById('btn-privacy').addEventListener('click',togglePrivacy);
         document.getElementById('go-hub-btn').addEventListener('click',()=>window.location.href='index.html');
 
         document.getElementById('quick-add-btn').addEventListener('click',()=>openOverlay('ov-quick'));

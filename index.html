@@ -747,9 +747,9 @@ function rendTodaySummary(){
     }
   }
   if(f==='todos'||f==='fin'){
-    receitas.forEach(t=>item(null,'var(--green)',t.descricao,t.categoria||'','+ '+fmt(t.valor),'green',{module:'financas.html'}));
-    despesas.forEach(t=>item(null,'var(--red)',t.descricao,t.categoria||'','- '+fmt(t.valor),'red',{module:'financas.html'}));
-    parcelados.forEach(t=>item(null,'var(--fin-c)',t.descricao,t.categoria||'','- '+fmt(t.valorParcela),'amber',{module:'financas.html'}));
+    receitas.forEach(t=>item(null,'var(--green)',t.descricao,t.categoria||'',`+ <span class="sensitive">${fmt(t.valor)}</span>`,'green',{module:'financas.html'}));
+    despesas.forEach(t=>item(null,'var(--red)',t.descricao,t.categoria||'',`- <span class="sensitive">${fmt(t.valor)}</span>`,'red',{module:'financas.html'}));
+    parcelados.forEach(t=>item(null,'var(--fin-c)',t.descricao,t.categoria||'',`- <span class="sensitive">${fmt(t.valorParcela)}</span>`,'amber',{module:'financas.html'}));
   }
 
   // Ordena: com hora primeiro (cronológico), sem hora depois
