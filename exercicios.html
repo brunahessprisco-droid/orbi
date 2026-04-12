@@ -35,7 +35,8 @@
 body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--text);min-height:100vh;font-size:14px;transition:background .3s,color .2s;}
 
 /* NAV */
-.nav{display:flex;align-items:center;gap:2px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:0;z-index:40;}
+.nav{display:flex;align-items:center;gap:2px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:0;z-index:40;overflow-x:auto;scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
 .nav-logo{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-right:16px;padding:0;cursor:pointer;}
 .nav-logo-mark{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .nav-logo-img{width:28px;height:28px;object-fit:contain;}
