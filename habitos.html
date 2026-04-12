@@ -761,12 +761,23 @@
             <option value="controle">Controle (4 dígitos)</option>
           </select>
         </div>
-        <div class="field" id="f-unit-block" style="display:none">
-          <label>Unidade / rótulo</label>
-          <input class="input" id="f-unit" placeholder="Ex: horas, pts, hhmm">
+        <div class="field" id="f-auto-row">
+          <label>Automação</label>
+          <select class="sel" id="f-auto-type" onchange="toggleAutoFields()">
+            <option value="">Nenhuma</option>
+            <option value="treino_realizado">Exercícios: treino realizado</option>
+            <option value="tarefa_concluida">Casinha: tarefa concluída</option>
+          </select>
         </div>
       </div>
-
+      <div class="field" id="f-unit-block" style="display:none;margin-bottom:12px">
+        <label>Unidade / rótulo</label>
+        <input class="input" id="f-unit" placeholder="Ex: horas, pts, hhmm">
+      </div>
+      <div class="field" id="auto-keyword-block" style="display:none;margin-bottom:12px">
+        <label>Palavra-chave</label>
+        <input class="input" id="f-auto-keyword" placeholder="Ex: cozinha, lavar, cama">
+      </div>
       <div class="field" id="weekdays-block" style="display:none;margin-bottom:12px">
         <label>Dias da semana</label>
         <div class="weekdays">
@@ -777,21 +788,6 @@
           <div class="wd" data-day="5" onclick="toggleWeekday(this)">Sex</div>
           <div class="wd" data-day="6" onclick="toggleWeekday(this)">Sáb</div>
           <div class="wd" data-day="0" onclick="toggleWeekday(this)">Dom</div>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="field">
-          <label>Automação</label>
-          <select class="sel" id="f-auto-type" onchange="toggleAutoFields()">
-            <option value="">Nenhuma</option>
-            <option value="treino_realizado">Exercícios: treino realizado</option>
-            <option value="tarefa_concluida">Casinha: tarefa concluída</option>
-          </select>
-        </div>
-        <div class="field" id="auto-keyword-block" style="display:none">
-          <label>Palavra-chave</label>
-          <input class="input" id="f-auto-keyword" placeholder="Ex: cozinha, lavar, cama">
         </div>
       </div>
 
