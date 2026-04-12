@@ -974,6 +974,7 @@ apiRouter.post("/saude/exames", requireAuth, async (req: AuthedRequest, res) => 
   const schema = z.object({
     usuario_id: z.string().min(1), client_id: z.string().min(1), nome: z.string().min(1),
     categoria: z.string().nullable().optional(), status: z.string().nullable().optional(),
+    resultado: z.string().nullable().optional(),
     laboratorio: z.string().nullable().optional(), medicoId: z.string().nullable().optional(),
     date: z.string().min(1), nextDate: z.string().nullable().optional(),
     obs: z.string().nullable().optional(), fileName: z.string().nullable().optional(),
@@ -981,7 +982,7 @@ apiRouter.post("/saude/exames", requireAuth, async (req: AuthedRequest, res) => 
   });
   const input = schema.parse(req.body);
   if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
-  const data = { nome: input.nome, categoria: input.categoria ?? null, status: input.status ?? null, laboratorio: input.laboratorio ?? null, medicoId: input.medicoId ?? null, date: input.date, nextDate: input.nextDate ?? null, obs: input.obs ?? null, fileName: input.fileName ?? null, fileData: input.fileData ?? null };
+  const data = { nome: input.nome, categoria: input.categoria ?? null, status: input.status ?? null, resultado: input.resultado ?? null, laboratorio: input.laboratorio ?? null, medicoId: input.medicoId ?? null, date: input.date, nextDate: input.nextDate ?? null, obs: input.obs ?? null, fileName: input.fileName ?? null, fileData: input.fileData ?? null };
   const row = await prisma.saudeExame.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
   res.status(201).json(row);
 });

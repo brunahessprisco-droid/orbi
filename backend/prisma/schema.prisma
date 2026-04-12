@@ -428,6 +428,7 @@ model SaudeExame {
   nome        String
   categoria   String?
   status      String?
+  resultado   String?
   laboratorio String?
   medicoId    String?
   date        String

@@ -97,6 +97,7 @@
     .badge.atencao{background:var(--health-bg);color:var(--health);border-color:var(--health-border)}
     .badge.critico{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
     .badge.agendado{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border)}
+    .badge.realizado{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
     .badge.realizada{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
     .badge.cancelada{background:var(--surface3);color:var(--muted);border-color:var(--border)}
     .badge.peso{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-border)}
@@ -309,17 +310,16 @@
           <input class="search" id="exam-search" placeholder="Buscar exame...">
           <select class="sel" id="exam-filter-status" style="max-width:180px">
             <option value="">Todos os status</option>
-            <option value="ok">Normal</option>
-            <option value="atencao">Atenção</option>
-            <option value="critico">Crítico</option>
-            <option value="aguardando">Aguardando</option>
+            <option value="agendado">Agendado</option>
+            <option value="realizado">Realizado</option>
+            <option value="cancelado">Cancelado</option>
           </select>
           <button class="btn-primary" id="new-exam-btn" type="button">+ Novo exame</button>
         </div>
         <div class="table-wrap">
           <table class="table">
             <thead>
-              <tr><th>Data</th><th>Exame</th><th>Status</th><th>Laboratório</th><th>Médico</th><th>PDF</th><th>Ações</th></tr>
+              <tr><th>Data</th><th>Exame</th><th>Status</th><th>Avaliação</th><th>Laboratório</th><th>Médico</th><th>PDF</th><th>Ações</th></tr>
             </thead>
             <tbody id="exam-body"></tbody>
           </table>
@@ -524,12 +524,13 @@
         <div class="field"><label>Categoria</label><select class="sel" id="e-category"><option value="sangue">Sangue</option><option value="imagem">Imagem</option><option value="cardiologico">Cardiológico</option><option value="hormonal">Hormonal</option><option value="checkup">Check-up</option><option value="outro">Outro</option></select></div>
       </div>
       <div class="form-row triple">
-        <div class="field"><label>Status</label><select class="sel" id="e-status"><option value="ok">Normal</option><option value="atencao">Atenção</option><option value="critico">Crítico</option><option value="aguardando">Aguardando</option></select></div>
+        <div class="field"><label>Status</label><select class="sel" id="e-status"><option value="agendado">Agendado</option><option value="realizado">Realizado</option><option value="cancelado">Cancelado</option></select></div>
         <div class="field"><label>Laboratório</label><input class="input" id="e-lab"></div>
         <div class="field"><label>Médico solicitante</label><select class="sel" id="e-doctor"></select></div>
       </div>
-      <div class="form-row">
-        <div class="field"><label>Próximo vencimento / repetir em</label><input class="input" id="e-next-date" type="date"></div>
+      <div class="form-row triple">
+        <div class="field"><label>Avaliação do resultado</label><select class="sel" id="e-result"><option value="">— Não avaliado</option><option value="ok">Normal</option><option value="atencao">Atenção</option><option value="critico">Crítico</option></select></div>
+        <div class="field"><label>Repetir / próxima data</label><input class="input" id="e-next-date" type="date"></div>
         <div class="field"><label>PDF do exame</label><input class="input" id="e-file" type="file" accept="application/pdf"></div>
       </div>
       <div class="field"><label>Observações</label><textarea class="textarea" id="e-note"></textarea></div>
@@ -684,7 +685,7 @@
       if(!canUseApi())return;
       return apiReq('/saude/exames',{method:'POST',body:JSON.stringify({
         usuario_id:API_USER_ID,client_id:e.id,nome:e.name,categoria:e.category||null,
-        status:e.status||null,laboratorio:e.lab||null,medicoId:e.doctorId||null,
+        status:e.status||null,resultado:e.resultado||null,laboratorio:e.lab||null,medicoId:e.doctorId||null,
         date:e.date,nextDate:e.nextDate||null,obs:e.note||null,
         fileName:e.fileName||null,fileData:e.fileData||null,
       })}).catch(()=>null);
@@ -736,7 +737,14 @@
           waist:r.extraJson?.waist||null,hip:r.extraJson?.hip||null,chest:r.extraJson?.chest||null,
         })).filter(r=>!deleted.weights.has(r.id));
         const apiMedicos=rM.map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,specialty:r.especialidade||'',frequencyDays:r.frequencyDays||null,phone:r.phone||'',whats:r.whats||'',email:r.email||'',clinic:r.clinica||'',address:r.endereco||'',note:r.obs||''})).filter(r=>!deleted.doctors.has(r.id));
-        const apiExames=rE.map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,category:r.categoria||'',status:r.status||'ok',lab:r.laboratorio||'',doctorId:r.medicoId||'',date:r.date,nextDate:r.nextDate||'',note:r.obs||'',fileName:r.fileName||'',fileData:r.fileData||''})).filter(r=>!deleted.exams.has(r.id));
+        const apiExames=rE.map(r=>{
+          let status=r.status||'realizado';
+          let resultado=r.resultado||'';
+          // backwards compat: old status values were ok/atencao/critico/aguardando
+          if(['ok','atencao','critico'].includes(status)){resultado=status;status='realizado';}
+          else if(status==='aguardando'){resultado='';status='agendado';}
+          return {id:r.client_id,_dbId:r.id,name:r.nome,category:r.categoria||'',status,resultado,lab:r.laboratorio||'',doctorId:r.medicoId||'',date:r.date,nextDate:r.nextDate||'',note:r.obs||'',fileName:r.fileName||'',fileData:r.fileData||''};
+        }).filter(r=>!deleted.exams.has(r.id));
         const apiConsultas=rC.map(r=>({id:r.client_id,_dbId:r.id,date:r.date,time:r.time||'',doctorId:r.medicoId||'',specialty:r.especialidade||'',reason:r.motivo||'',status:r.status||'agendada',returnDays:r.returnDays||null,nextDate:r.nextDate||'',summary:r.resumo||''})).filter(r=>!deleted.consults.has(r.id));
 
         // Merge: API + local não sincronizados
@@ -854,7 +862,10 @@
       function text(v){ return String(v||'').toLowerCase(); }
       function futureItems(){
         const today=todayStr();
-        const exams=state.exams.filter(x=>x.nextDate && compareDates(x.nextDate,today)>=0).map(x=>({type:'exam',date:x.nextDate,title:x.name,sub:x.category||'Exame'}));
+        const exams=[
+          ...state.exams.filter(x=>x.status==='agendado' && x.date && compareDates(x.date,today)>=0).map(x=>({type:'exam',date:x.date,title:x.name,sub:x.category||'Exame'})),
+          ...state.exams.filter(x=>x.nextDate && compareDates(x.nextDate,today)>=0).map(x=>({type:'exam',date:x.nextDate,title:x.name,sub:x.category||'Exame'})),
+        ];
         const consults=state.consults.filter(x=>x.status==='agendada' && x.date && compareDates(x.date,today)>=0).map(x=>({type:'consult',date:x.date,title:getDoctorName(x.doctorId)||x.specialty||'Consulta',sub:x.reason||'Consulta'}));
         return [...exams,...consults].sort((a,b)=>compareDates(a.date,b.date)).slice(0,6);
       }
@@ -881,7 +892,7 @@
         if(!weight) s-=20;
         const lateDoctors=state.doctors.filter(d=>doctorStatus(d).cls==='critico').length;
         s-=lateDoctors*8;
-        const criticalExams=state.exams.filter(e=>e.status==='critico').length;
+        const criticalExams=state.exams.filter(e=>e.resultado==='critico').length;
         s-=criticalExams*8;
         const overdueExams=state.exams.filter(e=>e.nextDate && compareDates(e.nextDate,todayStr())<0).length;
         s-=overdueExams*6;
@@ -1246,8 +1257,12 @@
         document.getElementById('sum-last-consult').textContent=lastConsult?fmtDate(lastConsult.date):'—';
         document.getElementById('sum-last-consult-sub').textContent=lastConsult?`${getDoctorName(lastConsult.doctorId)||lastConsult.specialty||'Consulta'}`:'sem consulta realizada';
 
-        const nextExam=[...state.exams].filter(e=>e.nextDate && compareDates(e.nextDate,todayStr())>=0).sort((a,b)=>compareDates(a.nextDate,b.nextDate))[0];
-        document.getElementById('sum-next-exam').textContent=nextExam?fmtDate(nextExam.nextDate):'—';
+        const nextExamCandidates=[
+          ...state.exams.filter(e=>e.status==='agendado' && e.date && compareDates(e.date,todayStr())>=0).map(e=>({date:e.date,name:e.name})),
+          ...state.exams.filter(e=>e.nextDate && compareDates(e.nextDate,todayStr())>=0).map(e=>({date:e.nextDate,name:e.name})),
+        ].sort((a,b)=>compareDates(a.date,b.date));
+        const nextExam=nextExamCandidates[0]||null;
+        document.getElementById('sum-next-exam').textContent=nextExam?fmtDate(nextExam.date):'—';
         document.getElementById('sum-next-exam-sub').textContent=nextExam?nextExam.name:'sem exame futuro';
 
         const lateDoctors=state.doctors.filter(d=>doctorStatus(d).cls==='critico').length;
@@ -1438,14 +1453,16 @@
         document.getElementById('exam-body').innerHTML=rows.length?rows.map(e=>`<tr>
           <td>${fmtDate(e.date)}</td>
           <td><div>${e.name}</div><div class="card-sub">${e.category||'—'} ${e.nextDate?`· repete ${fmtDate(e.nextDate)}`:''}</div></td>
-          <td><span class="badge ${e.status==='aguardando'?'agendado':e.status}">${labelExamStatus(e.status)}</span></td>
+          <td><span class="badge ${e.status||'agendado'}">${labelExamStatus(e.status)}</span></td>
+          <td>${e.resultado?`<span class="badge ${e.resultado}">${labelExamResult(e.resultado)}</span>`:'<span class="card-sub">—</span>'}</td>
           <td>${e.lab||'—'}</td>
           <td>${getDoctorName(e.doctorId)||'—'}</td>
           <td>${e.fileData?`<button class="btn btn-warning" onclick="window.saudeApp.openPdf('${e.id}')">Abrir PDF</button>`:'—'}</td>
           <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editExam('${e.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteExam('${e.id}')">Excluir</button></div></td>
-        </tr>`).join(''):'<tr><td colspan="7" class="empty">Nenhum exame encontrado.</td></tr>';
+        </tr>`).join(''):'<tr><td colspan="8" class="empty">Nenhum exame encontrado.</td></tr>';
       }
-      function labelExamStatus(v){ return ({ok:'Normal',atencao:'Atenção',critico:'Crítico',aguardando:'Aguardando'})[v]||v; }
+      function labelExamStatus(v){ return ({agendado:'Agendado',realizado:'Realizado',cancelado:'Cancelado'})[v]||'Agendado'; }
+      function labelExamResult(v){ return ({ok:'Normal',atencao:'Atenção',critico:'Crítico'})[v]||v; }
       async function saveExam(){
         const fileInput=document.getElementById('e-file');
         let fileData=editing.exam?.fileData||''; let fileName=editing.exam?.fileName||'';
@@ -1460,6 +1477,7 @@
           name:document.getElementById('e-name').value.trim(),
           category:document.getElementById('e-category').value,
           status:document.getElementById('e-status').value,
+          resultado:document.getElementById('e-result').value,
           lab:document.getElementById('e-lab').value.trim(),
           doctorId:document.getElementById('e-doctor').value,
           nextDate:document.getElementById('e-next-date').value,
@@ -1474,7 +1492,7 @@
         editing.exam=id?state.exams.find(x=>x.id===id):null;
         document.getElementById('exam-modal-title').textContent=editing.exam?'Editar exame':'Novo exame';
         const e=editing.exam||{};
-        setValue('e-date',e.date||todayStr()); setValue('e-name',e.name||''); setValue('e-category',e.category||'sangue'); setValue('e-status',e.status||'ok'); setValue('e-lab',e.lab||''); setValue('e-doctor',e.doctorId||''); setValue('e-next-date',e.nextDate||''); setValue('e-note',e.note||''); document.getElementById('e-file').value='';
+        setValue('e-date',e.date||todayStr()); setValue('e-name',e.name||''); setValue('e-category',e.category||'sangue'); setValue('e-status',e.status||'agendado'); setValue('e-result',e.resultado||''); setValue('e-lab',e.lab||''); setValue('e-doctor',e.doctorId||''); setValue('e-next-date',e.nextDate||''); setValue('e-note',e.note||''); document.getElementById('e-file').value='';
         openOverlay('ov-exam');
       }
       function readFileAsDataURL(file){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(file); }); }
