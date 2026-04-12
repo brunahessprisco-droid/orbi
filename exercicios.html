@@ -1894,7 +1894,7 @@ function renderStravaSection(){
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-strava-connect" onclick="stravaAction()">${stravaIconImg(16)} Reconectar</button>
-          <button class="btn" onclick="stravaDisconnect()" style="border:1px solid var(--border)">Desconectar</button>
+          <button onclick="stravaDisconnect()" style="display:inline-flex;align-items:center;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-family:inherit;font-size:13px;color:var(--text);cursor:pointer;">Desconectar</button>
         </div>
       </div>`;
   } else {
@@ -1907,7 +1907,7 @@ function renderStravaSection(){
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-primary" onclick="stravaSyncNow()" style="display:inline-flex;align-items:center;gap:6px;">${stravaIconImg(14)} Sincronizar agora</button>
-          <button class="btn" onclick="stravaDisconnect()" style="border:1px solid var(--border)">Desconectar</button>
+          <button onclick="stravaDisconnect()" style="display:inline-flex;align-items:center;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-family:inherit;font-size:13px;color:var(--text);cursor:pointer;">Desconectar</button>
         </div>
       </div>`;
   }
