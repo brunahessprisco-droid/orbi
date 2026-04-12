@@ -947,7 +947,7 @@
           return ia-ib;
         });
         const apiIds=new Set(apiHabitos.map(h=>h.id));
-        const naoSinc=localHabits.filter(h=>!apiIds.has(h.id)&&!h._dbId);
+        const naoSinc=localHabits.filter(h=>!apiIds.has(h.id));
         habits=[...apiHabitos,...naoSinc];
         for(const h of naoSinc)await syncHabito(h).catch(()=>null);
         if(habits.length===0){

@@ -833,7 +833,7 @@ async function bootstrapApi(){
     // Migração: sobe qualquer treino local que não está na API
     const localCache=JSON.parse(lsGet(SK_T)||'[]');
     const apiIds=new Set(treinos.map(t=>t.id));
-    const naoSincronizados=localCache.filter(t=>!apiIds.has(t.id)&&!t._dbId);
+    const naoSincronizados=localCache.filter(t=>!apiIds.has(t.id));
     for(const t of naoSincronizados){
       treinos.push(t);
       syncTreino(t).catch(()=>null);

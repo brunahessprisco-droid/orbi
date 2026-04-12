@@ -450,7 +450,7 @@
             .filter(m=>!deletedIds.has(m.id));
           const localMeals=JSON.parse(lsGet(KEY_MEALS)||'[]').filter(m=>!deletedIds.has(m.id));
           const apiIds=new Set(apiMeals.map(m=>m.id));
-          const naoSinc=localMeals.filter(m=>!apiIds.has(m.id)&&!m._dbId);
+          const naoSinc=localMeals.filter(m=>!apiIds.has(m.id));
           meals=[...apiMeals,...naoSinc];
           for(const m of naoSinc)await syncRefeicao(m).catch(()=>null);
           if(rCfg&&rCfg.goals)goals=rCfg.goals;
