@@ -52,6 +52,10 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .nav-menu-item:hover{background:var(--surface2);color:var(--text);}
 .nav-menu-item.active{background:var(--accent-bg);color:var(--accent);}
 .btn-hub{border:1px solid var(--border);background:none;color:var(--muted);border-radius:var(--radius-sm);padding:7px 12px;font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;}
+.btn-strava-connect{display:inline-flex;align-items:center;gap:10px;background:#FC4C02;color:#fff;border:none;border-radius:4px;padding:11px 18px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .15s;white-space:nowrap;letter-spacing:.2px;}
+.btn-strava-connect:hover{opacity:.88;}
+.btn-strava-connect svg{flex-shrink:0;}
+.strava-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:16px;}
 .btn-hub:hover{color:var(--text);border-color:var(--border2);}
 .btn-theme{border:1px solid var(--border);background:none;color:var(--muted);width:32px;height:32px;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .15s;}
 .btn-theme:hover{color:var(--text);}
@@ -437,6 +441,9 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
   <div class="dash-card full">
     <div class="dash-title">Treinos recentes</div>
     <div id="recent-list" class="recent-list"></div>
+  </div>
+  <div class="strava-card" id="strava-section" style="display:none">
+    <div id="strava-ui"></div>
   </div>
 </div>
 
@@ -1822,32 +1829,95 @@ function stravaAuthUrl(){
 }
 
 let stravaConnected=false;
+let stravaScope='';
+
+function stravaLogoSVG(size=20){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0 4 13.828h4.172"/></svg>`;
+}
+
+function hasRequiredScope(){
+  return stravaScope.includes('activity:read_all') || stravaScope.includes('activity:read');
+}
+
+function updateStravaNavBtn(){
+  const btn=document.getElementById('btn-strava');
+  if(!btn) return;
+  btn.style.display='';
+  if(!stravaConnected){
+    btn.innerHTML=`${stravaLogoSVG(14)} Conectar Strava`;
+    btn.style.cssText='display:inline-flex;align-items:center;gap:6px;background:#FC4C02;color:#fff;border:none;border-radius:4px;padding:7px 12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;';
+  } else if(!hasRequiredScope()){
+    btn.textContent='⚠️ Reconectar Strava';
+    btn.style.cssText='background:var(--amber);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;';
+  } else {
+    btn.textContent='⚡ Sincronizar';
+    btn.style.cssText='background:var(--accent);color:#1A1A1B;border:none;border-radius:var(--radius-sm);padding:7px 12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;';
+  }
+}
+
+function renderStravaSection(){
+  const section=document.getElementById('strava-section');
+  const ui=document.getElementById('strava-ui');
+  if(!section||!ui) return;
+  if(!canUseApi()){section.style.display='none';return;}
+  section.style.display='';
+  if(!stravaConnected){
+    ui.innerHTML=`
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">${stravaLogoSVG(18)} <span style="color:#FC4C02">Conectar ao Strava</span></div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:6px">Importa automaticamente tuas atividades — corridas, ciclismo, natação e mais.<br>Os dados aparecem na lista de treinos, calendário e dashboard.</div>
+          <div style="font-size:11px;color:var(--muted)">Podes revogar o acesso a qualquer momento nas configurações do Strava.</div>
+        </div>
+        <div><button class="btn-strava-connect" onclick="stravaAction()">${stravaLogoSVG(18)} Connect with Strava</button></div>
+      </div>`;
+  } else if(!hasRequiredScope()){
+    ui.innerHTML=`
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:14px;font-weight:700;color:var(--amber);margin-bottom:4px">⚠️ Permissão insuficiente</div>
+          <div style="font-size:13px;color:var(--muted)">O acesso a atividades não foi autorizado. Reconecta e aceita o escopo de atividades.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-strava-connect" onclick="stravaAction()">${stravaLogoSVG(16)} Reconectar</button>
+          <button class="btn" onclick="stravaDisconnect()" style="border:1px solid var(--border)">Desconectar</button>
+        </div>
+      </div>`;
+  } else {
+    ui.innerHTML=`
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="color:#FC4C02;font-size:22px;flex-shrink:0">${stravaLogoSVG(28)}</div>
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:2px">Strava conectado</div>
+          <div style="font-size:11px;color:var(--muted)">Escopos aceitos: ${stravaScope||'—'}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-primary" onclick="stravaSyncNow()">⚡ Sincronizar agora</button>
+          <button class="btn" onclick="stravaDisconnect()" style="border:1px solid var(--border)">Desconectar</button>
+        </div>
+      </div>`;
+  }
+}
 
 async function stravaLoadStatus(){
-  if(!canUseApi())return;
+  if(!canUseApi()) return;
   try{
     const d=await apiReq('/strava/status');
     stravaConnected=d.connected;
-    const btn=document.getElementById('btn-strava');
-    if(btn){
-      btn.style.display='';
-      btn.textContent=stravaConnected?'⚡ Sincronizar Strava':'🟠 Conectar Strava';
-      btn.style.background=stravaConnected?'var(--accent)':'#FC4C02';
-    }
+    stravaScope=d.scope||'';
+    updateStravaNavBtn();
+    renderStravaSection();
   }catch(_){}
 }
 
 async function stravaAction(){
   if(!canUseApi()){showLogin();return;}
-  if(!stravaConnected){
-    window.location.href=stravaAuthUrl();
-    return;
-  }
-  // Já conectado — sincronizar
-  const btn=document.getElementById('btn-strava');
-  const orig=btn.textContent;
-  btn.textContent='Sincronizando...';
-  btn.disabled=true;
+  window.location.href=stravaAuthUrl();
+}
+
+async function stravaSyncNow(){
+  const btn=document.querySelector('#strava-ui .btn-primary');
+  if(btn){btn.textContent='Sincronizando...';btn.disabled=true;}
   try{
     const d=await apiReq('/strava/sync',{method:'POST',body:JSON.stringify({days:60})});
     setStatus(`✓ ${d.synced} atividades importadas do Strava`);
@@ -1856,33 +1926,54 @@ async function stravaAction(){
     renderAll();
   }catch(e){
     setStatus('Erro ao sincronizar Strava: '+e.message,true);
+  }finally{
+    if(btn){btn.textContent='⚡ Sincronizar agora';btn.disabled=false;}
   }
-  btn.textContent=orig;
-  btn.disabled=false;
+}
+
+async function stravaDisconnect(){
+  if(!confirm('Desconectar o Strava? Os treinos já importados serão mantidos.')) return;
+  try{
+    await apiReq('/strava/disconnect',{method:'DELETE'});
+    stravaConnected=false;
+    stravaScope='';
+    updateStravaNavBtn();
+    renderStravaSection();
+    setStatus('Strava desconectado.');
+    setTimeout(()=>setStatus(null),4000);
+  }catch(e){
+    setStatus('Erro ao desconectar: '+e.message,true);
+  }
 }
 
 async function stravaHandleCallback(){
   const params=new URLSearchParams(window.location.search);
   const code=params.get('code');
+  const scope=params.get('scope')||'';
   const error=params.get('error');
   if(error){setStatus('Strava: acesso negado',true);history.replaceState({},'',window.location.pathname);return;}
-  if(!code)return;
-  // Limpa a URL imediatamente
+  if(!code) return;
   history.replaceState({},'',window.location.pathname);
   if(!canUseApi()){setStatus('Faça login antes de conectar o Strava',true);return;}
+  // Verifica escopos aceitos
+  const accepted=scope.split(',');
+  if(!accepted.includes('activity:read_all')&&!accepted.includes('activity:read')){
+    setStatus('⚠️ Acesso a atividades não autorizado. Conecta novamente e aceita o escopo de atividades.',true);
+    return;
+  }
   setStatus('Conectando Strava...');
   try{
     const d=await apiReq('/strava/exchange-token',{method:'POST',body:JSON.stringify({code})});
     stravaConnected=true;
+    stravaScope=scope;
+    updateStravaNavBtn();
     setStatus(`✓ Strava conectado (${d.athlete})! Sincronizando atividades...`);
-    const btn=document.getElementById('btn-strava');
-    if(btn){btn.textContent='⚡ Sincronizar Strava';btn.style.background='var(--accent)';}
-    // Sincroniza automaticamente após conectar
     const s=await apiReq('/strava/sync',{method:'POST',body:JSON.stringify({days:90})});
     setStatus(`✓ Strava conectado — ${s.synced} atividades importadas`);
     setTimeout(()=>setStatus(null),6000);
     await bootstrapApi();
     renderAll();
+    renderStravaSection();
   }catch(e){
     setStatus('Erro ao conectar Strava: '+e.message,true);
   }

@@ -1117,11 +1117,19 @@ apiRouter.post("/strava/exchange-token", requireAuth, async (req: AuthedRequest,
 
 apiRouter.get("/strava/status", requireAuth, async (req: AuthedRequest, res) => {
   const token = await prisma.stravaToken.findUnique({ where: { userId: req.userId! } });
-  return res.json({ connected: !!token });
+  return res.json({ connected: !!token, scope: token?.scope || null, athleteId: token?.athleteId || null });
 });
 
 apiRouter.delete("/strava/disconnect", requireAuth, async (req: AuthedRequest, res) => {
-  await prisma.stravaToken.deleteMany({ where: { userId: req.userId! } });
+  const token = await prisma.stravaToken.findUnique({ where: { userId: req.userId! } });
+  if (token) {
+    // Notify Strava of deauthorization (best-effort)
+    await fetch("https://www.strava.com/oauth/deauthorize", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token.accessToken}` },
+    }).catch(() => null);
+    await prisma.stravaToken.deleteMany({ where: { userId: req.userId! } });
+  }
   return res.status(204).send();
 });
 
