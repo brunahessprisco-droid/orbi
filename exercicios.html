@@ -775,7 +775,10 @@ async function logoutUser(){
 }
 
 // ── DADOS ────────────────────────────────────────────────────────────────────
-const SK_T='saude_treinos_v1',SK_L='saude_locais_v1',SK_TP='saude_tipos_v1';
+const SK_T='saude_treinos_v1',SK_L='saude_locais_v1',SK_TP='saude_tipos_v1',SK_EXCL_STRAVA='ex_excl_strava_v1';
+let excludedStravaIds=new Set();
+function loadExcludedStrava(){excludedStravaIds=new Set(JSON.parse(lsGet(SK_EXCL_STRAVA)||'[]'));}
+function saveExcludedStrava(){lsSet(SK_EXCL_STRAVA,JSON.stringify([...excludedStravaIds]));}
 // storage helpers – isolamento por usuário
 function _uid(){return localStorage.getItem('hub_user_id')||'anon';}
 function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
@@ -882,7 +885,7 @@ async function bootstrapApi(){
     } else {
       locais=apiLocais.map(r=>({id:r.client_id,nome:r.nome}));
     }
-    treinos=apiTreinos.map(r=>treinoFromApi(r));
+    treinos=apiTreinos.map(r=>treinoFromApi(r)).filter(t=>!excludedStravaIds.has(t.id));
     // Migração: sobe qualquer treino local que não está na API
     const localCache=JSON.parse(lsGet(SK_T)||'[]');
     const apiIds=new Set(treinos.map(t=>t.id));
@@ -1764,7 +1767,8 @@ async function delTreino(id){
   if(!confirm('Excluir este treino?'))return;
   const t=treinos.find(x=>x.id===id);
   treinos=treinos.filter(x=>x.id!==id);
-  saveLocal();
+  if(id.startsWith('strava_')){excludedStravaIds.add(id);saveExcludedStrava();}
+  saveLocal_();
   if(t)await deleteTreinoApi(t).catch(e=>console.error(e));
   renderAll();
 }
@@ -2010,6 +2014,7 @@ async function stravaHandleCallback(){
   if(npData)npData.value=dateStr(new Date());
 
   // Carrega cache local primeiro (resposta imediata)
+  loadExcludedStrava();
   loadLocal();
   renderAll();
 
