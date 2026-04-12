@@ -65,6 +65,18 @@ function toDecimal(value: unknown) {
 
 export const apiRouter = express.Router();
 
+apiRouter.get("/admin/users", async (req, res) => {
+  const secret = req.query.secret as string;
+  if (!secret || secret !== (process.env.ADMIN_SECRET || "orbi-admin-2025")) {
+    return res.status(403).json({ error: "FORBIDDEN" });
+  }
+  const users = await prisma.user.findMany({
+    select: { id: true, nome: true, email: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return res.json({ total: users.length, users });
+});
+
 apiRouter.post("/admin/create-invite", async (req, res) => {
   const { adminSecret, code, intendedEmail, intendedName } = req.body as Record<string, string>;
   if (!adminSecret || adminSecret !== (process.env.ADMIN_SECRET || "orbi-admin-2025")) {
