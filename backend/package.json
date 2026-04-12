@@ -1,0 +1,45 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch --include src src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "prisma:studio": "prisma studio",
+    "import:notion-parcelados": "node scripts/import_notion_parcelados.js",
+    "setup:parcelado-accounts": "node scripts/upsert_parcelado_accounts.js",
+    "audit:faturas": "node scripts/audit_faturas.js",
+    "find:month": "node scripts/find_in_month.js",
+    "export:fatura": "node scripts/export_fatura_csv.js",
+    "import:notion-entradas": "node scripts/import_notion_entradas.js",
+    "import:notion-lancamentos": "node scripts/import_notion_lancamentos.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "zod": "^4.3.6"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/cors": "2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.2",
+    "prisma": "6.19.3",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

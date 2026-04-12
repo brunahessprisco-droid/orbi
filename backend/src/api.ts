@@ -1,0 +1,1053 @@
+import crypto from "crypto";
+import express from "express";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
+import { prisma } from "./prisma";
+
+type AuthedRequest = express.Request & { userId?: string; sessionToken?: string };
+
+function readBearerToken(req: express.Request): string | null {
+  const header = req.header("authorization") || req.header("Authorization");
+  if (!header) return null;
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || null;
+}
+
+function readQueryParam(req: express.Request, name: string): string | null {
+  const raw = (req.query as Record<string, unknown>)[name];
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw.length ? String(raw[0]) : null;
+  return typeof raw === "string" ? raw : String(raw);
+}
+
+function readRouteParam(req: express.Request, name: string): string | null {
+  const raw = (req.params as Record<string, unknown>)[name];
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw.length ? String(raw[0]) : null;
+  return typeof raw === "string" ? raw : String(raw);
+}
+
+function assertUserMatchesQuery(req: AuthedRequest) {
+  const q = readQueryParam(req, "usuario_id");
+  if (!q) return;
+  if (!req.userId) throw Object.assign(new Error("UNAUTHORIZED"), { status: 401 });
+  if (String(q) !== String(req.userId)) throw Object.assign(new Error("FORBIDDEN"), { status: 403 });
+}
+
+async function requireAuth(req: AuthedRequest, res: express.Response, next: express.NextFunction) {
+  const token = readBearerToken(req);
+  if (!token) return res.status(401).json({ error: "UNAUTHORIZED" });
+  const session = await prisma.session.findUnique({ where: { token } });
+  if (!session) return res.status(401).json({ error: "UNAUTHORIZED" });
+  req.userId = session.userId;
+  req.sessionToken = token;
+  return next();
+}
+
+function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, senhaHash: string) {
+  const [salt, expectedHash] = senhaHash.split(":");
+  if (!salt || !expectedHash) return false;
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(expectedHash, "hex"));
+}
+
+function toDecimal(value: unknown) {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return new Prisma.Decimal(0);
+  return new Prisma.Decimal(n);
+}
+
+export const apiRouter = express.Router();
+
+apiRouter.get("/health", async (_req, res) => {
+  const rows = await prisma.$queryRaw<Array<{ db: string; schema: string }>>`
+    SELECT current_database() as db, current_schema() as schema
+  `;
+  const first = rows[0] || { db: "unknown", schema: "unknown" };
+  res.json({ ok: true, db: { name: first.db, schema: first.schema } });
+});
+
+apiRouter.post("/auth/register", async (req, res) => {
+  try {
+    console.log("REGISTER BODY:", req.body);
+
+    const schema = z.object({
+      nome: z.string().min(1),
+      email: z.string().email(),
+      senha: z.string().min(4),
+      inviteCode: z.string().min(1),
+    });
+
+    const input = schema.parse(req.body);
+    console.log("INPUT OK:", input);
+
+    const invite = await prisma.inviteCode.findUnique({
+      where: { code: input.inviteCode },
+    });
+    console.log("INVITE:", invite);
+
+    if (!invite) {
+      return res.status(400).json({ error: "INVITE_CODE_NOT_FOUND" });
+    }
+
+    if (!invite.isActive) {
+      return res.status(400).json({ error: "INVITE_CODE_INACTIVE" });
+    }
+
+    if (invite.usedAt) {
+      return res.status(400).json({ error: "INVITE_CODE_ALREADY_USED" });
+    }
+
+    if (
+      invite.intendedEmail &&
+      invite.intendedEmail.toLowerCase() !== input.email.toLowerCase()
+    ) {
+      return res.status(400).json({ error: "INVITE_CODE_EMAIL_MISMATCH" });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: input.email.toLowerCase() },
+    });
+    console.log("EXISTING USER:", existingUser);
+
+    if (existingUser) {
+      return res.status(400).json({ error: "EMAIL_ALREADY_EXISTS" });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        nome: input.nome,
+        email: input.email.toLowerCase(),
+        senhaHash: hashPassword(input.senha),
+      },
+    });
+    console.log("USER CREATED:", user);
+
+    await prisma.inviteCode.update({
+      where: { id: invite.id },
+      data: {
+        usedAt: new Date(),
+        usedByUserId: user.id,
+      },
+    });
+    console.log("INVITE UPDATED");
+
+    const token = crypto.randomBytes(32).toString("hex");
+    await prisma.session.create({ data: { userId: user.id, token } });
+    console.log("SESSION CREATED");
+
+    res.status(201).json({
+      token,
+      user: { id: user.id, nome: user.nome, email: user.email },
+    });
+  } catch (error) {
+    console.error("REGISTER ERROR FULL:", error);
+    return res.status(500).json({
+      error: "INTERNAL_SERVER_ERROR",
+      detail: String(error),
+    });
+  }
+});
+
+apiRouter.get("/health/weights", requireAuth, async (req: AuthedRequest, res) => {
+  const items = await prisma.healthWeight.findMany({
+    where: { userId: req.userId },
+    orderBy: { date: "desc" },
+  });
+  return res.json({ data: items });
+});
+
+apiRouter.post("/health/weights", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    client_id: z.string().min(1),
+    date: z.string().min(1),
+    weight: z.number().nullable().optional(),
+    height: z.number().nullable().optional(),
+    fat: z.number().nullable().optional(),
+    note: z.string().nullable().optional(),
+    extraJson: z.any().optional(),
+  });
+
+  const input = schema.parse(req.body);
+  const data = {
+    date: new Date(input.date),
+    weight: input.weight ?? null,
+    height: input.height ?? null,
+    fat: input.fat ?? null,
+    note: input.note ?? null,
+    extraJson: input.extraJson ?? null,
+  };
+
+  const item = await prisma.healthWeight.upsert({
+    where: { userId_clientId: { userId: req.userId!, clientId: input.client_id } },
+    update: data,
+    create: { userId: req.userId!, clientId: input.client_id, ...data },
+  });
+
+  return res.status(201).json({ data: item });
+});
+
+apiRouter.post("/auth/login", async (req, res) => {
+  const schema = z.object({
+    email: z.string().email(),
+    senha: z.string().min(1),
+  });
+  const input = schema.parse(req.body);
+
+  const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
+  if (!user || !verifyPassword(input.senha, user.senhaHash)) {
+    return res.status(401).json({ error: "INVALID_CREDENTIALS" });
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  await prisma.session.create({ data: { userId: user.id, token } });
+  return res.json({ token, user: { id: user.id, nome: user.nome, email: user.email } });
+});
+
+apiRouter.get("/auth/me", requireAuth, async (req: AuthedRequest, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user) return res.status(401).json({ error: "UNAUTHORIZED" });
+  return res.json({ user: { id: user.id, nome: user.nome, email: user.email } });
+});
+
+apiRouter.post("/auth/logout", requireAuth, async (req: AuthedRequest, res) => {
+  await prisma.session.delete({ where: { token: req.sessionToken! } }).catch(() => null);
+  res.json({ ok: true });
+});
+
+apiRouter.put("/auth/profile", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    nome: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+  });
+  let input: z.infer<typeof schema>;
+  try { input = schema.parse(req.body); } catch (e) { return res.status(400).json({ error: "INVALID_INPUT" }); }
+  if (input.email) {
+    const existing = await prisma.user.findUnique({ where: { email: input.email } });
+    if (existing && existing.id !== req.userId) return res.status(400).json({ error: "EMAIL_ALREADY_EXISTS" });
+  }
+  const updated = await prisma.user.update({ where: { id: req.userId! }, data: { ...(input.nome ? { nome: input.nome } : {}), ...(input.email ? { email: input.email } : {}) } });
+  return res.json({ user: { id: updated.id, nome: updated.nome, email: updated.email } });
+});
+
+apiRouter.post("/auth/change-password", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    senhaAtual: z.string().min(1),
+    novaSenha: z.string().min(4),
+  });
+  let input: z.infer<typeof schema>;
+  try { input = schema.parse(req.body); } catch (e) { return res.status(400).json({ error: "INVALID_INPUT" }); }
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user || !verifyPassword(input.senhaAtual, user.senhaHash)) return res.status(400).json({ error: "WRONG_PASSWORD" });
+  await prisma.user.update({ where: { id: req.userId! }, data: { senhaHash: hashPassword(input.novaSenha) } });
+  return res.json({ ok: true });
+});
+
+apiRouter.get("/categorias", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiCategoria.findMany({ where: { userId: req.userId! }, orderBy: { nome: "asc" } });
+  res.json(rows);
+});
+
+apiRouter.post("/categorias", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id: z.string().min(1),
+    nome: z.string().min(1),
+    cor: z.string().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiCategoria.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: { nome: input.nome, cor: input.cor },
+    create: { userId: req.userId!, client_id: input.client_id, nome: input.nome, cor: input.cor },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/categorias/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiCategoria.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+apiRouter.get("/contas", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiConta.findMany({ where: { userId: req.userId! }, orderBy: { createdAt: "desc" } });
+  res.json(rows);
+});
+
+apiRouter.post("/contas", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id: z.string().min(1),
+    nome: z.string().min(1),
+    banco: z.string().optional(),
+    tipo: z.string().optional(),
+    vencimento: z.coerce.number().optional(),
+    limite_total: z.coerce.number().optional(),
+    cor: z.string().optional(),
+    ativo: z.boolean().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiConta.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: {
+      nome: input.nome,
+      banco: input.banco,
+      tipo: input.tipo,
+      vencimento: input.vencimento ?? null,
+      limite_total: input.limite_total != null ? toDecimal(input.limite_total) : null,
+      cor: input.cor,
+      ativo: input.ativo ?? true,
+    },
+    create: {
+      userId: req.userId!,
+      client_id: input.client_id,
+      nome: input.nome,
+      banco: input.banco,
+      tipo: input.tipo,
+      vencimento: input.vencimento ?? null,
+      limite_total: input.limite_total != null ? toDecimal(input.limite_total) : null,
+      cor: input.cor,
+      ativo: input.ativo ?? true,
+    },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/contas/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiConta.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+apiRouter.get("/transacoes", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiTransacao.findMany({
+    where: { userId: req.userId! },
+    orderBy: { data_lancamento: "desc" },
+  });
+  res.json(rows);
+});
+
+apiRouter.post("/transacoes", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id: z.string().min(1),
+    tipo: z.string().min(1),
+    descricao: z.string().min(1),
+    valor: z.coerce.number(),
+    data_lancamento: z.string().min(10),
+    fatura: z.string().min(7),
+    categoria_nome: z.string().min(1),
+    conta_nome: z.string().min(1),
+    observacao: z.string().nullable().optional(),
+    grupo_parcela_id: z.string().nullable().optional(),
+    n_parcelas: z.coerce.number().int().nullable().optional(),
+    parcela_atual: z.coerce.number().int().nullable().optional(),
+    valor_parcela: z.coerce.number().nullable().optional(),
+    conta_fixa_id: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiTransacao.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: {
+      tipo: input.tipo,
+      descricao: input.descricao,
+      valor: toDecimal(input.valor),
+      data_lancamento: new Date(input.data_lancamento),
+      fatura: input.fatura,
+      categoria_nome: input.categoria_nome,
+      conta_nome: input.conta_nome,
+      observacao: input.observacao ?? null,
+      grupo_parcela_id: input.grupo_parcela_id ?? null,
+      n_parcelas: input.n_parcelas ?? null,
+      parcela_atual: input.parcela_atual ?? null,
+      valor_parcela: input.valor_parcela != null ? toDecimal(input.valor_parcela) : null,
+      conta_fixa_id: input.conta_fixa_id ?? null,
+    },
+    create: {
+      userId: req.userId!,
+      client_id: input.client_id,
+      tipo: input.tipo,
+      descricao: input.descricao,
+      valor: toDecimal(input.valor),
+      data_lancamento: new Date(input.data_lancamento),
+      fatura: input.fatura,
+      categoria_nome: input.categoria_nome,
+      conta_nome: input.conta_nome,
+      observacao: input.observacao ?? null,
+      grupo_parcela_id: input.grupo_parcela_id ?? null,
+      n_parcelas: input.n_parcelas ?? null,
+      parcela_atual: input.parcela_atual ?? null,
+      valor_parcela: input.valor_parcela != null ? toDecimal(input.valor_parcela) : null,
+      conta_fixa_id: input.conta_fixa_id ?? null,
+    },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/transacoes/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiTransacao.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+apiRouter.get("/contas-fixas", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiContaFixa.findMany({ where: { userId: req.userId! }, orderBy: { createdAt: "desc" } });
+  res.json(rows);
+});
+
+apiRouter.post("/contas-fixas", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id: z.string().min(1),
+    nome: z.string().min(1),
+    valor_padrao: z.coerce.number(),
+    dia_venc: z.coerce.number().int().nullable().optional(),
+    categoria_nome: z.string().min(1),
+    conta_nome: z.string().min(1),
+    cor: z.string().optional(),
+    encerrado_apos: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiContaFixa.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: {
+      nome: input.nome,
+      valor_padrao: toDecimal(input.valor_padrao),
+      dia_venc: input.dia_venc ?? null,
+      categoria_nome: input.categoria_nome,
+      conta_nome: input.conta_nome,
+      cor: input.cor,
+      encerrado_apos: input.encerrado_apos ?? null,
+    },
+    create: {
+      userId: req.userId!,
+      client_id: input.client_id,
+      nome: input.nome,
+      valor_padrao: toDecimal(input.valor_padrao),
+      dia_venc: input.dia_venc ?? null,
+      categoria_nome: input.categoria_nome,
+      conta_nome: input.conta_nome,
+      cor: input.cor,
+      encerrado_apos: input.encerrado_apos ?? null,
+    },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/contas-fixas/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiContaFixa.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+apiRouter.get("/contas-fixas-valores", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiContaFixaValor.findMany({
+    where: { userId: req.userId! },
+    orderBy: [{ fatura: "desc" }],
+  });
+  res.json(rows);
+});
+
+apiRouter.post("/contas-fixas-valores", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    fixa_client_id: z.string().min(1),
+    fatura: z.string().min(7),
+    valor_fatura: z.coerce.number(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiContaFixaValor.upsert({
+    where: {
+      userId_fixa_client_id_fatura: { userId: req.userId!, fixa_client_id: input.fixa_client_id, fatura: input.fatura },
+    },
+    update: { valor_fatura: toDecimal(input.valor_fatura) },
+    create: { userId: req.userId!, fixa_client_id: input.fixa_client_id, fatura: input.fatura, valor_fatura: toDecimal(input.valor_fatura) },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/contas-fixas-valores/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiContaFixaValor.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+apiRouter.get("/orcamentos-config", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiOrcamentoConfig.findMany({ where: { userId: req.userId! } });
+  res.json(rows);
+});
+
+apiRouter.post("/orcamentos-config", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    categoria_nome: z.string().min(1),
+    limite_valor: z.coerce.number(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiOrcamentoConfig.upsert({
+    where: { userId_categoria_nome: { userId: req.userId!, categoria_nome: input.categoria_nome } },
+    update: { limite_valor: toDecimal(input.limite_valor) },
+    create: { userId: req.userId!, categoria_nome: input.categoria_nome, limite_valor: toDecimal(input.limite_valor) },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/orcamentos-config", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const categoriaNome = readQueryParam(req, "categoria_nome") || "";
+  if (!categoriaNome) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiOrcamentoConfig.delete({
+    where: { userId_categoria_nome: { userId: req.userId!, categoria_nome: categoriaNome } },
+  }).catch(() => null);
+  res.status(204).send();
+});
+
+apiRouter.get("/settings/saving-goal", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const row = await prisma.apiSavingGoal.findUnique({ where: { userId: req.userId! } });
+  res.json(row || { saving_goal: 0 });
+});
+
+apiRouter.post("/settings/saving-goal", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    saving_goal: z.coerce.number(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiSavingGoal.upsert({
+    where: { userId: req.userId! },
+    update: { saving_goal: toDecimal(input.saving_goal) },
+    create: { userId: req.userId!, saving_goal: toDecimal(input.saving_goal) },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.get("/poupanca", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const row = await prisma.apiPoupanca.findUnique({ where: { userId: req.userId! } });
+  res.json(row || { meta: 0, previsto: {}, realizado: {} });
+});
+
+apiRouter.post("/poupanca", requireAuth, async (req: AuthedRequest, res) => {
+  type MonthMap = Record<string, number>;
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    meta: z.coerce.number(),
+    previsto: z.record(z.string(), z.coerce.number()).optional().default({} as MonthMap),
+    realizado: z.record(z.string(), z.coerce.number()).optional().default({} as MonthMap),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiPoupanca.upsert({
+    where: { userId: req.userId! },
+    update: {
+      meta: toDecimal(input.meta),
+      previsto: input.previsto as Prisma.InputJsonObject,
+      realizado: input.realizado as Prisma.InputJsonObject,
+    },
+    create: {
+      userId: req.userId!,
+      meta: toDecimal(input.meta),
+      previsto: input.previsto as Prisma.InputJsonObject,
+      realizado: input.realizado as Prisma.InputJsonObject,
+    },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.get("/projecao-extras", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiProjecaoExtra.findMany({ where: { userId: req.userId! }, orderBy: { nome: "asc" } });
+  res.json(rows);
+});
+
+apiRouter.post("/projecao-extras", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id: z.string().min(1),
+    nome: z.string().min(1),
+    valor: z.coerce.number(),
+    ativo: z.boolean().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiProjecaoExtra.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: { nome: input.nome, valor: toDecimal(input.valor), ativo: input.ativo ?? true },
+    create: { userId: req.userId!, client_id: input.client_id, nome: input.nome, valor: toDecimal(input.valor), ativo: input.ativo ?? true },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/projecao-extras/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiProjecaoExtra.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── SAÚDE: TREINOS ──────────────────────────────────────────────────────────
+
+apiRouter.get("/treinos", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiTreino.findMany({
+    where: { userId: req.userId! },
+    orderBy: [{ data: "desc" }, { hora_inicio: "desc" }],
+  });
+  res.json(rows);
+});
+
+apiRouter.post("/treinos", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id:  z.string().min(1),
+    titulo:     z.string().min(1),
+    data:       z.string().min(10),
+    hora_inicio: z.string().optional(),
+    hora_fim:    z.string().optional(),
+    duracao:     z.coerce.number().int().nullable().optional(),
+    tipo_cat:    z.string().min(1),
+    tipo_ex:     z.string().nullable().optional(),
+    calorias:    z.coerce.number().int().nullable().optional(),
+    km:          z.coerce.number().nullable().optional(),
+    local_nome:  z.string().nullable().optional(),
+    descricao:   z.string().nullable().optional(),
+    obs:         z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+
+  const row = await prisma.apiTreino.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: {
+      titulo: input.titulo, data: input.data, hora_inicio: input.hora_inicio ?? null,
+      hora_fim: input.hora_fim ?? null, duracao: input.duracao ?? null,
+      tipo_cat: input.tipo_cat, tipo_ex: input.tipo_ex ?? null,
+      calorias: input.calorias ?? null,
+      km: input.km != null ? toDecimal(input.km) : null,
+      local_nome: input.local_nome ?? null, descricao: input.descricao ?? null, obs: input.obs ?? null,
+    },
+    create: {
+      userId: req.userId!, client_id: input.client_id,
+      titulo: input.titulo, data: input.data, hora_inicio: input.hora_inicio ?? null,
+      hora_fim: input.hora_fim ?? null, duracao: input.duracao ?? null,
+      tipo_cat: input.tipo_cat, tipo_ex: input.tipo_ex ?? null,
+      calorias: input.calorias ?? null,
+      km: input.km != null ? toDecimal(input.km) : null,
+      local_nome: input.local_nome ?? null, descricao: input.descricao ?? null, obs: input.obs ?? null,
+    },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/treinos/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiTreino.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── SAÚDE: LOCAIS ───────────────────────────────────────────────────────────
+
+apiRouter.get("/locais-treino", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiLocalTreino.findMany({ where: { userId: req.userId! }, orderBy: { nome: "asc" } });
+  res.json(rows);
+});
+
+apiRouter.post("/locais-treino", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({ usuario_id: z.string().min(1), client_id: z.string().min(1), nome: z.string().min(1) });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const row = await prisma.apiLocalTreino.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: { nome: input.nome },
+    create: { userId: req.userId!, client_id: input.client_id, nome: input.nome },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/locais-treino/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiLocalTreino.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── SAÚDE: TIPOS DE EXERCÍCIO ────────────────────────────────────────────────
+
+apiRouter.get("/tipos-exercicio", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.apiTipoExercicio.findMany({ where: { userId: req.userId! }, orderBy: { nome: "asc" } });
+  res.json(rows);
+});
+
+apiRouter.post("/tipos-exercicio", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1), client_id: z.string().min(1),
+    nome: z.string().min(1), cat: z.string().min(1),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const row = await prisma.apiTipoExercicio.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: { nome: input.nome, cat: input.cat },
+    create: { userId: req.userId!, client_id: input.client_id, nome: input.nome, cat: input.cat },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/tipos-exercicio/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.apiTipoExercicio.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── CASINHA: AMBIENTES ───────────────────────────────────────────────────────
+apiRouter.get("/casinha/ambientes", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.casinhaAmbiente.findMany({
+    where: { userId: req.userId! },
+    orderBy: { nome: "asc" },
+  });
+  res.json(rows);
+});
+
+apiRouter.post("/casinha/ambientes", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id:  z.string().min(1),
+    nome:       z.string().min(1),
+    cor:        z.string().optional().default("#7b9cff"),
+    icone:      z.string().optional().default("🏠"),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const row = await prisma.casinhaAmbiente.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: { nome: input.nome, cor: input.cor, icone: input.icone },
+    create: { userId: req.userId!, client_id: input.client_id, nome: input.nome, cor: input.cor, icone: input.icone },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/casinha/ambientes/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.casinhaAmbiente.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── CASINHA: PESSOAS ─────────────────────────────────────────────────────────
+apiRouter.get("/casinha/pessoas", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.casinhaPessoa.findMany({
+    where: { userId: req.userId! },
+    orderBy: { nome: "asc" },
+  });
+  res.json(rows);
+});
+
+apiRouter.post("/casinha/pessoas", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1),
+    client_id:  z.string().min(1),
+    nome:       z.string().min(1),
+    cor:        z.string().optional().default("#7b9cff"),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const row = await prisma.casinhaPessoa.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: { nome: input.nome, cor: input.cor },
+    create: { userId: req.userId!, client_id: input.client_id, nome: input.nome, cor: input.cor },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/casinha/pessoas/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.casinhaPessoa.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── CASINHA: TAREFAS ─────────────────────────────────────────────────────────
+apiRouter.get("/casinha/tarefas", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.casinhaTarefa.findMany({
+    where: { userId: req.userId! },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(rows);
+});
+
+apiRouter.post("/casinha/tarefas", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id:     z.string().min(1),
+    client_id:      z.string().min(1),
+    titulo:         z.string().min(1),
+    descricao:      z.string().nullable().optional(),
+    tipo:           z.string().nullable().optional(),
+    ambiente:       z.string().nullable().optional(),
+    responsavel:    z.string().nullable().optional(),
+    prioridade:     z.string().optional().default("media"),
+    status:         z.string().optional().default("planejada"),
+    dataVenc:       z.string().nullable().optional(),
+    horario:        z.string().nullable().optional(),
+    tempoEst:       z.coerce.number().int().nullable().optional(),
+    tempoReal:      z.coerce.number().int().nullable().optional(),
+    recorrencia:    z.any().optional(),
+    obs:            z.string().nullable().optional(),
+    dataConclusao:  z.string().nullable().optional(),
+    rotinaId:       z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const data = {
+    titulo: input.titulo, descricao: input.descricao ?? null,
+    tipo: input.tipo ?? null, ambiente: input.ambiente ?? null,
+    responsavel: input.responsavel ?? null, prioridade: input.prioridade,
+    status: input.status, dataVenc: input.dataVenc ?? null,
+    horario: input.horario ?? null, tempoEst: input.tempoEst ?? null,
+    tempoReal: input.tempoReal ?? null, recorrencia: input.recorrencia ?? null,
+    obs: input.obs ?? null, dataConclusao: input.dataConclusao ?? null,
+    rotinaId: input.rotinaId ?? null,
+  };
+  const row = await prisma.casinhaTarefa.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: data,
+    create: { userId: req.userId!, client_id: input.client_id, ...data },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/casinha/tarefas/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.casinhaTarefa.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── CASINHA: ROTINAS ─────────────────────────────────────────────────────────
+apiRouter.get("/casinha/rotinas", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.casinhaRotina.findMany({
+    where: { userId: req.userId! },
+    orderBy: { nome: "asc" },
+  });
+  res.json(rows);
+});
+
+apiRouter.post("/casinha/rotinas", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id:   z.string().min(1),
+    client_id:    z.string().min(1),
+    nome:         z.string().min(1),
+    icone:        z.string().nullable().optional(),
+    tipo:         z.string().nullable().optional(),
+    ambiente:     z.string().nullable().optional(),
+    responsavel:  z.string().nullable().optional(),
+    prioridade:   z.string().nullable().optional(),
+    recorrencia:  z.any().default({}),
+    horario:      z.string().nullable().optional(),
+    tempoEst:     z.coerce.number().int().nullable().optional(),
+    proximaData:  z.string().nullable().optional(),
+    ativo:        z.boolean().optional().default(true),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const data = {
+    nome: input.nome, icone: input.icone ?? null,
+    tipo: input.tipo ?? null, ambiente: input.ambiente ?? null,
+    responsavel: input.responsavel ?? null, prioridade: input.prioridade ?? null,
+    recorrencia: input.recorrencia, horario: input.horario ?? null,
+    tempoEst: input.tempoEst ?? null, proximaData: input.proximaData ?? null,
+    ativo: input.ativo,
+  };
+  const row = await prisma.casinhaRotina.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: data,
+    create: { userId: req.userId!, client_id: input.client_id, ...data },
+  });
+  res.status(201).json(row);
+});
+
+apiRouter.delete("/casinha/rotinas/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.casinhaRotina.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).send();
+});
+
+// ── SAÚDE: MÉDICOS ───────────────────────────────────────────────────────────
+apiRouter.get("/saude/medicos", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.saudeMedico.findMany({ where: { userId: req.userId! }, orderBy: { nome: "asc" } });
+  res.json(rows);
+});
+apiRouter.post("/saude/medicos", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1), client_id: z.string().min(1), nome: z.string().min(1),
+    especialidade: z.string().nullable().optional(), frequencyDays: z.coerce.number().int().nullable().optional(),
+    phone: z.string().nullable().optional(), whats: z.string().nullable().optional(),
+    email: z.string().nullable().optional(), clinica: z.string().nullable().optional(),
+    endereco: z.string().nullable().optional(), obs: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const data = { nome: input.nome, especialidade: input.especialidade ?? null, frequencyDays: input.frequencyDays ?? null, phone: input.phone ?? null, whats: input.whats ?? null, email: input.email ?? null, clinica: input.clinica ?? null, endereco: input.endereco ?? null, obs: input.obs ?? null };
+  const row = await prisma.saudeMedico.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
+  res.status(201).json(row);
+});
+apiRouter.delete("/saude/medicos/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id"); if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.saudeMedico.deleteMany({ where: { id, userId: req.userId! } }); res.status(204).send();
+});
+
+// ── SAÚDE: EXAMES ────────────────────────────────────────────────────────────
+apiRouter.get("/saude/exames", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.saudeExame.findMany({ where: { userId: req.userId! }, orderBy: { date: "desc" } });
+  res.json(rows);
+});
+apiRouter.post("/saude/exames", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1), client_id: z.string().min(1), nome: z.string().min(1),
+    categoria: z.string().nullable().optional(), status: z.string().nullable().optional(),
+    laboratorio: z.string().nullable().optional(), medicoId: z.string().nullable().optional(),
+    date: z.string().min(1), nextDate: z.string().nullable().optional(),
+    obs: z.string().nullable().optional(), fileName: z.string().nullable().optional(),
+    fileData: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const data = { nome: input.nome, categoria: input.categoria ?? null, status: input.status ?? null, laboratorio: input.laboratorio ?? null, medicoId: input.medicoId ?? null, date: input.date, nextDate: input.nextDate ?? null, obs: input.obs ?? null, fileName: input.fileName ?? null, fileData: input.fileData ?? null };
+  const row = await prisma.saudeExame.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
+  res.status(201).json(row);
+});
+apiRouter.delete("/saude/exames/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id"); if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.saudeExame.deleteMany({ where: { id, userId: req.userId! } }); res.status(204).send();
+});
+
+// ── SAÚDE: CONSULTAS ─────────────────────────────────────────────────────────
+apiRouter.get("/saude/consultas", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.saudeConsulta.findMany({ where: { userId: req.userId! }, orderBy: { date: "desc" } });
+  res.json(rows);
+});
+apiRouter.post("/saude/consultas", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1), client_id: z.string().min(1), date: z.string().min(1),
+    time: z.string().nullable().optional(), medicoId: z.string().nullable().optional(),
+    especialidade: z.string().nullable().optional(), motivo: z.string().nullable().optional(),
+    status: z.string().nullable().optional(), returnDays: z.coerce.number().int().nullable().optional(),
+    nextDate: z.string().nullable().optional(), resumo: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const data = { date: input.date, time: input.time ?? null, medicoId: input.medicoId ?? null, especialidade: input.especialidade ?? null, motivo: input.motivo ?? null, status: input.status ?? null, returnDays: input.returnDays ?? null, nextDate: input.nextDate ?? null, resumo: input.resumo ?? null };
+  const row = await prisma.saudeConsulta.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
+  res.status(201).json(row);
+});
+apiRouter.delete("/saude/consultas/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id"); if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.saudeConsulta.deleteMany({ where: { id, userId: req.userId! } }); res.status(204).send();
+});
+
+// ── HÁBITOS ──────────────────────────────────────────────────────────────────
+apiRouter.get("/habitos", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.habito.findMany({ where: { userId: req.userId! }, orderBy: { createdAt: "asc" } });
+  res.json(rows);
+});
+apiRouter.post("/habitos", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1), client_id: z.string().min(1), nome: z.string().min(1),
+    icone: z.string().nullable().optional(), categoria: z.string().nullable().optional(),
+    frequencia: z.string().nullable().optional(), weekdays: z.any().optional(),
+    obs: z.string().nullable().optional(), autoType: z.string().nullable().optional(),
+    autoKeyword: z.string().nullable().optional(), logs: z.any().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const data = { nome: input.nome, icone: input.icone ?? null, categoria: input.categoria ?? null, frequencia: input.frequencia ?? null, weekdays: input.weekdays ?? null, obs: input.obs ?? null, autoType: input.autoType ?? null, autoKeyword: input.autoKeyword ?? null, logs: input.logs ?? null };
+  const row = await prisma.habito.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
+  res.status(201).json(row);
+});
+apiRouter.delete("/habitos/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id"); if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.habito.deleteMany({ where: { id, userId: req.userId! } }); res.status(204).send();
+});
+
+// ── ALIMENTAÇÃO ──────────────────────────────────────────────────────────────
+apiRouter.get("/alimentacao/refeicoes", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const rows = await prisma.alimentacaoRefeicao.findMany({ where: { userId: req.userId! }, orderBy: [{ date: "desc" }, { time: "desc" }] });
+  res.json(rows);
+});
+apiRouter.post("/alimentacao/refeicoes", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    usuario_id: z.string().min(1), client_id: z.string().min(1), nome: z.string().min(1),
+    tipo: z.string().nullable().optional(), date: z.string().min(1),
+    time: z.string().nullable().optional(), calories: z.coerce.number().int().nullable().optional(),
+    obs: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const data = { nome: input.nome, tipo: input.tipo ?? null, date: input.date, time: input.time ?? null, calories: input.calories ?? null, obs: input.obs ?? null };
+  const row = await prisma.alimentacaoRefeicao.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
+  res.status(201).json(row);
+});
+apiRouter.delete("/alimentacao/refeicoes/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id"); if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.alimentacaoRefeicao.deleteMany({ where: { id, userId: req.userId! } }); res.status(204).send();
+});
+apiRouter.get("/alimentacao/config", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
+  const row = await prisma.alimentacaoConfig.findUnique({ where: { userId: req.userId! } });
+  res.json(row || { goals: null, plan: null });
+});
+apiRouter.post("/alimentacao/config", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({ usuario_id: z.string().min(1), goals: z.any().optional(), plan: z.any().optional() });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const row = await prisma.alimentacaoConfig.upsert({ where: { userId: req.userId! }, update: { goals: input.goals ?? null, plan: input.plan ?? null }, create: { userId: req.userId!, goals: input.goals ?? null, plan: input.plan ?? null } });
+  res.status(201).json(row);
+});

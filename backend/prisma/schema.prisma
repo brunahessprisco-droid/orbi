@@ -1,0 +1,558 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  CASH
+  BANK
+  CREDIT
+}
+
+enum CategoryKind {
+  INCOME
+  EXPENSE
+}
+
+model Account {
+  id        String        @id @default(uuid())
+  name      String
+  type      AccountType
+  currency  String        @default("BRL")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  transactions Transaction[]
+}
+
+model Category {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  kind      CategoryKind
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id         String    @id @default(uuid())
+  accountId  String
+  categoryId String
+  amount     Decimal   @db.Decimal(14, 2)
+  occurredAt DateTime
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([accountId])
+  @@index([categoryId])
+  @@index([occurredAt])
+}
+
+model User {
+  id        String    @id @default(uuid())
+  nome      String
+  email     String    @unique
+  senhaHash String
+  inviteCodesUsed InviteCode[]
+  healthWeights HealthWeight[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  sessions Session[]
+
+  apiCategorias          ApiCategoria[]
+  apiContas              ApiConta[]
+  apiTransacoes          ApiTransacao[]
+  apiContasFixas         ApiContaFixa[]
+  apiContasFixasValores  ApiContaFixaValor[]
+  apiOrcamentos          ApiOrcamentoConfig[]
+  apiSavingGoal          ApiSavingGoal?
+  apiPoupanca            ApiPoupanca?
+  apiProjecaoExtras      ApiProjecaoExtra[]
+  apiTreinos             ApiTreino[]
+  apiLocaisTreino        ApiLocalTreino[]
+  apiTiposExercicio      ApiTipoExercicio[]
+
+  casinhaAmbientes       CasinhaAmbiente[]
+  casinhaPessoas         CasinhaPessoa[]
+  casinhaTarefas         CasinhaTarefa[]
+  casinhaRotinas         CasinhaRotina[]
+
+  saudeMedicos           SaudeMedico[]
+  saudeExames            SaudeExame[]
+  saudeConsultas         SaudeConsulta[]
+  habitos                Habito[]
+  alimentacaoRefeicoes   AlimentacaoRefeicao[]
+  alimentacaoConfig      AlimentacaoConfig?
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ApiCategoria {
+  id        String   @id @default(uuid())
+  userId    String
+  client_id String
+  nome      String
+  cor       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model ApiConta {
+  id          String   @id @default(uuid())
+  userId      String
+  client_id   String
+  nome        String
+  banco       String?
+  tipo        String?
+  vencimento  Int?
+  limite_total Decimal? @db.Decimal(14, 2)
+  cor         String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model ApiTransacao {
+  id             String    @id @default(uuid())
+  userId         String
+  client_id      String
+  tipo           String
+  descricao      String
+  valor          Decimal   @db.Decimal(14, 2)
+  data_lancamento DateTime
+  fatura         String
+  categoria_nome String
+  conta_nome     String
+  observacao     String?
+  grupo_parcela_id String?
+  n_parcelas     Int?
+  parcela_atual  Int?
+  valor_parcela  Decimal?  @db.Decimal(14, 2)
+  conta_fixa_id  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+  @@index([fatura])
+}
+
+model ApiContaFixa {
+  id            String   @id @default(uuid())
+  userId        String
+  client_id     String
+  nome          String
+  valor_padrao  Decimal  @db.Decimal(14, 2)
+  dia_venc      Int?
+  categoria_nome String
+  conta_nome    String
+  cor           String?
+  encerrado_apos String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model ApiContaFixaValor {
+  id             String   @id @default(uuid())
+  userId         String
+  fixa_client_id String
+  fatura         String
+  valor_fatura   Decimal  @db.Decimal(14, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fixa_client_id, fatura])
+  @@index([userId])
+}
+
+model ApiOrcamentoConfig {
+  id            String   @id @default(uuid())
+  userId        String
+  categoria_nome String
+  limite_valor  Decimal  @db.Decimal(14, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoria_nome])
+  @@index([userId])
+}
+
+model ApiSavingGoal {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  saving_goal Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiPoupanca {
+  id        String  @id @default(uuid())
+  userId    String  @unique
+  meta      Decimal @db.Decimal(14, 2)
+  previsto  Json
+  realizado Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiProjecaoExtra {
+  id        String   @id @default(uuid())
+  userId    String
+  client_id String
+  nome      String
+  valor     Decimal  @db.Decimal(14, 2)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model ApiTreino {
+  id           String    @id @default(uuid())
+  userId       String
+  client_id    String
+  titulo       String
+  data         String
+  hora_inicio  String?
+  hora_fim     String?
+  duracao      Int?
+  tipo_cat     String
+  tipo_ex      String?
+  calorias     Int?
+  km           Decimal?  @db.Decimal(8, 2)
+  local_nome   String?
+  descricao    String?
+  obs          String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+  @@index([data])
+}
+
+model ApiLocalTreino {
+  id        String   @id @default(uuid())
+  userId    String
+  client_id String
+  nome      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model ApiTipoExercicio {
+  id        String   @id @default(uuid())
+  userId    String
+  client_id String
+  nome      String
+  cat       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+// ── CASINHA ──────────────────────────────────────────────────────────────────
+
+model CasinhaAmbiente {
+  id        String   @id @default(uuid())
+  userId    String
+  client_id String
+  nome      String
+  cor       String
+  icone     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model CasinhaPessoa {
+  id        String   @id @default(uuid())
+  userId    String
+  client_id String
+  nome      String
+  cor       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model CasinhaTarefa {
+  id            String   @id @default(uuid())
+  userId        String
+  client_id     String
+  titulo        String
+  descricao     String?
+  tipo          String?
+  ambiente      String?
+  responsavel   String?
+  prioridade    String
+  status        String
+  dataVenc      String?
+  horario       String?
+  tempoEst      Int?
+  tempoReal     Int?
+  recorrencia   Json?
+  obs           String?
+  dataConclusao String?
+  rotinaId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+  @@index([dataVenc])
+}
+
+model CasinhaRotina {
+  id          String   @id @default(uuid())
+  userId      String
+  client_id   String
+  nome        String
+  icone       String?
+  tipo        String?
+  ambiente    String?
+  responsavel String?
+  prioridade  String?
+  recorrencia Json
+  horario     String?
+  tempoEst    Int?
+  proximaData String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+// ── SAÚDE ─────────────────────────────────────────────────────────────────────
+
+model SaudeMedico {
+  id            String   @id @default(uuid())
+  userId        String
+  client_id     String
+  nome          String
+  especialidade String?
+  frequencyDays Int?
+  phone         String?
+  whats         String?
+  email         String?
+  clinica       String?
+  endereco      String?
+  obs           String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model SaudeExame {
+  id          String   @id @default(uuid())
+  userId      String
+  client_id   String
+  nome        String
+  categoria   String?
+  status      String?
+  laboratorio String?
+  medicoId    String?
+  date        String
+  nextDate    String?
+  obs         String?
+  fileName    String?
+  fileData    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model SaudeConsulta {
+  id            String   @id @default(uuid())
+  userId        String
+  client_id     String
+  date          String
+  time          String?
+  medicoId      String?
+  especialidade String?
+  motivo        String?
+  status        String?
+  returnDays    Int?
+  nextDate      String?
+  resumo        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+// ── HÁBITOS ───────────────────────────────────────────────────────────────────
+
+model Habito {
+  id          String   @id @default(uuid())
+  userId      String
+  client_id   String
+  nome        String
+  icone       String?
+  categoria   String?
+  frequencia  String?
+  weekdays    Json?
+  obs         String?
+  autoType    String?
+  autoKeyword String?
+  logs        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+// ── ALIMENTAÇÃO ───────────────────────────────────────────────────────────────
+
+model AlimentacaoRefeicao {
+  id        String   @id @default(uuid())
+  userId    String
+  client_id String
+  nome      String
+  tipo      String?
+  date      String
+  time      String?
+  calories  Int?
+  obs       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, client_id])
+  @@index([userId])
+}
+
+model AlimentacaoConfig {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  goals     Json?
+  plan      Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InviteCode {
+  id            String    @id
+  code          String    @unique
+  intendedName  String?
+  intendedEmail String?
+  isActive      Boolean   @default(true)
+  usedAt        DateTime?
+  usedByUserId  String?
+  expiresAt     DateTime?
+  note          String?
+  createdAt     DateTime  @default(now())
+
+  usedByUser    User?     @relation(fields: [usedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@map("InviteCode")
+}
+
+model HealthWeight {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  clientId  String    @map("client_id")
+  date      DateTime  @map("date") @db.Date
+  weight    Decimal?  @db.Decimal(10, 2)
+  height    Decimal?  @db.Decimal(10, 2)
+  fat       Decimal?  @db.Decimal(10, 2)
+  note      String?
+  extraJson Json?     @map("extra_json")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, clientId], name: "userId_clientId")
+  @@map("HealthWeight")
+}

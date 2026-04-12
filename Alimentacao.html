@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>(function(){const t=localStorage.getItem('app_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})()</script>
+  <title>Alimentação</title>
+  <link rel="icon" type="image/png" href="assets/Alimentação.png">
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    [data-theme="dark"]{
+      --body-bg:#1A1A1B;
+      --bg:#1A1A1B;--surface:#252324;--surface2:#2F2D2E;--surface3:#3A3839;
+      --border:rgba(242,237,228,0.08);--border2:rgba(242,237,228,0.16);
+      --text:#F2EDE4;--muted:#AAB7B7;--hint:rgba(170,183,183,0.45);--shadow:rgba(0,0,0,0.6);
+    }
+    [data-theme="light"]{
+      --body-bg:#F2EDE4;
+      --bg:#F2EDE4;--surface:#FDFAF6;--surface2:#EDE8DF;--surface3:#DFD8CC;
+      --border:rgba(62,74,89,0.1);--border2:rgba(62,74,89,0.2);
+      --text:#1A1A1B;--muted:#3E4A59;--hint:#AAB7B7;--shadow:rgba(0,0,0,0.08);
+    }
+    :root{
+      --green:#3dd9a5;--green-bg:rgba(61,217,165,0.12);--green-border:rgba(61,217,165,0.25);
+      --red:#ff6b8a;--red-bg:rgba(255,107,138,0.12);--red-border:rgba(255,107,138,0.25);
+      --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.12);--amber-border:rgba(245,158,11,0.25);
+      --accent:#87A28B;--accent-bg:rgba(135,162,139,0.12);--accent-border:rgba(135,162,139,0.25);
+      --sage:#87A28B;--sage-bg:rgba(135,162,139,0.12);--sage-border:rgba(135,162,139,0.25);
+      --gold:#E7C489;--gold-bg:rgba(231,196,137,0.12);--gold-border:rgba(231,196,137,0.25);
+      --purple:#87A28B;--purple-bg:rgba(135,162,139,0.12);--purple-border:rgba(135,162,139,0.25);
+      --blue:#87A28B;--blue-bg:rgba(135,162,139,0.12);--blue-border:rgba(135,162,139,0.25);
+      --radius:16px;--radius-sm:10px;--mono:"DM Mono",monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--text);min-height:100vh}
+    button,input,select,textarea{font:inherit}
+    .nav{display:flex;align-items:center;gap:2px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:0;z-index:20;overflow-x:auto;scrollbar-width:none}
+    .nav::-webkit-scrollbar{display:none}
+    .nav-logo{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-right:16px;cursor:pointer}
+    .nav-logo-mark{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+    .nav-logo-img{width:28px;height:28px;object-fit:contain;}
+    .nav-logo-text{font-size:16px;font-weight:700}
+    .nav-btn{border:none;background:none;color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+    .nav-btn.active{background:var(--accent-bg);color:var(--accent)}
+    .nav-btn:hover:not(.active){background:var(--surface2);color:var(--text)}
+    .nav-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .btn,.btn-icon,.btn-primary{border-radius:var(--radius-sm);cursor:pointer;transition:.15s}
+    .btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:8px 12px}
+    .btn:hover{border-color:var(--border2)}
+    .btn-primary{border:none;background:var(--accent);color:#fff;padding:8px 14px;font-weight:700}
+    .btn-primary:hover{opacity:.88}
+    .btn-icon{width:32px;height:32px;border:1px solid var(--border);background:none;color:var(--muted);display:flex;align-items:center;justify-content:center}
+    .btn-icon:hover{color:var(--text);border-color:var(--border2)}
+    .btn-danger{background:var(--red-bg);color:var(--red);border-color:transparent}
+    .app{max-width:1680px;margin:0 auto;padding:24px 24px 40px}
+    .page{display:none}.page.active{display:block}
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+    .card,.section{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01)),var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px var(--shadow)}
+    .card{padding:18px 20px}.section{padding:20px;margin-bottom:16px}
+    .card-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+    .card-value{font-family:var(--mono);font-size:22px;font-weight:500}
+    .card-sub{font-size:11px;color:var(--hint);margin-top:4px}
+    .amber{color:var(--amber)} .green{color:var(--green)} .blue{color:var(--blue)} .purple{color:var(--purple)}
+    .section-title{font-size:14px;font-weight:600;margin-bottom:14px}
+    .dash-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+    .chart-wrap{position:relative;height:260px}
+    .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+    .search,.sel,.input,.textarea{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);outline:none;width:100%}
+    .search:focus,.sel:focus,.input:focus,.textarea:focus{border-color:var(--border2)}
+    .search{max-width:280px}.textarea{resize:vertical;min-height:72px}
+    .badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid transparent}
+    .badge.cafe{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
+    .badge.almoco{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+    .badge.lanche{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border)}
+    .badge.jantar{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-border)}
+    .badge.ceia{background:var(--surface3);color:var(--muted);border-color:var(--border)}
+    .table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;font-size:13px;vertical-align:middle}
+    .table th{font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:.4px;font-weight:500}
+    .table td:last-child,.table th:last-child{text-align:right}.table tr:last-child td{border-bottom:none}
+    .row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+    .progress-card{padding:14px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);margin-bottom:10px}
+    .progress-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;font-size:12px}
+    .progress-bar{height:8px;background:var(--surface3);border-radius:6px;overflow:hidden}
+    .progress-fill{height:100%;border-radius:6px;transition:width .3s}
+    .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+    .day-plan{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;min-height:220px}
+    .day-name{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px}
+    .plan-slot{font-size:12px;padding:8px;border-radius:10px;background:var(--surface3);margin-bottom:8px;border:1px solid var(--border)}
+    .plan-slot .mut{color:var(--muted);font-size:11px;margin-bottom:4px}
+    .cal-head{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+    .cal-label{font-size:15px;font-weight:600;min-width:170px;text-align:center}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .cal-dow{text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--hint);padding:6px 0}
+    .cal-day{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-height:110px}
+    .cal-day.other{opacity:.35}.cal-day.today{border-color:var(--amber)}
+    .cal-num{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px}
+    .cal-event{font-size:10px;padding:3px 6px;border-radius:6px;margin-bottom:4px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .empty{padding:24px;text-align:center;color:var(--muted)}
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px;z-index:100}
+    .overlay.open{display:flex}
+    .modal{width:100%;max-width:720px;background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;max-height:90vh;overflow:auto}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .modal-title{font-size:18px;font-weight:600}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+    .field{display:flex;flex-direction:column;gap:5px} label{font-size:12px;color:var(--muted)}
+    .modal-footer{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+    @media(max-width:1100px){.summary{grid-template-columns:1fr 1fr}.dash-grid,.week-grid{grid-template-columns:1fr}}
+    @media(max-width:700px){.app{padding:12px 10px 40px}.summary{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.search{max-width:none}}
+  /* AUTH */
+  .auth-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.7);z-index:500;}
+  .auth-overlay.open{display:flex;}
+  .auth-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border2,rgba(0,0,0,.15));border-radius:16px;padding:28px;}
+  .auth-title{font-size:18px;font-weight:700;margin-bottom:4px;}
+  .auth-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px;}
+  .auth-field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:13px;outline:none;}
+  .auth-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+  .auth-err{margin-top:12px;font-size:12px;color:#fb7185;}
+  </style>
+</head>
+<body>
+<div class="auth-overlay" id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-title">🍽️ Alimentação</div>
+    <div class="auth-sub">Entre com seu e-mail e senha para continuar</div>
+    <div class="auth-field"><label>E-mail</label><input id="auth-email" type="email" placeholder="voce@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="auth-field"><label>Senha</label><input id="auth-pass" type="password" placeholder="Sua senha" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="auth-field"><label>API (avançado)</label><input id="auth-api" type="text" placeholder="http://localhost:3333/api"></div>
+    <div class="auth-actions"><button class="btn-primary" onclick="doLogin()">Entrar</button></div>
+    <div class="auth-err" id="auth-msg"></div>
+  </div>
+</div>
+  <nav class="nav">
+    <div class="nav-logo" id="go-hub-btn">
+      <div class="nav-logo-mark"><img src="assets/Alimentação.png" class="nav-logo-img" alt="Alimentação"></div>
+      <div class="nav-logo-text">Alimentação</div>
+    </div>
+    <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+    <button class="nav-btn" data-page="calendario">Calendário</button>
+    <button class="nav-btn" data-page="refeicoes">Refeições</button>
+    <button class="nav-btn" data-page="planejamento">Planejamento</button>
+    <div class="nav-right">
+      <div style="position:relative;display:inline-block">
+        <button class="btn-primary" id="new-meal-btn" type="button">+ Novo</button>
+        <div id="new-meal-dropdown" style="display:none;position:fixed;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;min-width:140px;z-index:200;overflow:hidden;box-shadow:0 8px 24px var(--shadow)">
+          <button id="dd-refeicao" type="button" style="width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:var(--text);cursor:pointer;font-size:13px">🍽 Refeição</button>
+          <button id="dd-agua" type="button" style="width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:var(--text);cursor:pointer;font-size:13px;border-top:1px solid var(--border)">💧 Água</button>
+        </div>
+      </div>
+      <button class="btn-icon" id="btn-theme" type="button">🌙</button>
+    </div>
+  </nav>
+
+  <div class="app">
+    <div id="page-dashboard" class="page active">
+      <div class="summary">
+        <div class="card"><div class="card-label">Calorias hoje</div><div class="card-value amber" id="sum-cal">0</div><div class="card-sub">total do dia</div></div>
+        <div class="card"><div class="card-label">Refeições hoje</div><div class="card-value green" id="sum-meals">0</div><div class="card-sub">registradas</div></div>
+        <div class="card" id="sum-water-card" style="cursor:pointer;position:relative" title="Clique para registrar água"><div class="card-label">Água hoje</div><div class="card-value blue" id="sum-water">0 ml</div><div class="card-sub" id="sum-water-sub">clique para registrar</div><div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
+  <button id="water-quick-remove" type="button" title="Remover último registro" style="width:26px;height:26px;border-radius:50%;border:none;background:var(--blue-bg);color:var(--blue);font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0">−</button>
+  <button id="water-quick-add" type="button" title="Registrar água" style="width:26px;height:26px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0">+</button>
+</div></div>
+        <div class="card"><div class="card-label">Atingimento</div><div class="card-value purple" id="sum-goal-pct">0%</div><div class="card-sub" id="sum-goal-sub">da meta</div></div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="section">
+          <div class="section-title">Últimos 7 dias — calorias</div>
+          <div class="chart-wrap"><canvas id="chart-week"></canvas></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Meta de hoje</div>
+          <div id="goal-progress-box"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Refeições de hoje</div>
+        <div id="today-meals"></div>
+      </div>
+    </div>
+
+    <div id="page-refeicoes" class="page">
+      <div class="section">
+        <div class="toolbar">
+          <input class="search" id="meal-search" placeholder="Buscar refeição...">
+          <select class="sel" id="meal-filter-type" style="max-width:180px">
+            <option value="">Todos os tipos</option>
+            <option value="cafe">Café da manhã</option>
+            <option value="almoco">Almoço</option>
+            <option value="lanche">Lanche</option>
+            <option value="jantar">Jantar</option>
+            <option value="ceia">Ceia</option>
+          </select>
+        </div>
+        <div class="section-title">Cadastrar refeição / editar / excluir</div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Hora</th>
+                <th>Tipo</th>
+                <th>Refeição</th>
+                <th>Calorias</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="meals-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-planejamento" class="page">
+      <!-- METAS -->
+      <details class="section" id="metas-details" style="cursor:default">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600;outline:none">
+          <span>🎯 Metas diárias</span>
+          <span id="metas-summary-line" style="font-size:12px;font-weight:400;color:var(--muted)"></span>
+          <span style="color:var(--muted);font-size:12px;" id="metas-toggle-icon">▼</span>
+        </summary>
+        <div style="margin-top:16px">
+          <div class="form-row">
+            <div class="field"><label>Calorias mínimas (kcal)</label><input class="input" id="meta-cal-min" type="number" placeholder="Ex: 1800"></div>
+            <div class="field"><label>Calorias máximas (kcal)</label><input class="input" id="meta-cal-max" type="number" placeholder="Ex: 2200"></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label>Água (ml)</label><input class="input" id="meta-water" type="number" placeholder="Ex: 2500"></div>
+            <div class="field"></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">O percentual de atingimento é calculado pela média do range (min + max) ÷ 2.</div>
+          <div class="modal-footer" style="justify-content:flex-start">
+            <button class="btn-primary" id="save-goals-btn" type="button">Salvar metas</button>
+            <button class="btn" id="default-goals-btn" type="button">Usar padrão</button>
+          </div>
+        </div>
+      </details>
+      <!-- PLANEJAMENTO SEMANAL -->
+      <div class="section">
+        <div class="cal-head">
+          <button class="btn" id="prev-week-btn" type="button">‹</button>
+          <div class="cal-label" id="week-label">Semana</div>
+          <button class="btn" id="next-week-btn" type="button">›</button>
+          <button class="btn" id="today-week-btn" type="button">Hoje</button>
+          <button class="btn-primary" style="margin-left:auto" id="copy-plan-btn" type="button">Copiar para hoje →</button>
+        </div>
+        <div class="week-grid" id="week-grid"></div>
+      </div>
+    </div>
+
+    <div id="page-calendario" class="page">
+      <div class="section">
+        <div class="cal-head">
+          <button class="btn-icon" id="prev-month-btn" type="button">‹</button>
+          <div class="cal-label" id="cal-label">—</div>
+          <button class="btn-icon" id="next-month-btn" type="button">›</button>
+          <button class="btn" id="current-month-btn" type="button">Hoje</button>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-dow">Dom</div><div class="cal-dow">Seg</div><div class="cal-dow">Ter</div><div class="cal-dow">Qua</div><div class="cal-dow">Qui</div><div class="cal-dow">Sex</div><div class="cal-dow">Sáb</div>
+        </div>
+        <div class="cal-grid" id="cal-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-meal">
+    <div class="modal">
+      <div class="modal-head"><div class="modal-title" id="meal-modal-title">Nova refeição</div><button class="btn-icon" id="close-meal-modal" type="button">×</button></div>
+      <div class="form-row">
+        <div class="field"><label>Nome</label><input class="input" id="m-name" placeholder="Ex: Almoço"></div>
+        <div class="field"><label>Tipo</label><select class="sel" id="m-type"><option value="cafe">Café da manhã</option><option value="almoco">Almoço</option><option value="lanche">Lanche</option><option value="jantar">Jantar</option><option value="ceia">Ceia</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Data</label><input class="input" id="m-date" type="date"></div>
+        <div class="field"><label>Hora</label><input class="input" id="m-time" type="time"></div>
+      </div>
+      <div class="field"><label>Calorias</label><input class="input" id="m-calories" type="number" placeholder="Ex: 520"></div>
+      <div class="field"><label>Observação</label><textarea class="textarea" id="m-note" placeholder="Opcional"></textarea></div>
+      <div class="modal-footer"><button class="btn" id="cancel-meal-modal" type="button">Cancelar</button><button class="btn-primary" id="save-meal-btn" type="button">Salvar refeição</button></div>
+    </div>
+  </div>
+
+  <!-- CAL DETAIL MODAL -->
+  <div class="overlay" id="ov-cal-detail">
+    <div class="modal" style="max-width:360px">
+      <div class="modal-head"><div class="modal-title" id="cal-detail-title">Refeição</div><button class="btn-icon" id="close-cal-detail" type="button">×</button></div>
+      <div id="cal-detail-body"></div>
+      <div class="modal-footer"><button class="btn btn-success" id="cal-detail-edit-btn" type="button">Editar</button><button class="btn" id="close-cal-detail-btn" type="button">Fechar</button></div>
+    </div>
+  </div>
+
+  <!-- WATER MODAL -->
+  <div class="overlay" id="ov-water">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-head"><div class="modal-title">💧 Registrar água</div><button class="btn-icon" id="close-water-modal" type="button">×</button></div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Quantidade (ml)</label>
+        <input class="input" id="water-ml" type="number" placeholder="Ex: 250" min="1" max="5000">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn" data-water-preset="150" type="button">150 ml</button>
+        <button class="btn" data-water-preset="200" type="button">200 ml</button>
+        <button class="btn" data-water-preset="250" type="button">250 ml</button>
+        <button class="btn" data-water-preset="300" type="button">300 ml</button>
+        <button class="btn" data-water-preset="500" type="button">500 ml</button>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancel-water-modal" type="button">Cancelar</button>
+        <button class="btn-primary" id="save-water-btn" type="button">Registrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIZARD: COPIAR PARA HOJE -->
+  <div class="overlay" id="ov-wizard">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-head"><div class="modal-title">Copiar para hoje</div><button class="btn-icon" id="close-wizard-btn" type="button">×</button></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px" id="wizard-step-info">Passo 1 de 1</div>
+      <div style="font-size:13px;font-weight:600;color:var(--amber);margin-bottom:14px" id="wizard-type-label"></div>
+      <div class="form-row">
+        <div class="field"><label>Nome da refeição</label><input class="input" id="wiz-name" type="text"></div>
+        <div class="field"><label>Hora</label><input class="input" id="wiz-time" type="time"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Calorias (opcional)</label><input class="input" id="wiz-calories" type="number" placeholder="Ex: 520"></div>
+        <div class="field"></div>
+      </div>
+      <div class="field" style="margin-bottom:16px"><label>Observação (opcional)</label><textarea class="textarea" id="wiz-note" placeholder="Opcional"></textarea></div>
+      <div class="modal-footer">
+        <button class="btn" id="wiz-skip-btn" type="button">Pular</button>
+        <button class="btn-primary" id="wiz-next-btn" type="button">Próximo →</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── AUTH + API ──────────────────────────────────────────────────────────────
+    const SK_AUTH='fin_auth_token_v1',SK_API_BASE='fin_api_base_v1';
+    let authToken=localStorage.getItem(SK_AUTH)||'';
+    let apiBase=localStorage.getItem(SK_API_BASE)||'http://localhost:3333/api';
+    let API_USER_ID=null;
+    function getApiBase(){return(apiBase||'http://localhost:3333/api').replace(/\/+$/,'');}
+    function canUseApi(){return!!(authToken&&API_USER_ID);}
+    async function apiReq(path,opts={}){
+      const headers={'Content-Type':'application/json',...(opts.headers||{})};
+      if(authToken)headers.Authorization='Bearer '+authToken;
+      let res;
+      try{res=await fetch(getApiBase()+path,{...opts,headers});}catch(e){throw new Error('Falha de rede');}
+      if(!res.ok){let msg='Erro';try{const j=await res.json();msg=j.error||msg;}catch(_){}throw new Error(msg);}
+      if(res.status===204)return null;
+      return res.json();
+    }
+    async function checkAuth(){
+      if(!authToken)return false;
+      try{const d=await apiReq('/auth/me',{method:'GET'});API_USER_ID=d.user.id;return true;}
+      catch(_){authToken='';API_USER_ID=null;return false;}
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const KEY_MEALS='alimentacao_meals_v3_light';
+      const KEY_GOALS='alimentacao_goals_v3_light';
+      const KEY_PLAN='alimentacao_plan_v3_light';
+      const KEY_DELETED='alimentacao_deleted_ids_v1';
+      const KEY_WATER='alimentacao_water_v1';
+      // storage helpers – isolamento por usuário
+      const _uid=()=>localStorage.getItem('hub_user_id')||'anon';
+      const lsGet=k=>{const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;};
+      const lsSet=(k,v)=>localStorage.setItem('u_'+_uid()+'_'+k,v);
+      const lsRem=k=>localStorage.removeItem('u_'+_uid()+'_'+k);
+      const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+      const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      const TYPE_LABEL={cafe:'Café da manhã',almoco:'Almoço',lanche:'Lanche',jantar:'Jantar',ceia:'Ceia'};
+
+      let meals=JSON.parse(lsGet(KEY_MEALS)||'[]');
+      let _rawGoals=JSON.parse(lsGet(KEY_GOALS)||'null')||{calories:2000,water:2500};
+      // Migrate old {calories} format → {caloriesMin, caloriesMax, water}
+      let goals=_rawGoals;
+      if(_rawGoals.calories && !_rawGoals.caloriesMin){
+        goals={caloriesMin:_rawGoals.calories,caloriesMax:_rawGoals.calories,water:_rawGoals.water||2500};
+        lsSet(KEY_GOALS,JSON.stringify(goals));
+      }
+      if(!goals.caloriesMin && !goals.caloriesMax) goals={caloriesMin:1800,caloriesMax:2200,water:goals.water||2500};
+      let plan=JSON.parse(lsGet(KEY_PLAN)||'{}');
+      let deletedMealIds=JSON.parse(lsGet(KEY_DELETED)||'[]');
+      let waterLogs=JSON.parse(localStorage.getItem(KEY_WATER)||'[]');
+      let refMonth=new Date();
+      let refWeek=new Date();
+      let editingMealId=null;
+      let chartWeek=null;
+      // Wizard state
+      let wizardSteps=[];
+      let wizardIdx=0;
+      let wizardAccumulated=[];
+
+      const $ = (id) => document.getElementById(id);
+      const qs = (sel) => document.querySelector(sel);
+      const qsa = (sel) => [...document.querySelectorAll(sel)];
+
+      function uid(){return crypto.randomUUID();}
+      function todayStr(){return new Date().toISOString().slice(0,10);}
+      function nowTime(){const d=new Date();return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+      function saveMeals(){lsSet(KEY_MEALS,JSON.stringify(meals));}
+      function saveGoalsStore(){lsSet(KEY_GOALS,JSON.stringify(goals));}
+      function savePlan(){lsSet(KEY_PLAN,JSON.stringify(plan));}
+      function saveDeletedMeals(){lsSet(KEY_DELETED,JSON.stringify([...new Set(deletedMealIds)]));}
+
+      async function syncRefeicao(m){
+        if(!canUseApi())return;
+        await apiReq('/alimentacao/refeicoes',{method:'POST',body:JSON.stringify({
+          usuario_id:API_USER_ID,client_id:m.id,nome:m.name,tipo:m.type||null,
+          date:m.date,time:m.time||null,calories:m.calories||null,obs:m.note||null,
+        })}).catch(()=>null);
+      }
+      async function deleteRefeicaoApi(m){
+        if(!canUseApi()||!m._dbId)return;
+        await apiReq(`/alimentacao/refeicoes/${m._dbId}`,{method:'DELETE'}).catch(()=>null);
+      }
+      async function syncConfig(){
+        if(!canUseApi())return;
+        await apiReq('/alimentacao/config',{method:'POST',body:JSON.stringify({
+          usuario_id:API_USER_ID,goals,plan,
+        })}).catch(()=>null);
+      }
+
+      const SK_LAST_USER='app_last_user_id';
+      function clearModuleStorage(){
+        const keep=new Set(['fin_auth_token_v1','fin_api_base_v1','app_theme','app_last_user_id']);
+        for(const k of[...Object.keys(localStorage)])if(!keep.has(k))localStorage.removeItem(k);
+      }
+      function applyUserIsolation(userId){
+        const last=localStorage.getItem(SK_LAST_USER);
+        if(last&&last!==String(userId)){clearModuleStorage();meals=[];waterLogs=[];}
+        localStorage.setItem(SK_LAST_USER,String(userId));
+      }
+
+      async function bootstrapApi(){
+        if(!canUseApi())return;
+        try{
+          const[rRef,rCfg]=await Promise.all([
+            apiReq(`/alimentacao/refeicoes?usuario_id=${API_USER_ID}`),
+            apiReq(`/alimentacao/config?usuario_id=${API_USER_ID}`),
+          ]);
+          const deletedIds=new Set(JSON.parse(lsGet(KEY_DELETED)||'[]'));
+          const apiMeals=rRef
+            .map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,type:r.tipo||'almoco',date:r.date,time:r.time||'',calories:r.calories||0,note:r.obs||''}))
+            .filter(m=>!deletedIds.has(m.id));
+          const localMeals=JSON.parse(lsGet(KEY_MEALS)||'[]').filter(m=>!deletedIds.has(m.id));
+          const apiIds=new Set(apiMeals.map(m=>m.id));
+          const naoSinc=localMeals.filter(m=>!apiIds.has(m.id)&&!m._dbId);
+          meals=[...apiMeals,...naoSinc];
+          for(const m of naoSinc)await syncRefeicao(m).catch(()=>null);
+          if(rCfg&&rCfg.goals)goals=rCfg.goals;
+          if(rCfg&&rCfg.plan)plan=rCfg.plan;
+          saveMeals();saveGoalsStore();savePlan();
+          renderAll();
+        }catch(e){console.error('Bootstrap alimentação:',e);}
+      }
+      function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+      function fmtNum(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:0});}
+      function weekStart(d){const x=new Date(d);const day=x.getDay();x.setHours(0,0,0,0);x.setDate(x.getDate()-day);return x;}
+      function weekKey(d){return weekStart(d).toISOString().slice(0,10);}
+      function typeClass(t){return TYPE_LABEL[t]?t:'ceia';}
+      function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+      function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+      function goHub(){ try{window.location.href='index.html';}catch(e){ console.warn(e); } }
+
+      function showPage(id){
+        qsa('.page').forEach(p=>p.classList.remove('active'));
+        const page=$('page-'+id); if(page) page.classList.add('active');
+        qsa('.nav-btn').forEach(b=>b.classList.remove('active'));
+        const btn=qs(`.nav-btn[data-page="${id}"]`); if(btn) btn.classList.add('active');
+        if(id==='planejamento') renderPlanning();
+        if(id==='calendario') renderCalendar();
+      }
+
+      function toggleTheme(){
+        const dark=document.documentElement.getAttribute('data-theme')==='dark';
+        const next=dark?'light':'dark';
+        document.documentElement.setAttribute('data-theme',next);
+        localStorage.setItem('app_theme',next);
+        $('btn-theme').textContent=next==='dark'?'🌙':'☀️';
+        renderDashboard();
+      }
+
+      function openMealModal(id=null){
+        editingMealId=id;
+        const m=id?meals.find(x=>x.id===id):null;
+        $('meal-modal-title').textContent=id?'Editar refeição':'Nova refeição';
+        $('m-name').value=m?.name||'';
+        $('m-type').value=m?.type||'almoco';
+        $('m-date').value=m?.date||todayStr();
+        $('m-time').value=m?.time||nowTime();
+        $('m-calories').value=m?.calories||'';
+        $('m-note').value=m?.note||'';
+        $('ov-meal').classList.add('open');
+        _mealDirty=false;
+      }
+      let _mealDirty=false;
+      function _mealDirtyGuard(){
+        if(_mealDirty&&!confirm('Deseja abandonar as alterações?\nAs informações não serão salvas.')){return;}
+        closeMealModal();
+      }
+      function closeMealModal(){ $('ov-meal').classList.remove('open'); editingMealId=null; _mealDirty=false; }
+
+      function saveMealAction(){
+        const data={
+          id:editingMealId||uid(),
+          name:$('m-name').value.trim(),
+          type:$('m-type').value,
+          date:$('m-date').value,
+          time:$('m-time').value,
+          calories:Number($('m-calories').value||0),
+          note:$('m-note').value.trim()
+        };
+        if(!data.name){ alert('Informe o nome da refeição.'); return; }
+        const i=meals.findIndex(x=>x.id===data.id);
+        if(i>=0) meals[i]=data; else meals.unshift(data);
+        deletedMealIds=deletedMealIds.filter(id=>id!==data.id);
+        saveDeletedMeals();
+        saveMeals();syncRefeicao(data).catch(()=>null);
+        closeMealModal();
+        renderAll();
+      }
+      function deleteMeal(id){ if(!confirm('Excluir refeição?')) return; const m=meals.find(x=>x.id===id); if(m)deleteRefeicaoApi(m).catch(()=>null); deletedMealIds=[...new Set([...deletedMealIds,id])]; saveDeletedMeals(); meals=meals.filter(x=>x.id!==id); saveMeals(); renderAll(); }
+
+      function mealsToday(){ return meals.filter(m=>m.date===todayStr()).sort((a,b)=>a.time.localeCompare(b.time)); }
+      function caloriesToday(){ return mealsToday().reduce((a,m)=>a+Number(m.calories||0),0); }
+
+      function renderDashboard(){
+        const cal=caloriesToday();
+        const count=mealsToday().length;
+        const target=goals.caloriesMin&&goals.caloriesMax?(goals.caloriesMin+goals.caloriesMax)/2:(goals.caloriesMin||goals.caloriesMax||0);
+        const pct=target?Math.round((cal/target)*100):0;
+        const waterToday=waterLogs.filter(w=>w.date===todayStr()).reduce((a,w)=>a+Number(w.ml||0),0);
+        const waterMeta=goals.water||2500;
+        const waterPct=waterMeta?Math.round((waterToday/waterMeta)*100):0;
+
+        $('sum-cal').textContent=fmtNum(cal);
+        $('sum-meals').textContent=count;
+        $('sum-water').textContent=fmtNum(waterToday)+' ml';
+        $('sum-water-sub').textContent=waterToday>=waterMeta?'meta atingida ✓':`${fmtNum(waterMeta-waterToday)} ml restantes`;
+        $('sum-goal-pct').textContent=`${pct}%`;
+        $('sum-goal-sub').textContent=goals.caloriesMin&&goals.caloriesMax?`meta: ${fmtNum(goals.caloriesMin)}–${fmtNum(goals.caloriesMax)} kcal`:'da meta';
+
+        $('goal-progress-box').innerHTML=`
+          <div class="progress-card">
+            <div class="progress-head"><span>Calorias</span><span>${fmtNum(cal)} kcal · ${pct}%</span></div>
+            ${goals.caloriesMin&&goals.caloriesMax?`<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Meta: ${fmtNum(goals.caloriesMin)} – ${fmtNum(goals.caloriesMax)} kcal · média ${fmtNum(target)} kcal</div>`:''}
+            <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100,pct)}%;background:var(--amber)"></div></div>
+          </div>
+          <div class="progress-card">
+            <div class="progress-head"><span>Água</span><span>${fmtNum(waterToday)} / ${fmtNum(waterMeta)} ml · ${waterPct}%</span></div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100,waterPct)}%;background:var(--blue)"></div></div>
+          </div>`;
+
+        const today=mealsToday();
+        $('today-meals').innerHTML=today.length?today.map(m=>`
+          <div class="progress-card">
+            <div class="progress-head"><strong>${escapeHtml(m.name)}</strong><span class="badge ${typeClass(m.type)}">${TYPE_LABEL[m.type]}</span></div>
+            <div style="font-size:12px;color:var(--muted)">${m.time} · ${fmtNum(m.calories)} kcal</div>
+            ${m.note?`<div style="font-size:12px;color:var(--hint);margin-top:6px">${escapeHtml(m.note)}</div>`:''}
+          </div>`).join(''):'<div class="empty">Nenhuma refeição registrada hoje.</div>';
+
+        renderWeekChart();
+      }
+
+      function renderWeekChart(){
+        const labels=[],calVals=[],waterVals=[];
+        for(let i=6;i>=0;i--){
+          const d=new Date(); d.setDate(d.getDate()-i); const s=d.toISOString().slice(0,10);
+          labels.push(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`);
+          calVals.push(meals.filter(m=>m.date===s).reduce((a,m)=>a+Number(m.calories||0),0));
+          waterVals.push(waterLogs.filter(w=>w.date===s).reduce((a,w)=>a+Number(w.ml||0),0));
+        }
+        if(chartWeek) chartWeek.destroy();
+        const muted=getCSS('--muted'), txt=getCSS('--text');
+        chartWeek=new Chart($('chart-week'),{
+          type:'bar',
+          data:{labels,datasets:[
+            {label:'Calorias (kcal)',data:calVals,backgroundColor:'rgba(245,158,11,.55)',borderColor:'rgba(245,158,11,1)',borderWidth:1,borderRadius:6,yAxisID:'y'},
+            {label:'Água (ml)',data:waterVals,backgroundColor:'rgba(96,165,250,.45)',borderColor:'rgba(96,165,250,1)',borderWidth:1,borderRadius:6,yAxisID:'y1'},
+          ]},
+          options:{
+            responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:true,labels:{color:txt,boxWidth:12,padding:12}}},
+            scales:{
+              x:{ticks:{color:muted},grid:{display:false}},
+              y:{position:'left',ticks:{color:muted},grid:{color:'rgba(128,128,128,.1)'}},
+              y1:{position:'right',ticks:{color:muted},grid:{display:false}},
+            }
+          }
+        });
+      }
+
+      function renderMealsPage(){
+        const s=$('meal-search').value.trim().toLowerCase();
+        const t=$('meal-filter-type').value;
+        const list=meals.filter(m=>(!s||m.name.toLowerCase().includes(s)||String(m.note||'').toLowerCase().includes(s))&&(!t||m.type===t)).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+        $('meals-body').innerHTML=list.length?list.map(m=>`
+          <tr>
+            <td>${fmtDate(m.date)}</td>
+            <td>${m.time}</td>
+            <td><span class="badge ${typeClass(m.type)}">${TYPE_LABEL[m.type]}</span></td>
+            <td><strong>${escapeHtml(m.name)}</strong>${m.note?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${escapeHtml(m.note)}</div>`:''}</td>
+            <td>${fmtNum(m.calories)} kcal</td>
+            <td><div class="row-actions"><button class="btn edit-meal-btn" data-id="${m.id}" type="button">Editar</button><button class="btn btn-danger delete-meal-btn" data-id="${m.id}" type="button">Excluir</button></div></td>
+          </tr>`).join(''):'<tr><td colspan="6"><div class="empty">Nenhuma refeição encontrada.</div></td></tr>';
+
+        qsa('.edit-meal-btn').forEach(b=>b.addEventListener('click',()=>openMealModal(b.dataset.id)));
+        qsa('.delete-meal-btn').forEach(b=>b.addEventListener('click',()=>deleteMeal(b.dataset.id)));
+      }
+
+      function fillGoalsForm(){
+        $('meta-cal-min').value=goals.caloriesMin||'';
+        $('meta-cal-max').value=goals.caloriesMax||'';
+        $('meta-water').value=goals.water||'';
+        const hasRange=goals.caloriesMin&&goals.caloriesMax;
+        $('metas-summary-line').textContent=hasRange?`${fmtNum(goals.caloriesMin)}–${fmtNum(goals.caloriesMax)} kcal · ${fmtNum(goals.water||0)} ml água`:'';
+      }
+      function saveGoalsAction(){
+        const min=Number($('meta-cal-min').value||0);
+        const max=Number($('meta-cal-max').value||0);
+        if(min&&max&&min>max){alert('Mínimo de calorias não pode ser maior que o máximo.');return;}
+        goals={caloriesMin:min,caloriesMax:max||min,water:Number($('meta-water').value||0)};
+        saveGoalsStore();syncConfig().catch(()=>null);fillGoalsForm();renderDashboard();
+      }
+      function resetGoals(){ goals={caloriesMin:1800,caloriesMax:2200,water:2500}; saveGoalsStore(); fillGoalsForm(); renderDashboard(); }
+
+      function renderPlanning(){
+        fillGoalsForm();
+        const key=weekKey(refWeek);
+        if(!plan[key]) plan[key]=[];
+        const ws=weekStart(refWeek);
+        const today=todayStr();
+        $('week-label').textContent=`Semana de ${fmtDate(ws.toISOString().slice(0,10))}`;
+        const html=[];
+        for(let i=0;i<7;i++){
+          const d=new Date(ws); d.setDate(ws.getDate()+i); const ds=d.toISOString().slice(0,10);
+          let row=plan[key].find(x=>x.date===ds);
+          if(!row){ row={date:ds,slots:{cafe:'',almoco:'',lanche:'',jantar:'',ceia:''}}; plan[key].push(row); }
+          const isToday=ds===today;
+          const dayCalReg=meals.filter(m=>m.date===ds).reduce((a,m)=>a+Number(m.calories||0),0);
+          html.push(`<div class="day-plan" style="${isToday?'border-color:var(--amber);border-width:2px':''}">
+            <div class="day-name" style="${isToday?'color:var(--amber)':''}">${DAYS[d.getDay()]} · ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}${isToday?' ●':''}</div>
+            ${dayCalReg>0?`<div style="font-size:10px;color:var(--muted);margin-bottom:6px">${fmtNum(dayCalReg)} kcal registradas</div>`:''}
+            ${['cafe','almoco','lanche','jantar','ceia'].map(tp=>`<div class="plan-slot"><div class="mut">${TYPE_LABEL[tp]}</div><input class="input plan-input" data-week="${key}" data-date="${ds}" data-type="${tp}" value="${escapeHtml(row.slots[tp]||'')}" placeholder="Planejar..."></div>`).join('')}
+          </div>`);
+        }
+        $('week-grid').innerHTML=html.join('');
+        savePlan();
+        qsa('.plan-input').forEach(inp=>inp.addEventListener('input',e=>{
+          const {week,date,type}=e.target.dataset;
+          const r=plan[week].find(x=>x.date===date);
+          r.slots[type]=e.target.value;
+          savePlan();
+        }));
+      }
+      function prevWeek(){ refWeek.setDate(refWeek.getDate()-7); renderPlanning(); }
+      function nextWeek(){ refWeek.setDate(refWeek.getDate()+7); renderPlanning(); }
+      function goToWeekOfToday(){ refWeek=new Date(); renderPlanning(); }
+
+      // Wizard: copiar planejamento para hoje passo a passo
+      const WIZARD_TIMES={cafe:'08:00',almoco:'12:30',lanche:'16:00',jantar:'20:00',ceia:'22:00'};
+      function openWizard(){
+        const key=weekKey(refWeek);
+        const row=(plan[key]||[]).find(x=>x.date===todayStr());
+        if(!row){ alert('Nada planejado para hoje na semana exibida.'); return; }
+        wizardSteps=Object.entries(row.slots).filter(([,v])=>v.trim()).map(([type,name])=>({type,name}));
+        if(!wizardSteps.length){ alert('Nenhum item planejado para hoje.'); return; }
+        wizardIdx=0; wizardAccumulated=[];
+        loadWizardStep();
+        $('ov-wizard').classList.add('open');
+      }
+      function loadWizardStep(){
+        const step=wizardSteps[wizardIdx];
+        const isLast=wizardIdx===wizardSteps.length-1;
+        $('wizard-step-info').textContent=`Refeição ${wizardIdx+1} de ${wizardSteps.length}`;
+        $('wizard-type-label').textContent=TYPE_LABEL[step.type];
+        $('wiz-name').value=step.name;
+        $('wiz-time').value=WIZARD_TIMES[step.type]||'12:00';
+        $('wiz-calories').value='';
+        $('wiz-note').value='';
+        $('wiz-next-btn').textContent=isLast?'Finalizar ✓':'Próximo →';
+      }
+      function wizardAdvance(skip){
+        if(!skip){
+          const name=$('wiz-name').value.trim();
+          if(!name){ alert('Informe o nome da refeição.'); return; }
+          wizardAccumulated.push({
+            id:uid(), name, type:wizardSteps[wizardIdx].type,
+            date:todayStr(), time:$('wiz-time').value,
+            calories:Number($('wiz-calories').value||0),
+            note:$('wiz-note').value.trim()
+          });
+        }
+        if(wizardIdx===wizardSteps.length-1){
+          wizardFinalize();
+        } else {
+          wizardIdx++;
+          loadWizardStep();
+        }
+      }
+      function wizardFinalize(){
+        $('ov-wizard').classList.remove('open');
+        if(!wizardAccumulated.length) return;
+        const existingIds=new Set(meals.map(m=>m.id));
+        for(const m of wizardAccumulated){
+          if(!existingIds.has(m.id)){
+            meals.unshift(m);
+            syncRefeicao(m).catch(()=>null);
+          }
+        }
+        deletedMealIds=deletedMealIds.filter(id=>!wizardAccumulated.some(m=>m.id===id));
+        saveDeletedMeals(); saveMeals(); renderAll();
+      }
+
+      // Água
+      let _waterDirty=false;
+      function _waterDirtyGuard(){
+        if(_waterDirty&&!confirm('Deseja abandonar as alterações?\nAs informações não serão salvas.')){return;}
+        closeWaterModal();
+      }
+      function openWaterModal(){ $('ov-water').classList.add('open'); $('water-ml').value=''; _waterDirty=false; setTimeout(()=>$('water-ml').focus(),50); }
+      function closeWaterModal(){ $('ov-water').classList.remove('open'); _waterDirty=false; }
+      function saveWater(){
+        const ml=Number($('water-ml').value||0);
+        if(!ml||ml<1){ alert('Informe a quantidade em ml.'); return; }
+        waterLogs.push({id:uid(),date:todayStr(),ml,time:nowTime()});
+        lsSet(KEY_WATER,JSON.stringify(waterLogs));
+        closeWaterModal();
+        renderDashboard();
+      }
+      function quickAddWater(ml){
+        waterLogs.push({id:uid(),date:todayStr(),ml,time:nowTime()});
+        lsSet(KEY_WATER,JSON.stringify(waterLogs));
+        renderDashboard();
+      }
+
+      function renderCalendar(){
+        $('cal-label').textContent=`${MONTHS[refMonth.getMonth()]} ${refMonth.getFullYear()}`;
+        const y=refMonth.getFullYear(), m=refMonth.getMonth();
+        const first=new Date(y,m,1), start=new Date(first); start.setDate(1-first.getDay());
+        const cells=[];
+        for(let i=0;i<42;i++){
+          const d=new Date(start); d.setDate(start.getDate()+i); const ds=d.toISOString().slice(0,10);
+          const inMonth=d.getMonth()===m; const isToday=ds===todayStr();
+          const dayMeals=meals.filter(me=>me.date===ds).sort((a,b)=>a.time.localeCompare(b.time));
+          const dayWater=waterLogs.filter(w=>w.date===ds).reduce((a,w)=>a+Number(w.ml||0),0);
+          const waterBadge=dayWater?`<div style="font-size:10px;padding:3px 6px;border-radius:6px;margin-bottom:4px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border)">💧 ${fmtNum(dayWater)} ml</div>`:'';
+          cells.push(`<div class="cal-day ${!inMonth?'other':''} ${isToday?'today':''}"><div class="cal-num">${d.getDate()}</div>${waterBadge}${dayMeals.slice(0,4).map(me=>`<div class="cal-event" data-meal-id="${me.id}" style="cursor:pointer" title="${escapeHtml(me.name)}">${me.time} · ${escapeHtml(me.name)}</div>`).join('')}${dayMeals.length>4?`<div class="cal-event" style="background:var(--surface3);color:var(--muted);border-color:var(--border)">+${dayMeals.length-4} mais</div>`:''}</div>`);
+        }
+        $('cal-body').innerHTML=cells.join('');
+      }
+      function changeMonth(step){ refMonth.setMonth(refMonth.getMonth()+step); renderCalendar(); }
+      function goCurrentMonth(){ refMonth=new Date(); renderCalendar(); }
+
+      function openCalDetail(id){
+        const m=meals.find(x=>x.id===id); if(!m) return;
+        $('cal-detail-title').textContent=escapeHtml(m.name);
+        $('cal-detail-body').innerHTML=`
+          <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span class="badge ${typeClass(m.type)}">${TYPE_LABEL[m.type]}</span>
+              <span style="font-size:13px;color:var(--muted)">${fmtDate(m.date)}${m.time?' · '+m.time:''}</span>
+            </div>
+            <div style="font-size:22px;font-weight:700;color:var(--amber)">${fmtNum(m.calories)} kcal</div>
+            ${m.note?`<div style="font-size:13px;color:var(--muted);padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">${escapeHtml(m.note)}</div>`:''}
+          </div>`;
+        $('cal-detail-edit-btn').onclick=()=>{ $('ov-cal-detail').classList.remove('open'); openMealModal(m.id); };
+        $('ov-cal-detail').classList.add('open');
+      }
+
+      function renderAll(){ renderDashboard(); renderMealsPage(); renderPlanning(); renderCalendar(); }
+
+      async function doLogin(){
+        const email=document.getElementById('auth-email').value.trim();
+        const senha=document.getElementById('auth-pass').value;
+        const apiInput=document.getElementById('auth-api').value.trim();
+        const msg=document.getElementById('auth-msg');
+        msg.textContent='';
+        if(!email||!senha){msg.textContent='Preencha e-mail e senha.';return;}
+        if(apiInput){apiBase=apiInput;localStorage.setItem(SK_API_BASE,apiBase);}
+        try{
+          const data=await apiReq('/auth/login',{method:'POST',body:JSON.stringify({email,senha})});
+          authToken=data.token;API_USER_ID=data.user.id;
+          localStorage.setItem(SK_AUTH,authToken);
+          applyUserIsolation(API_USER_ID);
+          document.getElementById('auth-overlay').classList.remove('open');
+          await bootstrapApi();
+          renderAll();
+        }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
+      }
+      async function logoutUser(){
+        try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
+        authToken='';API_USER_ID=null;localStorage.removeItem(SK_AUTH);
+        document.getElementById('auth-overlay').classList.add('open');
+      }
+      // expõe para onkeydown do HTML
+      window._alimLogin=doLogin;
+
+      $('go-hub-btn').addEventListener('click',goHub);
+      qsa('.nav-btn').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
+      $('btn-theme').addEventListener('click',toggleTheme);
+      // "+" dropdown
+      const _dd=$('new-meal-dropdown');
+      $('new-meal-btn').addEventListener('click',e=>{
+        e.stopPropagation();
+        const isOpen=_dd.style.display==='block';
+        if(isOpen){ _dd.style.display='none'; return; }
+        const r=$('new-meal-btn').getBoundingClientRect();
+        _dd.style.top=(r.bottom+6)+'px';
+        _dd.style.right=(window.innerWidth-r.right)+'px';
+        _dd.style.display='block';
+      });
+      $('dd-refeicao').addEventListener('click',()=>{ _dd.style.display='none'; openMealModal(); });
+      $('dd-agua').addEventListener('click',()=>{ _dd.style.display='none'; openWaterModal(); });
+      document.addEventListener('click',()=>{ _dd.style.display='none'; });
+      $('meal-search').addEventListener('input',renderMealsPage);
+      $('meal-filter-type').addEventListener('change',renderMealsPage);
+      $('save-goals-btn').addEventListener('click',saveGoalsAction);
+      $('default-goals-btn').addEventListener('click',resetGoals);
+      $('prev-week-btn').addEventListener('click',prevWeek);
+      $('next-week-btn').addEventListener('click',nextWeek);
+      $('today-week-btn').addEventListener('click',goToWeekOfToday);
+      $('copy-plan-btn').addEventListener('click',openWizard);
+      $('prev-month-btn').addEventListener('click',()=>changeMonth(-1));
+      $('next-month-btn').addEventListener('click',()=>changeMonth(1));
+      $('current-month-btn').addEventListener('click',goCurrentMonth);
+      $('close-meal-modal').addEventListener('click',closeMealModal);
+      $('cancel-meal-modal').addEventListener('click',closeMealModal);
+      $('save-meal-btn').addEventListener('click',()=>{ _mealDirty=false; saveMealAction(); });
+      $('ov-meal').addEventListener('click',e=>{ if(e.target.id==='ov-meal') _mealDirtyGuard(); });
+      $('ov-meal').querySelector('.modal').addEventListener('input',()=>_mealDirty=true);
+      $('ov-meal').querySelector('.modal').addEventListener('change',()=>_mealDirty=true);
+      // Water modal
+      $('water-quick-add').addEventListener('click',e=>{ e.stopPropagation(); openWaterModal(); });
+      $('water-quick-remove').addEventListener('click',e=>{
+        e.stopPropagation();
+        const today=todayStr();
+        const idx=[...waterLogs].map((w,i)=>({w,i})).filter(({w})=>w.date===today).sort((a,b)=>String(b.w.time||'').localeCompare(String(a.w.time||''))).map(x=>x.i)[0];
+        if(idx==null) return;
+        waterLogs.splice(idx,1);
+        lsSet(KEY_WATER,JSON.stringify(waterLogs));
+        renderDashboard();
+      });
+      $('sum-water-card').addEventListener('click',openWaterModal);
+      $('close-water-modal').addEventListener('click',closeWaterModal);
+      $('cancel-water-modal').addEventListener('click',closeWaterModal);
+      $('save-water-btn').addEventListener('click',saveWater);
+      $('ov-water').addEventListener('click',e=>{ if(e.target.id==='ov-water') _waterDirtyGuard(); });
+      $('water-ml').addEventListener('input',()=>{ if($('water-ml').value) _waterDirty=true; });
+      $('water-ml').addEventListener('keydown',e=>{ if(e.key==='Enter') saveWater(); });
+      qsa('[data-water-preset]').forEach(btn=>btn.addEventListener('click',()=>{ $('water-ml').value=btn.dataset.waterPreset; }));
+      // Cal detail modal
+      $('close-cal-detail').addEventListener('click',()=>$('ov-cal-detail').classList.remove('open'));
+      $('close-cal-detail-btn').addEventListener('click',()=>$('ov-cal-detail').classList.remove('open'));
+      $('ov-cal-detail').addEventListener('click',e=>{ if(e.target.id==='ov-cal-detail') $('ov-cal-detail').classList.remove('open'); });
+      $('cal-body').addEventListener('click',e=>{
+        const el=e.target.closest('[data-meal-id]');
+        if(el) openCalDetail(el.dataset.mealId);
+      });
+      // Wizard modal
+      $('close-wizard-btn').addEventListener('click',()=>$('ov-wizard').classList.remove('open'));
+      $('wiz-next-btn').addEventListener('click',()=>wizardAdvance(false));
+      $('wiz-skip-btn').addEventListener('click',()=>wizardAdvance(true));
+      $('ov-wizard').addEventListener('click',e=>{ if(e.target.id==='ov-wizard') $('ov-wizard').classList.remove('open'); });
+      // metas toggle icon
+      $('metas-details').addEventListener('toggle',()=>{ $('metas-toggle-icon').textContent=$('metas-details').open?'▲':'▼'; });
+
+      (function(){const th=localStorage.getItem('app_theme')||'dark';document.documentElement.setAttribute('data-theme',th);$('btn-theme').textContent=th==='dark'?'🌙':'☀️';})();
+      checkAuth().then(ok=>{
+        if(!ok){document.getElementById('auth-overlay').classList.add('open');renderAll();return;}
+        applyUserIsolation(API_USER_ID);
+        bootstrapApi().then(()=>renderAll());
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Backend
+backend/node_modules/
+backend/dist/
+backend/.env
+backend/.npm-cache/
+backend/prisma/.env
+
+# OS
+.DS_Store
+Thumbs.db

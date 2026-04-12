@@ -1,0 +1,5 @@
+backend/
+db/
+docker-compose.yml
+README.md
+fundo.jpg

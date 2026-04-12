@@ -1,0 +1,1682 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>(function(){const t=localStorage.getItem('app_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})()</script>
+  <title>Saúde</title>
+  <link rel="icon" type="image/png" href="assets/Saúde.png">
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    [data-theme="dark"]{
+      --body-bg:#1A1A1B;
+      --bg:#1A1A1B;--surface:#252324;--surface2:#2F2D2E;--surface3:#3A3839;
+      --border:rgba(242,237,228,0.08);--border2:rgba(242,237,228,0.16);
+      --text:#F2EDE4;--muted:#AAB7B7;--hint:rgba(170,183,183,0.45);--shadow:rgba(0,0,0,0.6);
+    }
+    [data-theme="light"]{
+      --body-bg:#F2EDE4;
+      --bg:#F2EDE4;--surface:#FDFAF6;--surface2:#EDE8DF;--surface3:#DFD8CC;
+      --border:rgba(62,74,89,0.1);--border2:rgba(62,74,89,0.2);
+      --text:#1A1A1B;--muted:#3E4A59;--hint:#AAB7B7;--shadow:rgba(0,0,0,0.08);
+    }
+    :root{
+      --green:#3dd9a5;--green-bg:rgba(61,217,165,0.12);--green-border:rgba(61,217,165,0.25);
+      --red:#ff6b8a;--red-bg:rgba(255,107,138,0.12);--red-border:rgba(255,107,138,0.25);
+      --accent:#3E4A59;--accent-bg:rgba(62,74,89,0.15);--accent-border:rgba(62,74,89,0.3);
+      --sage:#87A28B;--sage-bg:rgba(135,162,139,0.12);--sage-border:rgba(135,162,139,0.25);
+      --gold:#E7C489;--gold-bg:rgba(231,196,137,0.12);--gold-border:rgba(231,196,137,0.25);
+      --purple:#3E4A59;--purple-bg:rgba(62,74,89,0.15);--purple-border:rgba(62,74,89,0.3);
+      --blue:#87A28B;--blue-bg:rgba(135,162,139,0.12);--blue-border:rgba(135,162,139,0.25);
+      --health:#3E4A59;--health-bg:rgba(62,74,89,0.15);--health-border:rgba(62,74,89,0.3);
+      --radius:16px;--radius-sm:10px;--mono:"DM Mono",monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--text);min-height:100vh}
+    button,input,select,textarea{font:inherit}
+    a{color:inherit}
+
+    .nav{display:flex;align-items:center;gap:2px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:0;z-index:20;overflow-x:auto;scrollbar-width:none}
+    .nav::-webkit-scrollbar{display:none}
+    .nav-logo{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-right:16px;cursor:pointer}
+    .nav-logo-mark{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+    .nav-logo-img{width:28px;height:28px;object-fit:contain;}
+    .nav-logo-text{font-size:16px;font-weight:700}
+    .nav-btn{border:none;background:none;color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+    .nav-btn.active{background:var(--health-bg);color:var(--health)}
+    .nav-btn:hover:not(.active){background:var(--surface2);color:var(--text)}
+    .nav-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+    .btn,.btn-icon,.btn-primary{border-radius:var(--radius-sm);cursor:pointer;transition:.15s}
+    .btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:8px 12px}
+    .btn:hover{border-color:var(--border2)}
+    .btn-primary{border:none;background:var(--health);color:#fff;padding:8px 14px;font-weight:700}
+    .btn-primary:hover{opacity:.9}
+    .btn-icon{width:32px;height:32px;border:1px solid var(--border);background:none;color:var(--muted);display:flex;align-items:center;justify-content:center}
+    .btn-icon:hover{color:var(--text);border-color:var(--border2)}
+    .btn-danger{background:var(--red-bg);color:var(--red);border-color:transparent}
+    .btn-success{background:var(--green-bg);color:var(--green);border-color:transparent}
+    .btn-warning{background:var(--health-bg);color:var(--health);border-color:transparent}
+
+    .app{max-width:1680px;margin:0 auto;padding:24px 24px 40px}
+    .page{display:none}.page.active{display:block}
+    .summary{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
+    .card,.section{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01)),var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px var(--shadow)}
+    .card{padding:18px 20px}.section{padding:20px;margin-bottom:16px}
+    .card-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+    .card-value{font-family:var(--mono);font-size:21px;font-weight:500}
+    .card-sub{font-size:11px;color:var(--hint);margin-top:4px}
+    .health{color:var(--health)} .green{color:var(--green)} .blue{color:var(--blue)} .purple{color:var(--purple)} .red{color:var(--red)}
+
+    .section-title{font-size:14px;font-weight:600;margin-bottom:14px}
+    .section-sub{font-size:12px;color:var(--muted);margin:-4px 0 14px}
+    .dash-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+    .dash-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    .chart-wrap{position:relative;height:260px}
+
+    .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+    .search,.sel,.input,.textarea{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);outline:none;width:100%}
+    .search:focus,.sel:focus,.input:focus,.textarea:focus{border-color:var(--border2)}
+    .search{max-width:280px}.textarea{resize:vertical;min-height:72px}
+
+    .table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;font-size:13px;vertical-align:middle}
+    .table th{font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:.4px;font-weight:500}
+    .table td:last-child,.table th:last-child{text-align:right}.table tr:last-child td{border-bottom:none}
+    .row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+
+    .badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid transparent}
+    .badge.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+    .badge.atencao{background:var(--health-bg);color:var(--health);border-color:var(--health-border)}
+    .badge.critico{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+    .badge.agendado{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border)}
+    .badge.realizada{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+    .badge.cancelada{background:var(--surface3);color:var(--muted);border-color:var(--border)}
+    .badge.peso{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-border)}
+
+    .stat-list{display:flex;flex-direction:column;gap:10px}
+    .stat-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:12px}
+    .stat-row-main{flex:1;min-width:0}
+    .stat-row-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .stat-row-sub{font-size:11px;color:var(--muted);margin-top:2px}
+    .stat-row-val{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+
+    .alert-list{display:flex;flex-direction:column;gap:10px}
+    .alert-card{padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface2)}
+    .alert-card.warning{background:var(--health-bg);border-color:var(--health-border)}
+    .alert-card.danger{background:var(--red-bg);border-color:var(--red-border)}
+    .alert-title{font-size:13px;font-weight:700;margin-bottom:4px}
+    .alert-text{font-size:12px;color:var(--muted)}
+
+    .chip-row{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:4px 8px;border-radius:20px}
+    .chip.health{color:var(--health);border-color:var(--health-border);background:var(--health-bg)}
+
+    .cal-head{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+    .cal-label{font-size:15px;font-weight:600;min-width:170px;text-align:center}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .cal-dow{text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--hint);padding:6px 0}
+    .cal-day{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-height:110px}
+    .cal-day.other{opacity:.35}.cal-day.today{border-color:var(--health)}
+    .cal-num{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px}
+    .cal-event{font-size:10px;padding:3px 6px;border-radius:6px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid transparent}
+    .cal-event.weight{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-border)}
+    .cal-event.exam{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border)}
+    .cal-event.consult{background:var(--health-bg);color:var(--health);border-color:var(--health-border)}
+
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px;z-index:100}
+    .overlay.open{display:flex}
+    .modal{width:100%;max-width:860px;background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;max-height:90vh;overflow:auto}
+    .modal.sm{max-width:540px}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .modal-title{font-size:18px;font-weight:600}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+    .form-row.triple{grid-template-columns:1fr 1fr 1fr}
+    .field{display:flex;flex-direction:column;gap:5px} label{font-size:12px;color:var(--muted)}
+    .modal-footer{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+
+    .empty{padding:24px;text-align:center;color:var(--muted)}
+    .mono{font-family:var(--mono)}
+
+    /* REMÉDIOS */
+    .rem-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+    .rem-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px;}
+    .rem-card-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+    .rem-card-icon{font-size:22px;line-height:1;flex-shrink:0;}
+    .rem-card-name{font-size:14px;font-weight:700;flex:1;}
+    .rem-card-cat{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.4px;}
+    .rem-card-stock{font-size:22px;font-weight:700;font-family:var(--mono,monospace);margin-bottom:2px;}
+    .rem-card-stock.ok{color:var(--health);}
+    .rem-card-stock.low{color:var(--amber);}
+    .rem-card-stock.out{color:var(--red);}
+    .rem-stock-bar{height:6px;background:var(--surface3);border-radius:99px;overflow:hidden;margin:6px 0 10px;}
+    .rem-stock-fill{height:100%;border-radius:99px;transition:width .4s;}
+    .rem-card-meta{font-size:11px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px;}
+    .rem-card-actions{display:flex;gap:8px;flex-wrap:wrap;}
+    .rem-habito-link{border-top:1px solid var(--border);margin:10px 0 8px;padding-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+    .rem-habito-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;flex-shrink:0;}
+    .rem-habito-badge.done{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+    .rem-habito-badge.pending{background:var(--surface3);color:var(--muted);border:1px solid var(--border);}
+    .rem-habito-dots{display:flex;gap:3px;align-items:center;}
+    .rem-h-dot{width:10px;height:10px;border-radius:3px;background:var(--surface3);}
+    .rem-h-dot.done{background:var(--green);opacity:.8;}
+    .rem-h-dot.miss{background:var(--surface3);}
+    .rem-h-dot.future{background:var(--surface3);opacity:.3;}
+
+
+    @media(max-width:1180px){.summary{grid-template-columns:repeat(3,1fr)}.dash-grid,.dash-grid-3{grid-template-columns:1fr}}
+    @media(max-width:700px){.app{padding:12px 10px 40px}.summary{grid-template-columns:1fr 1fr}.form-row,.form-row.triple{grid-template-columns:1fr}.search{max-width:none}.summary{grid-template-columns:1fr}}
+  /* AUTH */
+  .auth-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.7);z-index:500;}
+  .auth-overlay.open{display:flex;}
+  .auth-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;}
+  .auth-title{font-size:18px;font-weight:700;margin-bottom:4px;}
+  .auth-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px;}
+  .auth-field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:13px;outline:none;}
+  .auth-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+  .auth-err{margin-top:12px;font-size:12px;color:var(--red);}
+  </style>
+</head>
+<body>
+<div class="auth-overlay" id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-title">❤️ Saúde</div>
+    <div class="auth-sub">Entre com seu e-mail e senha para continuar</div>
+    <div class="auth-field"><label>E-mail</label><input id="auth-email" type="email" placeholder="voce@email.com" onkeydown="if(event.key==='Enter')saudeLogin()"></div>
+    <div class="auth-field"><label>Senha</label><input id="auth-pass" type="password" placeholder="Sua senha" onkeydown="if(event.key==='Enter')saudeLogin()"></div>
+    <div class="auth-field"><label>API (avançado)</label><input id="auth-api" type="text" placeholder="http://localhost:3333/api"></div>
+    <div class="auth-actions"><button class="btn-primary" onclick="saudeLogin()">Entrar</button></div>
+    <div class="auth-err" id="auth-msg"></div>
+  </div>
+</div>
+  <nav class="nav">
+    <div class="nav-logo" id="go-hub-btn" title="Voltar ao hub">
+      <div class="nav-logo-mark"><img src="assets/Saúde.png" class="nav-logo-img" alt="Saúde"></div>
+      <div class="nav-logo-text">Saúde</div>
+    </div>
+    <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+    <button class="nav-btn" data-page="calendario">Calendário</button>
+    <button class="nav-btn" data-page="peso">Peso</button>
+    <button class="nav-btn" data-page="exames">Exames</button>
+    <button class="nav-btn" data-page="consultas">Consultas</button>
+    <button class="nav-btn" data-page="medicos">Médicos</button>
+    <button class="nav-btn" data-page="remedios">Remédios</button>
+    <div class="nav-right">
+      <button class="btn-primary" id="quick-add-btn" type="button">+ Novo registro</button>
+      <button class="btn-icon" id="btn-theme" type="button">🌙</button>
+    </div>
+  </nav>
+
+  <div class="app">
+    <div id="page-dashboard" class="page active">
+      <div class="summary">
+        <div class="card"><div class="card-label">Peso atual</div><div class="card-value health" id="sum-weight">—</div><div class="card-sub" id="sum-weight-sub">sem registros</div></div>
+        <div class="card"><div class="card-label">Variação 7 dias</div><div class="card-value purple" id="sum-var-7">—</div><div class="card-sub">comparado com 7 dias atrás</div></div>
+        <div class="card"><div class="card-label">Última consulta</div><div class="card-value blue" id="sum-last-consult">—</div><div class="card-sub" id="sum-last-consult-sub">—</div></div>
+        <div class="card"><div class="card-label">Próximo exame</div><div class="card-value green" id="sum-next-exam">—</div><div class="card-sub" id="sum-next-exam-sub">—</div></div>
+        <div class="card"><div class="card-label">Médicos em atraso</div><div class="card-value red" id="sum-doctors-late">0</div><div class="card-sub">sem retorno há muito tempo</div></div>
+        <div class="card"><div class="card-label">Score geral</div><div class="card-value health" id="sum-score">0</div><div class="card-sub">0–100</div></div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="section">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <div class="section-title" style="margin:0">Evolução do peso</div>
+            <div id="dash-weight-metric-toggles" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-weight"></canvas></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Alertas de saúde</div>
+          <div class="alert-list" id="dashboard-alerts"></div>
+        </div>
+      </div>
+
+      <div class="dash-grid-3">
+        <div class="section">
+          <div class="section-title">Próximas consultas e exames</div>
+          <div class="stat-list" id="dashboard-next-items"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Médicos para acompanhar</div>
+          <div class="stat-list" id="dashboard-doctor-followup"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Integrações do ecossistema</div>
+          <div class="section-sub">Leitura visual de dados do Exercícios, Alimentação e Hábitos salvos no navegador.</div>
+          <div class="chip-row" id="integration-chips"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-peso" class="page">
+      <div class="section">
+        <div class="toolbar">
+          <input class="search" id="weight-search" placeholder="Buscar observação...">
+          <button class="btn-primary" id="new-weight-btn" type="button">+ Registrar peso</button>
+        </div>
+        <div class="summary" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+          <div class="card"><div class="card-label">Meta</div><div class="card-value health" id="goal-weight-card">—</div><div class="card-sub">peso objetivo</div></div>
+          <div class="card"><div class="card-label">IMC atual</div><div class="card-value blue" id="current-bmi-card">—</div><div class="card-sub">com altura configurada</div></div>
+          <div class="card"><div class="card-label">Média 30 dias</div><div class="card-value purple" id="avg-weight-card">—</div><div class="card-sub">média recente</div></div>
+          <div class="card"><div class="card-label">Dif. da meta</div><div class="card-value green" id="goal-diff-card">—</div><div class="card-sub">peso atual x meta</div></div>
+        </div>
+        <div id="weight-metric-toggles" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div class="chart-wrap" style="margin-bottom:16px"><canvas id="chart-weight-detail"></canvas></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead id="weight-thead"></thead>
+            <tbody id="weight-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-exames" class="page">
+      <div class="section">
+        <div class="toolbar">
+          <input class="search" id="exam-search" placeholder="Buscar exame...">
+          <select class="sel" id="exam-filter-status" style="max-width:180px">
+            <option value="">Todos os status</option>
+            <option value="ok">Normal</option>
+            <option value="atencao">Atenção</option>
+            <option value="critico">Crítico</option>
+            <option value="aguardando">Aguardando</option>
+          </select>
+          <button class="btn-primary" id="new-exam-btn" type="button">+ Novo exame</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Data</th><th>Exame</th><th>Status</th><th>Laboratório</th><th>Médico</th><th>PDF</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="exam-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-consultas" class="page">
+      <div class="section">
+        <div class="toolbar">
+          <input class="search" id="consult-search" placeholder="Buscar consulta...">
+          <select class="sel" id="consult-filter-status" style="max-width:180px">
+            <option value="">Todos os status</option>
+            <option value="agendada">Agendada</option>
+            <option value="realizada">Realizada</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+          <button class="btn-primary" id="new-consult-btn" type="button">+ Nova consulta</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Data</th><th>Médico</th><th>Especialidade</th><th>Status</th><th>Retorno</th><th>Resumo</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="consult-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-medicos" class="page">
+      <div class="section">
+        <div class="toolbar">
+          <input class="search" id="doctor-search" placeholder="Buscar médico...">
+          <button class="btn-primary" id="new-doctor-btn" type="button">+ Novo médico</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Nome</th><th>Especialidade</th><th>Contato</th><th>Clínica</th><th>Última consulta</th><th>Status</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="doctor-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-calendario" class="page">
+      <div class="section">
+        <div class="cal-head">
+          <button class="btn-icon" id="prev-month-btn" type="button">‹</button>
+          <div class="cal-label" id="cal-label">—</div>
+          <button class="btn-icon" id="next-month-btn" type="button">›</button>
+          <button class="btn" id="current-month-btn" type="button">Hoje</button>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-dow">Dom</div><div class="cal-dow">Seg</div><div class="cal-dow">Ter</div><div class="cal-dow">Qua</div><div class="cal-dow">Qui</div><div class="cal-dow">Sex</div><div class="cal-dow">Sáb</div>
+        </div>
+        <div class="cal-grid" id="cal-body"></div>
+      </div>
+    </div>
+
+    <div id="page-remedios" class="page">
+      <!-- Remédios recorrentes -->
+      <div class="section">
+        <div class="toolbar">
+          <input class="search" id="rem-search" placeholder="Buscar remédio...">
+          <button class="btn-primary" id="new-remedio-btn" type="button">+ Novo remédio</button>
+        </div>
+        <div class="section-title" style="margin-bottom:8px">Recorrentes</div>
+        <div class="section-sub" style="margin-bottom:14px">Remédios de uso contínuo — controle de estoque e próxima compra</div>
+        <div id="remedios-recorrentes-list"></div>
+      </div>
+
+      <!-- Consumo avulso -->
+      <div class="section">
+        <div class="toolbar" style="margin-bottom:0">
+          <div class="section-title">Consumo avulso</div>
+          <button class="btn-primary" id="new-consumo-btn" type="button">+ Registrar uso</button>
+        </div>
+        <div class="section-sub" style="margin-bottom:14px">Medicamentos pontuais — dores, gripes, etc.</div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Data</th><th>Remédio</th><th>Dose</th><th>Motivo</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="consumo-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: novo/editar remédio recorrente -->
+  <div class="overlay" id="ov-remedio">
+    <div class="modal">
+      <div class="modal-head">
+        <div class="modal-title" id="remedio-modal-title">Novo remédio</div>
+        <button class="btn-icon" id="close-remedio-modal" type="button">×</button>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Nome</label><input class="input" id="rm-name" placeholder="Ex: Losartana 50mg"></div>
+        <div class="field"><label>Categoria</label>
+          <select class="sel" id="rm-cat">
+            <option value="hipertensao">Hipertensão</option>
+            <option value="diabetes">Diabetes</option>
+            <option value="colesterol">Colesterol</option>
+            <option value="ansiedade">Ansiedade / Humor</option>
+            <option value="tireoide">Tireoide</option>
+            <option value="vitamina">Vitamina / Suplemento</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row triple">
+        <div class="field"><label>Dose diária</label><input class="input" id="rm-dose" placeholder="Ex: 1 comprimido"></div>
+        <div class="field"><label>Estoque atual (unid.)</label><input class="input" id="rm-stock" type="number" min="0"></div>
+        <div class="field"><label>Qtd. por compra</label><input class="input" id="rm-qty" type="number" min="1" placeholder="Ex: 30"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Duração (dias entre compras)</label><input class="input" id="rm-days" type="number" min="1" placeholder="Ex: 30"></div>
+        <div class="field"><label>Última compra</label><input class="input" id="rm-last-buy" type="date"></div>
+      </div>
+      <div class="field" style="margin-bottom:12px"><label>Observação</label><textarea class="textarea" id="rm-note" placeholder="Opcional"></textarea></div>
+      <div id="rm-criar-habito-row" style="display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--border);margin-bottom:4px">
+        <input type="checkbox" id="rm-criar-habito" style="width:16px;height:16px;cursor:pointer;accent-color:var(--health)">
+        <label for="rm-criar-habito" style="font-size:13px;color:var(--text);cursor:pointer;margin:0">Criar hábito diário no módulo Hábitos para registrar o uso</label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancel-remedio-modal" type="button">Cancelar</button>
+        <button class="btn-primary" id="save-remedio-btn" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: registrar consumo avulso -->
+  <div class="overlay" id="ov-consumo">
+    <div class="modal sm">
+      <div class="modal-head">
+        <div class="modal-title" id="consumo-modal-title">Registrar uso</div>
+        <button class="btn-icon" id="close-consumo-modal" type="button">×</button>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Data</label><input class="input" id="co-date" type="date"></div>
+        <div class="field"><label>Hora</label><input class="input" id="co-time" type="time"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px"><label>Remédio</label><input class="input" id="co-name" placeholder="Ex: Neosaldina, Dipirona..."></div>
+      <div class="field" style="margin-bottom:10px"><label>Dose</label><input class="input" id="co-dose" placeholder="Ex: 1 comprimido, 10ml"></div>
+      <div class="field" style="margin-bottom:12px"><label>Motivo / sintoma</label><input class="input" id="co-reason" placeholder="Ex: dor de cabeça, febre..."></div>
+      <div class="modal-footer">
+        <button class="btn" id="cancel-consumo-modal" type="button">Cancelar</button>
+        <button class="btn-primary" id="save-consumo-btn" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-quick">
+    <div class="modal sm">
+      <div class="modal-head"><div class="modal-title">Novo registro</div><button class="btn-icon" id="close-quick-modal" type="button">×</button></div>
+      <div class="chip-row" style="margin-bottom:16px">
+        <button class="btn btn-warning" data-quick="peso">Peso</button>
+        <button class="btn" data-quick="exame">Exame</button>
+        <button class="btn" data-quick="consulta">Consulta</button>
+        <button class="btn" data-quick="medico">Médico</button>
+      </div>
+      <div class="empty">Escolhe o tipo de registro para abrir o formulário.</div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-weight">
+    <div class="modal">
+      <div class="modal-head"><div class="modal-title" id="weight-modal-title">Novo peso</div><button class="btn-icon" id="close-weight-modal" type="button">×</button></div>
+      <div class="form-row triple">
+        <div class="field"><label>Data</label><input class="input" id="w-date" type="date"></div>
+        <div class="field"><label>Hora (opcional)</label><input class="input" id="w-time" type="time"></div>
+        <div class="field"><label>Peso (kg)</label><input class="input" id="w-weight" type="number" step="0.1"></div>
+      </div>
+      <div class="form-row triple">
+        <div class="field"><label>Altura (m)</label><input class="input" id="w-height" type="number" step="0.01" placeholder="Ex: 1.75"></div>
+        <div class="field"><label>Gordura (%)</label><input class="input" id="w-fat" type="number" step="0.1"></div>
+        <div class="field"><label>Massa muscular (kg)</label><input class="input" id="w-muscle" type="number" step="0.1"></div>
+      </div>
+      <div class="form-row triple">
+        <div class="field"><label>Meta de peso (kg)</label><input class="input" id="w-goal" type="number" step="0.1"></div>
+        <div class="field"><label>Cintura (cm)</label><input class="input" id="w-waist" type="number" step="0.1"></div>
+        <div class="field"><label>Quadril (cm)</label><input class="input" id="w-hip" type="number" step="0.1"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Peito (cm)</label><input class="input" id="w-chest" type="number" step="0.1"></div>
+      </div>
+      <div class="field"><label>Observação</label><textarea class="textarea" id="w-note" placeholder="Ex: medição em jejum"></textarea></div>
+      <div class="modal-footer"><button class="btn" id="cancel-weight-modal" type="button">Cancelar</button><button class="btn-primary" id="save-weight-btn" type="button">Salvar</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-exam">
+    <div class="modal">
+      <div class="modal-head"><div class="modal-title" id="exam-modal-title">Novo exame</div><button class="btn-icon" id="close-exam-modal" type="button">×</button></div>
+      <div class="form-row triple">
+        <div class="field"><label>Data</label><input class="input" id="e-date" type="date"></div>
+        <div class="field"><label>Nome do exame</label><input class="input" id="e-name"></div>
+        <div class="field"><label>Categoria</label><select class="sel" id="e-category"><option value="sangue">Sangue</option><option value="imagem">Imagem</option><option value="cardiologico">Cardiológico</option><option value="hormonal">Hormonal</option><option value="checkup">Check-up</option><option value="outro">Outro</option></select></div>
+      </div>
+      <div class="form-row triple">
+        <div class="field"><label>Status</label><select class="sel" id="e-status"><option value="ok">Normal</option><option value="atencao">Atenção</option><option value="critico">Crítico</option><option value="aguardando">Aguardando</option></select></div>
+        <div class="field"><label>Laboratório</label><input class="input" id="e-lab"></div>
+        <div class="field"><label>Médico solicitante</label><select class="sel" id="e-doctor"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Próximo vencimento / repetir em</label><input class="input" id="e-next-date" type="date"></div>
+        <div class="field"><label>PDF do exame</label><input class="input" id="e-file" type="file" accept="application/pdf"></div>
+      </div>
+      <div class="field"><label>Observações</label><textarea class="textarea" id="e-note"></textarea></div>
+      <div class="modal-footer"><button class="btn" id="cancel-exam-modal" type="button">Cancelar</button><button class="btn-primary" id="save-exam-btn" type="button">Salvar</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-consult">
+    <div class="modal">
+      <div class="modal-head"><div class="modal-title" id="consult-modal-title">Nova consulta</div><button class="btn-icon" id="close-consult-modal" type="button">×</button></div>
+      <div class="form-row triple">
+        <div class="field"><label>Data</label><input class="input" id="c-date" type="date"></div>
+        <div class="field"><label>Hora</label><input class="input" id="c-time" type="time"></div>
+        <div class="field"><label>Status</label><select class="sel" id="c-status"><option value="agendada">Agendada</option><option value="realizada">Realizada</option><option value="cancelada">Cancelada</option></select></div>
+      </div>
+      <div class="form-row triple">
+        <div class="field"><label>Médico</label><select class="sel" id="c-doctor"></select></div>
+        <div class="field"><label>Especialidade</label><input class="input" id="c-specialty"></div>
+        <div class="field"><label>Motivo</label><input class="input" id="c-reason"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Retorno recomendado (dias)</label><input class="input" id="c-return-days" type="number" min="0"></div>
+        <div class="field"><label>Próximo retorno marcado</label><input class="input" id="c-next-date" type="date"></div>
+      </div>
+      <div class="field"><label>Resumo / diagnóstico / observações</label><textarea class="textarea" id="c-summary"></textarea></div>
+      <div id="consult-proximo-row" style="display:none;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--border);margin-bottom:4px">
+        <input type="checkbox" id="c-criar-proxima" style="width:16px;height:16px;cursor:pointer;accent-color:var(--health)">
+        <label for="c-criar-proxima" style="font-size:13px;color:var(--text);cursor:pointer;margin:0">Já adicionar o card da próxima consulta com essa data</label>
+      </div>
+      <div class="modal-footer"><button class="btn" id="cancel-consult-modal" type="button">Cancelar</button><button class="btn-primary" id="save-consult-btn" type="button">Salvar</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-doctor">
+    <div class="modal">
+      <div class="modal-head"><div class="modal-title" id="doctor-modal-title">Novo médico</div><button class="btn-icon" id="close-doctor-modal" type="button">×</button></div>
+      <div class="form-row triple">
+        <div class="field"><label>Nome</label><input class="input" id="d-name"></div>
+        <div class="field"><label>Especialidade</label><input class="input" id="d-specialty"></div>
+        <div class="field"><label>Frequência ideal (dias)</label><input class="input" id="d-frequency" type="number" min="0" placeholder="Ex: 365"></div>
+      </div>
+      <div class="form-row triple">
+        <div class="field"><label>Telefone</label><input class="input" id="d-phone"></div>
+        <div class="field"><label>WhatsApp</label><input class="input" id="d-whats"></div>
+        <div class="field"><label>E-mail</label><input class="input" id="d-email" type="email"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Clínica / hospital</label><input class="input" id="d-clinic"></div>
+        <div class="field"><label>Endereço / cidade</label><input class="input" id="d-address"></div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Atendimento</label>
+          <div style="display:flex;gap:16px;margin-top:6px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="d-atend" id="d-atend-plano" value="plano" style="accent-color:var(--health)"> Plano</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="d-atend" id="d-atend-particular" value="particular" style="accent-color:var(--health)"> Particular</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="d-atend" id="d-atend-ambos" value="ambos" style="accent-color:var(--health)"> Plano e Particular</label>
+          </div>
+        </div>
+        <div class="field" id="d-valor-row" style="display:none"><label>Valor da consulta (R$)</label><input class="input" id="d-valor" type="number" min="0" step="0.01" placeholder="Ex: 350,00"></div>
+      </div>
+      <div class="field"><label>Observações</label><textarea class="textarea" id="d-note"></textarea></div>
+      <div class="modal-footer"><button class="btn" id="cancel-doctor-modal" type="button">Cancelar</button><button class="btn-primary" id="save-doctor-btn" type="button">Salvar</button></div>
+    </div>
+  </div>
+
+  <script>
+    // ── AUTH + API ──────────────────────────────────────────────────────────────
+    const SK_AUTH='fin_auth_token_v1',SK_API_BASE='fin_api_base_v1';
+    let authToken=localStorage.getItem(SK_AUTH)||'';
+    let apiBase=localStorage.getItem(SK_API_BASE)||'http://localhost:3333/api';
+    let API_USER_ID=null;
+    function getApiBase(){return(apiBase||'http://localhost:3333/api').replace(/\/+$/,'');}
+    function canUseApi(){return!!(authToken&&API_USER_ID);}
+    async function apiReq(path,opts={}){
+      const headers={'Content-Type':'application/json',...(opts.headers||{})};
+      if(authToken)headers.Authorization='Bearer '+authToken;
+      let res;
+      try{res=await fetch(getApiBase()+path,{...opts,headers});}catch(e){throw new Error('Falha de rede');}
+      if(!res.ok){let msg='Erro';try{const j=await res.json();msg=j.error||msg;}catch(_){}throw new Error(msg);}
+      if(res.status===204)return null;
+      return res.json();
+    }
+    async function checkAuthSaude(){
+      if(!authToken)return false;
+      try{const d=await apiReq('/auth/me',{method:'GET'});API_USER_ID=d.user.id;return true;}
+      catch(_){authToken='';API_USER_ID=null;return false;}
+    }
+
+    const SK_LAST_USER='app_last_user_id';
+    // storage helpers – isolamento por usuário
+    function _uid(){return localStorage.getItem('hub_user_id')||'anon';}
+    function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
+    function lsSet(k,v){localStorage.setItem('u_'+_uid()+'_'+k,v);}
+    function lsRem(k){localStorage.removeItem('u_'+_uid()+'_'+k);}
+    function clearModuleStorage(){
+      const keep=new Set(['fin_auth_token_v1','fin_api_base_v1','app_theme','app_last_user_id']);
+      for(const k of[...Object.keys(localStorage)])if(!keep.has(k))localStorage.removeItem(k);
+    }
+    function applyUserIsolation(userId){
+      const last=localStorage.getItem(SK_LAST_USER);
+      if(last&&last!==String(userId))clearModuleStorage();
+      localStorage.setItem(SK_LAST_USER,String(userId));
+    }
+
+    async function saudeLogin(){
+      const email=document.getElementById('auth-email').value.trim();
+      const senha=document.getElementById('auth-pass').value;
+      const apiInput=document.getElementById('auth-api').value.trim();
+      const msg=document.getElementById('auth-msg');
+      msg.textContent='';
+      if(!email||!senha){msg.textContent='Preencha e-mail e senha.';return;}
+      if(apiInput){apiBase=apiInput;localStorage.setItem(SK_API_BASE,apiBase);}
+      try{
+        const data=await apiReq('/auth/login',{method:'POST',body:JSON.stringify({email,senha})});
+        authToken=data.token;API_USER_ID=data.user.id;
+        localStorage.setItem(SK_AUTH,authToken);
+        applyUserIsolation(API_USER_ID);
+        document.getElementById('auth-overlay').classList.remove('open');
+        await saudeBootstrap();
+        window.saudeApp&&window.saudeApp.renderAll&&window.saudeApp.renderAll();
+      }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
+    }
+    function saudeLogout(){
+      try{if(authToken)apiReq('/auth/logout',{method:'POST'});}catch(_){}
+      authToken='';API_USER_ID=null;localStorage.removeItem(SK_AUTH);
+      document.getElementById('auth-overlay').classList.add('open');
+    }
+
+    // sync helpers
+    async function syncWeight(w){
+      if(!canUseApi())return;
+      await apiReq('/health/weights',{method:'POST',body:JSON.stringify({
+        client_id:w.id,
+        date:w.date,weight:w.weight,height:w.height,fat:w.fat,note:w.note||null,
+        extraJson:{muscle:w.muscle,goal:w.goal,waist:w.waist,hip:w.hip,chest:w.chest},
+      })}).catch(()=>null);
+    }
+    async function syncMedico(d){
+      if(!canUseApi())return;
+      return apiReq('/saude/medicos',{method:'POST',body:JSON.stringify({
+        usuario_id:API_USER_ID,client_id:d.id,nome:d.name,especialidade:d.specialty||null,
+        frequencyDays:d.frequencyDays||null,phone:d.phone||null,whats:d.whats||null,
+        email:d.email||null,clinica:d.clinic||null,endereco:d.address||null,obs:d.note||null,
+      })}).catch(()=>null);
+    }
+    async function deleteMedicoApi(d){
+      if(!canUseApi()||!d._dbId)return;
+      await apiReq(`/saude/medicos/${d._dbId}`,{method:'DELETE'}).catch(()=>null);
+    }
+    async function syncExame(e){
+      if(!canUseApi())return;
+      return apiReq('/saude/exames',{method:'POST',body:JSON.stringify({
+        usuario_id:API_USER_ID,client_id:e.id,nome:e.name,categoria:e.category||null,
+        status:e.status||null,laboratorio:e.lab||null,medicoId:e.doctorId||null,
+        date:e.date,nextDate:e.nextDate||null,obs:e.note||null,
+        fileName:e.fileName||null,fileData:e.fileData||null,
+      })}).catch(()=>null);
+    }
+    async function deleteExameApi(e){
+      if(!canUseApi()||!e._dbId)return;
+      await apiReq(`/saude/exames/${e._dbId}`,{method:'DELETE'}).catch(()=>null);
+    }
+    async function syncConsulta(c){
+      if(!canUseApi())return;
+      return apiReq('/saude/consultas',{method:'POST',body:JSON.stringify({
+        usuario_id:API_USER_ID,client_id:c.id,date:c.date,time:c.time||null,
+        medicoId:c.doctorId||null,especialidade:c.specialty||null,motivo:c.reason||null,
+        status:c.status||null,returnDays:c.returnDays||null,nextDate:c.nextDate||null,
+        resumo:c.summary||null,
+      })}).catch(()=>null);
+    }
+    async function deleteConsultaApi(c){
+      if(!canUseApi()||!c._dbId)return;
+      await apiReq(`/saude/consultas/${c._dbId}`,{method:'DELETE'}).catch(()=>null);
+    }
+
+    async function saudeBootstrap(){
+      if(!canUseApi())return;
+      // Bootstrap é chamado depois que state já está carregado do localStorage
+      // Puxamos dados da API e mesclamos com o estado local
+      try{
+        const[rW,rM,rE,rC]=await Promise.all([
+          apiReq('/health/weights'),
+          apiReq(`/saude/medicos?usuario_id=${API_USER_ID}`),
+          apiReq(`/saude/exames?usuario_id=${API_USER_ID}`),
+          apiReq(`/saude/consultas?usuario_id=${API_USER_ID}`),
+        ]);
+        // HealthWeight usa modelo diferente — mapeamos via extraJson
+        const deleted = {
+          weights:new Set((deletedState&&deletedState.weights)||[]),
+          doctors:new Set((deletedState&&deletedState.doctors)||[]),
+          exams:new Set((deletedState&&deletedState.exams)||[]),
+          consults:new Set((deletedState&&deletedState.consults)||[])
+        };
+        const apiWeights=(rW.data||rW).map(r=>({
+          id:r.client_id||r.extraJson?.id||r.id,_dbId:r.id,
+          date:typeof r.date==='string'?r.date.slice(0,10):new Date(r.date).toISOString().slice(0,10),
+          weight:r.weight!=null?Number(r.weight):null,
+          height:r.height!=null?Number(r.height):null,
+          fat:r.fat!=null?Number(r.fat):null,
+          note:r.note||'',
+          muscle:r.extraJson?.muscle||null,goal:r.extraJson?.goal||null,
+          waist:r.extraJson?.waist||null,hip:r.extraJson?.hip||null,chest:r.extraJson?.chest||null,
+        })).filter(r=>!deleted.weights.has(r.id));
+        const apiMedicos=rM.map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,specialty:r.especialidade||'',frequencyDays:r.frequencyDays||null,phone:r.phone||'',whats:r.whats||'',email:r.email||'',clinic:r.clinica||'',address:r.endereco||'',note:r.obs||''})).filter(r=>!deleted.doctors.has(r.id));
+        const apiExames=rE.map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,category:r.categoria||'',status:r.status||'ok',lab:r.laboratorio||'',doctorId:r.medicoId||'',date:r.date,nextDate:r.nextDate||'',note:r.obs||'',fileName:r.fileName||'',fileData:r.fileData||''})).filter(r=>!deleted.exams.has(r.id));
+        const apiConsultas=rC.map(r=>({id:r.client_id,_dbId:r.id,date:r.date,time:r.time||'',doctorId:r.medicoId||'',specialty:r.especialidade||'',reason:r.motivo||'',status:r.status||'agendada',returnDays:r.returnDays||null,nextDate:r.nextDate||'',summary:r.resumo||''})).filter(r=>!deleted.consults.has(r.id));
+
+        // Merge: API + local não sincronizados
+        const app=window.saudeApp;
+        if(!app)return;
+        const st=app.getState();
+        const apiWIds=new Set(apiWeights.map(w=>w.id));
+        const apiMIds=new Set(apiMedicos.map(m=>m.id));
+        const apiEIds=new Set(apiExames.map(e=>e.id));
+        const apiCIds=new Set(apiConsultas.map(c=>c.id));
+        // Only merge items that never had a _dbId (truly local, never synced to server)
+        const nwW=st.weights.filter(w=>!apiWIds.has(w.id) && !deleted.weights.has(w.id) && !w._dbId);
+        const nwM=st.doctors.filter(d=>!apiMIds.has(d.id) && !deleted.doctors.has(d.id) && !d._dbId);
+        const nwE=st.exams.filter(e=>!apiEIds.has(e.id) && !deleted.exams.has(e.id) && !e._dbId);
+        const nwC=st.consults.filter(c=>!apiCIds.has(c.id) && !deleted.consults.has(c.id) && !c._dbId);
+        app.setState({
+          weights:[...apiWeights,...nwW],
+          doctors:[...apiMedicos,...nwM],
+          exams:[...apiExames,...nwE],
+          consults:[...apiConsultas,...nwC],
+        });
+        for(const w of nwW)syncWeight(w).catch(()=>null);
+        for(const m of nwM)syncMedico(m).catch(()=>null);
+        for(const e of nwE)syncExame(e).catch(()=>null);
+        for(const c of nwC)syncConsulta(c).catch(()=>null);
+        app.renderAll();
+      }catch(e){console.error('Bootstrap saúde:',e);}
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const KEY='saude_app_v1';
+      const KEY_DELETED='saude_deleted_ids_v1';
+      const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+      const KEY_REM='saude_remedios_v1';
+      const KEY_CONSUMO='saude_consumos_v1';
+
+      const defaultData={
+        settings:{theme:document.documentElement.getAttribute('data-theme')||'dark'},
+        goals:{weight:null,height:null},
+        weights:[],
+        exams:[],
+        consults:[],
+        doctors:[]
+      };
+
+      let state=loadState();
+      let deletedState=loadDeletedState();
+      let remedios=loadRemedios();
+      let consumos=loadConsumos();
+      let refMonth=new Date();
+      let charts={dashboardWeight:null,weightDetail:null};
+      let editing={weight:null,exam:null,consult:null,doctor:null,remedio:null,consumo:null};
+
+      const WEIGHT_METRICS=[
+        {key:'peso',   label:'Peso',         unit:'kg', color:'--health', bgColor:'--health-bg'},
+        {key:'imc',    label:'IMC',           unit:'',   color:'--blue',   bgColor:'--blue-bg'  },
+        {key:'fat',    label:'Gordura %',     unit:'%',  color:'--red',    bgColor:'--red-bg'   },
+        {key:'muscle', label:'Massa muscular',unit:'kg', color:'--green',  bgColor:'--green-bg' },
+      ];
+      const KEY_WCOLS='saude_weight_cols_v1';
+      function loadWeightCols(){ try{ return Object.assign({peso:true,imc:false,fat:false,muscle:false},JSON.parse(lsGet(KEY_WCOLS)||'{}')); }catch{ return {peso:true,imc:false,fat:false,muscle:false}; } }
+      function saveWeightCols(){ lsSet(KEY_WCOLS,JSON.stringify(weightCols)); }
+      let weightCols=loadWeightCols();
+
+      const KEY_HAB_HABITS='habitos_app_v5';
+
+      applyTheme(localStorage.getItem('app_theme')||state.settings.theme||'dark');
+      bind();
+      renderAll();
+      checkAuthSaude().then(ok=>{
+        if(!ok){document.getElementById('auth-overlay').classList.add('open');return;}
+        applyUserIsolation(API_USER_ID);
+        saudeBootstrap();
+      });
+
+      function loadState(){
+        try{ return {...defaultData,...JSON.parse(lsGet(KEY)||'{}')}; }
+        catch{ return structuredClone(defaultData); }
+      }
+      function loadDeletedState(){
+        try{
+          const raw=JSON.parse(lsGet(KEY_DELETED)||'{}');
+          return {
+            weights:Array.isArray(raw.weights)?raw.weights:[],
+            exams:Array.isArray(raw.exams)?raw.exams:[],
+            consults:Array.isArray(raw.consults)?raw.consults:[],
+            doctors:Array.isArray(raw.doctors)?raw.doctors:[]
+          };
+        }catch{
+          return {weights:[],exams:[],consults:[],doctors:[]};
+        }
+      }
+      function saveState(){ lsSet(KEY,JSON.stringify(state)); }
+      function saveDeletedState(){ lsSet(KEY_DELETED,JSON.stringify(deletedState)); }
+
+      // Expõe estado para o saudeBootstrap e sync functions
+      window.saudeApp={
+        getState:()=>state,
+        setState:(partial)=>{ Object.assign(state,partial); saveState(); },
+        renderAll:()=>renderAll(),
+      };
+      function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
+      function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+      function todayStr(){ return toDateInput(new Date()); }
+      function toDateInput(d){ const dt=new Date(d); const m=String(dt.getMonth()+1).padStart(2,'0'); const day=String(dt.getDate()).padStart(2,'0'); return `${dt.getFullYear()}-${m}-${day}`; }
+      function fmtDate(v){ if(!v) return '—'; const [y,m,d]=String(v).split('-'); return `${d}/${m}/${y}`; }
+      function parseDate(v){ return v ? new Date(v+'T12:00:00') : null; }
+      function daysBetween(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000); }
+      function safeNum(v){ return v===''||v==null?null:Number(v); }
+      function asKg(v){ return v==null||isNaN(v)?'—':`${Number(v).toFixed(1)} kg`; }
+      function bmi(weight,height){ if(!weight||!height) return null; return weight/(height*height); }
+      function average(arr){ if(!arr.length) return null; return arr.reduce((a,b)=>a+b,0)/arr.length; }
+      function compareDates(a,b){ return String(a).localeCompare(String(b)); }
+      function text(v){ return String(v||'').toLowerCase(); }
+      function futureItems(){
+        const today=todayStr();
+        const exams=state.exams.filter(x=>x.nextDate && compareDates(x.nextDate,today)>=0).map(x=>({type:'exam',date:x.nextDate,title:x.name,sub:x.category||'Exame'}));
+        const consults=state.consults.filter(x=>x.status==='agendada' && x.date && compareDates(x.date,today)>=0).map(x=>({type:'consult',date:x.date,title:getDoctorName(x.doctorId)||x.specialty||'Consulta',sub:x.reason||'Consulta'}));
+        return [...exams,...consults].sort((a,b)=>compareDates(a.date,b.date)).slice(0,6);
+      }
+      function lastWeight(){ return [...state.weights].sort((a,b)=>compareDates(b.date,a.date))[0]||null; }
+      function getDoctorName(id){ return state.doctors.find(d=>d.id===id)?.name||''; }
+      function getDoctorById(id){ return state.doctors.find(d=>d.id===id)||null; }
+      function doctorLastConsultDate(id){
+        const items=state.consults.filter(c=>c.doctorId===id && c.status==='realizada').sort((a,b)=>compareDates(b.date,a.date));
+        return items[0]?.date || null;
+      }
+      function doctorStatus(doctor){
+        const last=doctorLastConsultDate(doctor.id);
+        const freq=Number(doctor.frequencyDays||0);
+        if(!last) return {label:'Sem consulta',cls:'atencao',days:null};
+        if(!freq) return {label:'Em dia',cls:'ok',days:daysBetween(last,todayStr())};
+        const delta=daysBetween(last,todayStr());
+        if(delta>freq) return {label:'Atrasado',cls:'critico',days:delta};
+        if(delta>freq*0.75) return {label:'Atenção',cls:'atencao',days:delta};
+        return {label:'Em dia',cls:'ok',days:delta};
+      }
+      function score(){
+        let s=100;
+        const weight=lastWeight();
+        if(!weight) s-=20;
+        const lateDoctors=state.doctors.filter(d=>doctorStatus(d).cls==='critico').length;
+        s-=lateDoctors*8;
+        const criticalExams=state.exams.filter(e=>e.status==='critico').length;
+        s-=criticalExams*8;
+        const overdueExams=state.exams.filter(e=>e.nextDate && compareDates(e.nextDate,todayStr())<0).length;
+        s-=overdueExams*6;
+        const openConsultReturns=state.consults.filter(c=>c.status==='realizada' && c.nextDate && compareDates(c.nextDate,todayStr())<0).length;
+        s-=openConsultReturns*5;
+        return Math.max(0,Math.min(100,s));
+      }
+      function integrationStats(){
+        const chips=[];
+        try{
+          const workouts=JSON.parse(lsGet('saude_treinos_v1')||'[]');
+          chips.push({label:`Exercícios: ${Array.isArray(workouts)?workouts.length:0} treinos`,active:true});
+        }catch{}
+        try{
+          const meals=JSON.parse(lsGet('alimentacao_meals_v3_light')||'[]');
+          chips.push({label:`Alimentação: ${Array.isArray(meals)?meals.length:0} refeições`,active:true});
+        }catch{}
+        try{
+          const habits=JSON.parse(lsGet('habitos_app_v5')||'[]');
+          chips.push({label:`Hábitos: ${Array.isArray(habits)?habits.length:0} hábitos`,active:true});
+        }catch{}
+        if(!chips.length) chips.push({label:'Sem integrações encontradas ainda',active:false});
+        return chips;
+      }
+
+      function bind(){
+        document.querySelectorAll('.nav-btn').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.page,btn)));
+        document.getElementById('btn-theme').addEventListener('click',toggleTheme);
+        document.getElementById('go-hub-btn').addEventListener('click',()=>window.location.href='index.html');
+
+        document.getElementById('quick-add-btn').addEventListener('click',()=>openOverlay('ov-quick'));
+        document.getElementById('close-quick-modal').addEventListener('click',()=>closeOverlay('ov-quick'));
+        document.querySelectorAll('[data-quick]').forEach(btn=>btn.addEventListener('click',()=>{ closeOverlay('ov-quick'); ({peso:openWeightModal,exame:openExamModal,consulta:openConsultModal,medico:openDoctorModal})[btn.dataset.quick](); }));
+
+        document.getElementById('new-weight-btn').addEventListener('click',()=>openWeightModal());
+        document.getElementById('close-weight-modal').addEventListener('click',()=>closeOverlay('ov-weight'));
+        document.getElementById('cancel-weight-modal').addEventListener('click',()=>closeOverlay('ov-weight'));
+        document.getElementById('save-weight-btn').addEventListener('click',saveWeight);
+        document.getElementById('weight-search').addEventListener('input',renderWeights);
+
+        document.getElementById('new-exam-btn').addEventListener('click',()=>openExamModal());
+        document.getElementById('close-exam-modal').addEventListener('click',()=>closeOverlay('ov-exam'));
+        document.getElementById('cancel-exam-modal').addEventListener('click',()=>closeOverlay('ov-exam'));
+        document.getElementById('save-exam-btn').addEventListener('click',saveExam);
+        document.getElementById('exam-search').addEventListener('input',renderExams);
+        document.getElementById('exam-filter-status').addEventListener('change',renderExams);
+
+        document.getElementById('new-consult-btn').addEventListener('click',()=>openConsultModal());
+        document.getElementById('close-consult-modal').addEventListener('click',()=>closeOverlay('ov-consult'));
+        document.getElementById('cancel-consult-modal').addEventListener('click',()=>closeOverlay('ov-consult'));
+        document.getElementById('save-consult-btn').addEventListener('click',saveConsult);
+        document.getElementById('consult-search').addEventListener('input',renderConsults);
+        document.getElementById('c-doctor').addEventListener('change',()=>{
+          const id=document.getElementById('c-doctor').value;
+          if(!id) return;
+          const d=getDoctorById(id);
+          if(d?.specialty) setValue('c-specialty',d.specialty);
+        });
+        document.getElementById('c-next-date').addEventListener('change',updateConsultProximoRow);
+        document.getElementById('c-return-days').addEventListener('input',updateConsultProximoRow);
+        document.getElementById('c-status').addEventListener('change',updateConsultProximoRow);
+        document.getElementById('consult-filter-status').addEventListener('change',renderConsults);
+
+        document.querySelectorAll('input[name="d-atend"]').forEach(r=>r.addEventListener('change',()=>{
+          const v=document.querySelector('input[name="d-atend"]:checked')?.value;
+          document.getElementById('d-valor-row').style.display=(v==='particular'||v==='ambos')?'block':'none';
+        }));
+        document.getElementById('new-doctor-btn').addEventListener('click',()=>openDoctorModal());
+        document.getElementById('close-doctor-modal').addEventListener('click',()=>closeOverlay('ov-doctor'));
+        document.getElementById('cancel-doctor-modal').addEventListener('click',()=>closeOverlay('ov-doctor'));
+        document.getElementById('save-doctor-btn').addEventListener('click',saveDoctor);
+        document.getElementById('doctor-search').addEventListener('input',renderDoctors);
+
+        document.getElementById('prev-month-btn').addEventListener('click',()=>{ refMonth.setMonth(refMonth.getMonth()-1); renderCalendar(); });
+        document.getElementById('next-month-btn').addEventListener('click',()=>{ refMonth.setMonth(refMonth.getMonth()+1); renderCalendar(); });
+        document.getElementById('current-month-btn').addEventListener('click',()=>{ refMonth=new Date(); renderCalendar(); });
+
+        document.getElementById('new-remedio-btn').addEventListener('click',()=>openRemedioModal());
+        document.getElementById('close-remedio-modal').addEventListener('click',()=>closeOverlay('ov-remedio'));
+        document.getElementById('cancel-remedio-modal').addEventListener('click',()=>closeOverlay('ov-remedio'));
+        document.getElementById('save-remedio-btn').addEventListener('click',()=>saveRemedio());
+        document.getElementById('rem-search').addEventListener('input',renderRemedios);
+        document.getElementById('new-consumo-btn').addEventListener('click',()=>openConsumoModal());
+        document.getElementById('close-consumo-modal').addEventListener('click',()=>closeOverlay('ov-consumo'));
+        document.getElementById('cancel-consumo-modal').addEventListener('click',()=>closeOverlay('ov-consumo'));
+        document.getElementById('save-consumo-btn').addEventListener('click',()=>saveConsumo());
+
+        // Backdrop click with dirty guard (skip quick-add and auth overlays)
+        const FORM_OVERLAYS=['ov-weight','ov-exam','ov-consult','ov-doctor','ov-remedio','ov-consumo'];
+        document.querySelectorAll('.overlay').forEach(ov=>{
+          if(FORM_OVERLAYS.includes(ov.id)){
+            ov.addEventListener('click',e=>{ if(e.target===ov) _saude_dirtyGuard(ov.id); });
+            const modal=ov.querySelector('.modal');
+            if(modal){
+              modal.addEventListener('input',_saude_markDirty);
+              modal.addEventListener('change',_saude_markDirty);
+            }
+          } else {
+            ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.remove('open'); });
+          }
+        });
+      }
+
+      // Dirty-state guard for Saude modals
+      let _saudeDirty=false;
+      function _saude_markDirty(){_saudeDirty=true;}
+      function _saude_dirtyGuard(id){
+        if(_saudeDirty&&!confirm('Deseja abandonar as alterações?\nAs informações não serão salvas.')){return;}
+        _saudeDirty=false;
+        closeOverlay(id);
+      }
+
+      function seedIfEmpty(){ return; }
+      function shiftDay(days){ const d=new Date(); d.setDate(d.getDate()+days); return toDateInput(d); }
+
+      function applyTheme(theme){
+        document.documentElement.setAttribute('data-theme',theme);
+        localStorage.setItem('app_theme',theme);
+        state.settings.theme=theme;
+        document.getElementById('btn-theme').textContent=theme==='dark'?'🌙':'☀️';
+        saveState();
+      }
+      function toggleTheme(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); renderAll(); }
+      function showPage(page,btn){
+        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+        document.getElementById(`page-${page}`).classList.add('active');
+        document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+        (btn || document.querySelector(`.nav-btn[data-page="${page}"]`))?.classList.add('active');
+      }
+      function openOverlay(id){ _saudeDirty=false; document.getElementById(id).classList.add('open'); }
+      function closeOverlay(id){ _saudeDirty=false; document.getElementById(id).classList.remove('open'); }
+
+      function loadRemedios(){ try{return JSON.parse(lsGet(KEY_REM)||'[]');}catch{return [];} }
+      function loadConsumos(){ try{return JSON.parse(lsGet(KEY_CONSUMO)||'[]');}catch{return [];} }
+      function saveRemedios(){ try{ lsSet(KEY_REM,JSON.stringify(remedios)); }catch(e){ console.error('saveRemedios:',e); } }
+      function saveConsumos(){ lsSet(KEY_CONSUMO,JSON.stringify(consumos)); }
+
+      const REM_CAT_LABEL={hipertensao:'Hipertensão',diabetes:'Diabetes',colesterol:'Colesterol',ansiedade:'Ansiedade / Humor',tireoide:'Tireoide',vitamina:'Vitamina / Suplemento',outro:'Outro'};
+
+      function remedioStockStatus(r){
+        const stock=Number(r.stock||0);
+        const qty=Number(r.qty||30);
+        const pct=Math.min(1,stock/qty);
+        if(stock===0) return{cls:'out',label:'Sem estoque',pct:0};
+        if(pct<=0.2) return{cls:'low',label:'Estoque baixo',pct};
+        return{cls:'ok',label:'Em dia',pct};
+      }
+
+      function remedioNextBuy(r){
+        if(!r.lastBuy || !r.days) return null;
+        const d=new Date(r.lastBuy+'T12:00:00');
+        d.setDate(d.getDate()+Number(r.days));
+        return toDateInput(d);
+      }
+
+      function createHabitoForRemedio(r){
+        try{
+          const habitos=JSON.parse(lsGet(KEY_HAB_HABITS)||'[]');
+          const hid=uid();
+          habitos.push({
+            id:hid,
+            name:`Tomar ${r.name}`,
+            icon:'💊',
+            cat:'saude',
+            freq:'diario',
+            tipo:'check',
+            unit:'',
+            weekdays:[],
+            startDate:todayStr(),
+            note:r.dose||'',
+            autoType:'',
+            autoKeyword:'',
+            logs:{},
+            linkedRemedioId:r.id
+          });
+          lsSet(KEY_HAB_HABITS,JSON.stringify(habitos));
+          // store link back on the remédio
+          const idx=remedios.findIndex(x=>x.id===r.id);
+          if(idx>=0){ remedios[idx].habitId=hid; saveRemedios(); }
+        }catch(e){ console.error('createHabitoForRemedio',e); }
+      }
+
+      function remedioHabitoStatus(r){
+        if(!r.habitId) return '';
+        try{
+          const habitos=JSON.parse(lsGet(KEY_HAB_HABITS)||'[]');
+          const h=habitos.find(x=>x.id===r.habitId);
+          if(!h) return '';
+          const logs=h.logs||{};
+          const today=new Date();
+          const todayDs=today.toISOString().slice(0,10);
+          const todayDone=!!logs[todayDs];
+          const dots=[];
+          for(let i=6;i>=0;i--){
+            const d=new Date(today); d.setDate(d.getDate()-i);
+            const ds=d.toISOString().slice(0,10);
+            const isFuture=ds>todayDs;
+            dots.push(`<div class="rem-h-dot ${isFuture?'future':logs[ds]?'done':'miss'}" title="${ds}"></div>`);
+          }
+          return `<div class="rem-habito-link">
+            <span class="rem-habito-badge ${todayDone?'done':'pending'}">${todayDone?'✓ Tomado hoje':'○ Pendente hoje'}</span>
+            <div class="rem-habito-dots">${dots.join('')}</div>
+          </div>`;
+        }catch{ return ''; }
+      }
+
+      function renderRemedios(){
+        const q=text(document.getElementById('rem-search').value);
+        const list=document.getElementById('remedios-recorrentes-list');
+        const filtered=remedios.filter(r=>[r.name,r.note,REM_CAT_LABEL[r.cat]||r.cat].some(v=>text(v).includes(q)));
+
+        if(!filtered.length){
+          list.innerHTML=`<div class="empty">Nenhum remédio cadastrado. Clique em "+ Novo remédio" para começar.</div>`;
+          return;
+        }
+
+        list.innerHTML=`<div class="rem-cards">${filtered.map(r=>{
+          const st=remedioStockStatus(r);
+          const next=remedioNextBuy(r);
+          const barColor=st.cls==='ok'?'var(--health)':st.cls==='low'?'var(--amber)':'var(--red)';
+          return`<div class="rem-card">
+            <div class="rem-card-head">
+              <div class="rem-card-icon">💊</div>
+              <div>
+                <div class="rem-card-name">${escapeHtml(r.name)}</div>
+                <div class="rem-card-cat">${escapeHtml(REM_CAT_LABEL[r.cat]||r.cat||'')}</div>
+              </div>
+            </div>
+            <div class="rem-card-stock ${st.cls}">${r.stock??'—'} un.</div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${st.label}</div>
+            <div class="rem-stock-bar"><div class="rem-stock-fill" style="width:${(st.pct*100).toFixed(0)}%;background:${barColor}"></div></div>
+            <div class="rem-card-meta">
+              <span>📋 ${r.dose||'—'}</span>
+              ${r.days?`<span>🔁 a cada ${r.days} dias</span>`:''}
+              ${next?`<span>🛒 próxima compra ${fmtDate(next)}</span>`:''}
+              ${r.note?`<span>📝 ${escapeHtml(r.note)}</span>`:''}
+            </div>
+            ${remedioHabitoStatus(r)}
+            <div class="rem-card-actions">
+              <button class="btn btn-success" onclick="window.saudeApp.editRemedio('${r.id}')">Editar</button>
+              <button class="btn" onclick="window.saudeApp.remedioCompra('${r.id}')">Registrar compra</button>
+              ${r.habitId?`<button class="btn" onclick="window.saudeApp.desvincularHabito('${r.id}')" title="Desvincular do módulo Hábitos">💊 Hábito vinculado</button>`:`<button class="btn" onclick="window.saudeApp.vincularHabito('${r.id}')">+ Criar hábito</button>`}
+              <button class="btn btn-danger" onclick="window.saudeApp.deleteRemedio('${r.id}')">Excluir</button>
+            </div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+
+      function renderConsumos(){
+        const rows=[...consumos].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.time||'').localeCompare(String(a.time||'')));
+        document.getElementById('consumo-body').innerHTML=rows.length?rows.map(c=>`<tr>
+          <td>${fmtDate(c.date)} ${c.time?`<span style="font-size:11px;color:var(--muted)">${c.time}</span>`:''}</td>
+          <td>${escapeHtml(c.name)}</td>
+          <td>${escapeHtml(c.dose||'—')}</td>
+          <td>${escapeHtml(c.reason||'—')}</td>
+          <td><div class="row-actions"><button class="btn btn-danger" onclick="window.saudeApp.deleteConsumo('${c.id}')">Excluir</button></div></td>
+        </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhum consumo registrado.</td></tr>`;
+      }
+
+      function openRemedioModal(id){
+        editing.remedio=id?remedios.find(x=>x.id===id):null;
+        document.getElementById('remedio-modal-title').textContent=editing.remedio?'Editar remédio':'Novo remédio';
+        const r=editing.remedio||{};
+        setValue('rm-name',r.name||''); setValue('rm-cat',r.cat||'outro');
+        setValue('rm-dose',r.dose||''); setValue('rm-stock',r.stock??'');
+        setValue('rm-qty',r.qty||''); setValue('rm-days',r.days||'');
+        setValue('rm-last-buy',r.lastBuy||todayStr()); setValue('rm-note',r.note||'');
+        // show checkbox only for new remédios that don't already have a linked habit
+        const isNew=!editing.remedio;
+        const hasHabit=!isNew && !!(editing.remedio?.habitId);
+        const row=document.getElementById('rm-criar-habito-row');
+        const cb=document.getElementById('rm-criar-habito');
+        row.style.display=(isNew && !hasHabit)?'flex':'none';
+        cb.checked=false;
+        openOverlay('ov-remedio');
+      }
+
+      function saveRemedio(){
+        const name=document.getElementById('rm-name').value.trim();
+        if(!name){alert('Informe o nome do remédio.');return;}
+        const isNew=!editing.remedio;
+        const item={
+          id:editing.remedio?.id||uid(),
+          name,cat:document.getElementById('rm-cat').value,
+          dose:document.getElementById('rm-dose').value.trim(),
+          stock:safeNum(document.getElementById('rm-stock').value),
+          qty:safeNum(document.getElementById('rm-qty').value),
+          days:safeNum(document.getElementById('rm-days').value),
+          lastBuy:document.getElementById('rm-last-buy').value,
+          note:document.getElementById('rm-note').value.trim(),
+          // preserve existing habitId if editing
+          habitId:editing.remedio?.habitId||undefined
+        };
+        const idx=remedios.findIndex(x=>x.id===item.id);
+        if(idx>=0) remedios[idx]=item; else remedios.push(item);
+        editing.remedio=null;
+        saveRemedios();
+        closeOverlay('ov-remedio');
+        renderRemedios();
+        // create linked habit if checkbox was checked
+        if(isNew && document.getElementById('rm-criar-habito').checked){
+          createHabitoForRemedio(item);
+          renderRemedios();
+        }
+      }
+
+      function openConsumoModal(id){
+        editing.consumo=id?consumos.find(x=>x.id===id):null;
+        document.getElementById('consumo-modal-title').textContent='Registrar uso';
+        const c=editing.consumo||{};
+        setValue('co-date',c.date||todayStr()); setValue('co-time',c.time||'');
+        setValue('co-name',c.name||''); setValue('co-dose',c.dose||''); setValue('co-reason',c.reason||'');
+        openOverlay('ov-consumo');
+      }
+
+      function saveConsumo(){
+        const name=document.getElementById('co-name').value.trim();
+        if(!name){alert('Informe o nome do remédio/medicamento.');return;}
+        const item={
+          id:editing.consumo?.id||uid(),
+          date:document.getElementById('co-date').value||todayStr(),
+          time:document.getElementById('co-time').value,
+          name,
+          dose:document.getElementById('co-dose').value.trim(),
+          reason:document.getElementById('co-reason').value.trim()
+        };
+        const idx=consumos.findIndex(x=>x.id===item.id);
+        if(idx>=0) consumos[idx]=item; else consumos.push(item);
+        editing.consumo=null;
+        saveConsumos();
+        closeOverlay('ov-consumo');
+        renderConsumos();
+      }
+
+      function renderAll(){
+        try{populateDoctorSelects();}catch(e){console.error('populateDoctorSelects',e);}
+        try{renderDashboard();}catch(e){console.error('renderDashboard',e);}
+        try{renderWeights();}catch(e){console.error('renderWeights',e);}
+        try{renderExams();}catch(e){console.error('renderExams',e);}
+        try{renderConsults();}catch(e){console.error('renderConsults',e);}
+        try{renderDoctors();}catch(e){console.error('renderDoctors',e);}
+        try{renderCalendar();}catch(e){console.error('renderCalendar',e);}
+        try{renderRemedios();}catch(e){console.error('renderRemedios',e);}
+        try{renderConsumos();}catch(e){console.error('renderConsumos',e);}
+      }
+
+      function renderDashboard(){
+        const lw=lastWeight();
+        document.getElementById('sum-weight').textContent=lw?asKg(lw.weight):'—';
+        document.getElementById('sum-weight-sub').textContent=lw?`último registro em ${fmtDate(lw.date)}`:'sem registros';
+
+        const sortedWeights=[...state.weights].sort((a,b)=>compareDates(a.date,b.date));
+        const current=sortedWeights[sortedWeights.length-1];
+        const ref7=[...sortedWeights].reverse().find(x=>daysBetween(x.date,todayStr())>=7);
+        const delta7=current&&ref7?(current.weight-ref7.weight):null;
+        document.getElementById('sum-var-7').textContent=delta7==null?'—':`${delta7>0?'+':''}${delta7.toFixed(1)} kg`;
+
+        const lastConsult=[...state.consults].filter(c=>c.status==='realizada').sort((a,b)=>compareDates(b.date,a.date))[0];
+        document.getElementById('sum-last-consult').textContent=lastConsult?fmtDate(lastConsult.date):'—';
+        document.getElementById('sum-last-consult-sub').textContent=lastConsult?`${getDoctorName(lastConsult.doctorId)||lastConsult.specialty||'Consulta'}`:'sem consulta realizada';
+
+        const nextExam=[...state.exams].filter(e=>e.nextDate && compareDates(e.nextDate,todayStr())>=0).sort((a,b)=>compareDates(a.nextDate,b.nextDate))[0];
+        document.getElementById('sum-next-exam').textContent=nextExam?fmtDate(nextExam.nextDate):'—';
+        document.getElementById('sum-next-exam-sub').textContent=nextExam?nextExam.name:'sem exame futuro';
+
+        const lateDoctors=state.doctors.filter(d=>doctorStatus(d).cls==='critico').length;
+        document.getElementById('sum-doctors-late').textContent=String(lateDoctors);
+        document.getElementById('sum-score').textContent=String(score());
+
+        renderDashWeightToggles(sortedWeights);
+        renderWeightChart('chart-weight', sortedWeights, 'dashboardWeight', weightCols);
+
+        const alerts=buildAlerts();
+        const alertsBox=document.getElementById('dashboard-alerts');
+        alertsBox.innerHTML=alerts.length?alerts.map(a=>`<div class="alert-card ${a.level}"><div class="alert-title">${a.title}</div><div class="alert-text">${a.text}</div></div>`).join(''):'<div class="empty">Tudo em dia por aqui.</div>';
+
+        const nextItems=futureItems();
+        document.getElementById('dashboard-next-items').innerHTML=nextItems.length?nextItems.map(i=>`<div class="stat-row"><div class="stat-row-main"><div class="stat-row-title">${i.title}</div><div class="stat-row-sub">${i.sub}</div></div><div class="stat-row-val">${fmtDate(i.date)}</div></div>`).join(''):'<div class="empty">Nenhum evento futuro.</div>';
+
+        const follow=state.doctors.map(d=>({doctor:d,status:doctorStatus(d)})).sort((a,b)=>{
+          const rank={critico:0,atencao:1,ok:2}; return rank[a.status.cls]-rank[b.status.cls];
+        }).slice(0,6);
+        document.getElementById('dashboard-doctor-followup').innerHTML=follow.length?follow.map(({doctor,status})=>`<div class="stat-row"><div class="stat-row-main"><div class="stat-row-title">${doctor.name}</div><div class="stat-row-sub">${doctor.specialty}</div></div><div class="badge ${status.cls}">${status.label}</div></div>`).join(''):'<div class="empty">Nenhum médico cadastrado.</div>';
+
+        document.getElementById('integration-chips').innerHTML=integrationStats().map(c=>`<div class="chip ${c.active?'health':''}">${c.label}</div>`).join('');
+      }
+      function buildAlerts(){
+        const arr=[];
+        state.doctors.forEach(d=>{
+          const st=doctorStatus(d);
+          if(st.cls==='critico') arr.push({level:'danger',title:`Retorno atrasado com ${d.name}`,text:`Já fazem ${st.days} dias desde a última consulta. Especialidade: ${d.specialty}.`});
+          else if(st.cls==='atencao') arr.push({level:'warning',title:`Hora de olhar ${d.name}`,text:`Acompanhamento quase vencendo para ${d.specialty}.`});
+        });
+        state.exams.filter(e=>e.nextDate && compareDates(e.nextDate,todayStr())<0).forEach(e=>arr.push({level:'warning',title:`Exame vencido: ${e.name}`,text:`A data prevista era ${fmtDate(e.nextDate)}.`}));
+        state.consults.filter(c=>c.status==='realizada' && c.nextDate && compareDates(c.nextDate,todayStr())<0).forEach(c=>arr.push({level:'warning',title:`Retorno de consulta vencido`,text:`${getDoctorName(c.doctorId)||c.specialty} deveria ter retorno desde ${fmtDate(c.nextDate)}.`}));
+        if(!state.weights.length) arr.push({level:'warning',title:'Sem peso registrado',text:'Começa registrando teu peso para destravar os gráficos e alertas.'});
+        return arr.slice(0,6);
+      }
+      function getMetricValue(m, w){
+        if(m.key==='peso')   return w.weight??null;
+        if(m.key==='imc')    return (w.weight&&(w.height||state.goals.height))?+bmi(w.weight,w.height||state.goals.height).toFixed(1):null;
+        if(m.key==='fat')    return w.fat??null;
+        if(m.key==='muscle') return w.muscle??null;
+        return null;
+      }
+      function renderWeightChart(canvasId, list, chartKey, cols){
+        const el=document.getElementById(canvasId); if(!el) return;
+        cols=cols||{peso:true};
+        const labels=list.map(x=>fmtDate(x.date));
+        const active=WEIGHT_METRICS.filter(m=>cols[m.key]);
+        const datasets=active.map(m=>({
+          label:`${m.label}${m.unit?' ('+m.unit+')':''}`,
+          data:list.map(w=>getMetricValue(m,w)),
+          tension:.35,
+          borderColor:getCss(m.color),
+          backgroundColor:getCss(m.bgColor),
+          fill:active.length===1,
+          spanGaps:true,
+          pointRadius:3,
+        }));
+        const tColor=getCss('--muted'), gColor=getCss('--border'), txtColor=getCss('--text');
+        if(charts[chartKey]) charts[chartKey].destroy();
+        charts[chartKey]=new Chart(el,{
+          type:'line',
+          data:{labels,datasets},
+          options:{
+            responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:active.length>1,labels:{color:txtColor,boxWidth:12,padding:12}}},
+            scales:{
+              x:{ticks:{color:tColor},grid:{color:gColor}},
+              y:{position:'left',ticks:{color:tColor},grid:{color:gColor}},
+            }
+          }
+        });
+      }
+      function baseChartOptions(){
+        const text=getCss('--muted'), grid=getCss('--border');
+        return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:text},grid:{color:grid}},y:{ticks:{color:text},grid:{color:grid}}}};
+      }
+      function getCss(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+      function renderDashWeightToggles(sortedWeights){
+        const box=document.getElementById('dash-weight-metric-toggles'); if(!box) return;
+        box.innerHTML=WEIGHT_METRICS.map(m=>`
+          <button class="btn ${weightCols[m.key]?'btn-warning':''}" data-dwcol="${m.key}" style="padding:4px 10px;font-size:11px;font-weight:600">
+            ${m.label}
+          </button>`).join('');
+        box.querySelectorAll('[data-dwcol]').forEach(btn=>{
+          btn.addEventListener('click',()=>{
+            const k=btn.dataset.dwcol;
+            weightCols[k]=!weightCols[k];
+            saveWeightCols();
+            renderDashWeightToggles(sortedWeights);
+            renderWeightChart('chart-weight',sortedWeights,'dashboardWeight',weightCols);
+            renderWeights(); // keep detail tab in sync
+          });
+        });
+      }
+      function renderWeightToggles(){
+        const box=document.getElementById('weight-metric-toggles'); if(!box) return;
+        box.innerHTML=WEIGHT_METRICS.map(m=>`
+          <button class="btn ${weightCols[m.key]?'btn-warning':''}" data-wcol="${m.key}" style="padding:6px 14px;font-size:12px;font-weight:600">
+            ${m.label}
+          </button>`).join('');
+        box.querySelectorAll('[data-wcol]').forEach(btn=>{
+          btn.addEventListener('click',()=>{
+            const k=btn.dataset.wcol;
+            weightCols[k]=!weightCols[k];
+            saveWeightCols();
+            renderWeights();
+          });
+        });
+      }
+      function renderWeights(){
+        renderWeightToggles();
+        const active=WEIGHT_METRICS.filter(m=>weightCols[m.key]);
+        const extraCols=active.filter(m=>m.key!=='peso'); // peso always shown, others are extras
+        const totalCols=3+active.length; // Data + active metrics + Medidas + Obs + Ações
+        // thead
+        const thead=document.getElementById('weight-thead');
+        if(thead) thead.innerHTML=`<tr>
+          <th>Data</th>
+          ${active.map(m=>`<th>${m.label}${m.unit?' ('+m.unit+')':''}</th>`).join('')}
+          <th>Medidas</th><th>Observação</th><th>Ações</th>
+        </tr>`;
+        const q=text(document.getElementById('weight-search').value);
+        const rows=[...state.weights].sort((a,b)=>compareDates(b.date,a.date)).filter(w=>text(w.note).includes(q));
+        const body=document.getElementById('weight-body');
+        const colCount=2+active.length+2; // Data + metrics + Medidas + Obs + Ações
+        body.innerHTML=rows.length?rows.map(w=>{
+          const medidas=[w.waist?`Cint. ${w.waist}cm`:null,w.hip?`Quad. ${w.hip}cm`:null,w.chest?`Peito ${w.chest}cm`:null].filter(Boolean).join(' · ')||'—';
+          const metricCells=active.map(m=>{
+            const v=getMetricValue(m,w);
+            return `<td>${v!=null?(m.key==='peso'?asKg(v):`${v}${m.unit?` ${m.unit}`:''}`):'—'}</td>`;
+          }).join('');
+          return `<tr>
+            <td>${fmtDate(w.date)}${w.time?`<div class="card-sub">${w.time}</div>`:''}</td>
+            ${metricCells}
+            <td>${medidas}</td>
+            <td>${w.note||'—'}</td>
+            <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editWeight('${w.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteWeight('${w.id}')">Excluir</button></div></td>
+          </tr>`;
+        }).join(''):`<tr><td colspan="${colCount}" class="empty">Nenhum registro de peso.</td></tr>`;
+
+        const lw=lastWeight();
+        const goal=lw?.goal || state.goals.weight;
+        const h=lw?.height || state.goals.height;
+        document.getElementById('goal-weight-card').textContent=goal?asKg(goal):'—';
+        document.getElementById('current-bmi-card').textContent=lw&&h?bmi(lw.weight,h).toFixed(1):'—';
+        const recent=state.weights.filter(w=>daysBetween(w.date,todayStr())<=30).map(w=>w.weight);
+        document.getElementById('avg-weight-card').textContent=recent.length?asKg(average(recent)):'—';
+        document.getElementById('goal-diff-card').textContent=lw&&goal?`${(lw.weight-goal>0?'+':'')}${(lw.weight-goal).toFixed(1)} kg`:'—';
+        renderWeightChart('chart-weight-detail',[...state.weights].sort((a,b)=>compareDates(a.date,b.date)),'weightDetail',weightCols);
+      }
+
+      async function saveWeight(){
+        const item={
+          id:editing.weight?.id || uid(),
+          date:document.getElementById('w-date').value,
+          time:document.getElementById('w-time').value||'',
+          weight:safeNum(document.getElementById('w-weight').value),
+          height:safeNum(document.getElementById('w-height').value),
+          fat:safeNum(document.getElementById('w-fat').value),
+          muscle:safeNum(document.getElementById('w-muscle').value),
+          goal:safeNum(document.getElementById('w-goal').value),
+          waist:safeNum(document.getElementById('w-waist').value),
+          hip:safeNum(document.getElementById('w-hip').value),
+          chest:safeNum(document.getElementById('w-chest').value),
+          note:document.getElementById('w-note').value.trim()
+        };
+        if(!item.date || !item.weight){ alert('Preenche pelo menos data e peso.'); return; }
+        if(item.goal) state.goals.weight=item.goal;
+        if(item.height) state.goals.height=item.height;
+        upsert('weights',item,'weight');
+        closeOverlay('ov-weight');
+      }
+      function openWeightModal(id){
+        editing.weight=id?state.weights.find(x=>x.id===id):null;
+        document.getElementById('weight-modal-title').textContent=editing.weight?'Editar peso':'Novo peso';
+        const w=editing.weight||{};
+        setValue('w-date',w.date||todayStr()); setValue('w-time',w.time||''); setValue('w-weight',w.weight); setValue('w-height',w.height||state.goals.height); setValue('w-fat',w.fat); setValue('w-muscle',w.muscle); setValue('w-goal',w.goal||state.goals.weight); setValue('w-waist',w.waist); setValue('w-hip',w.hip); setValue('w-chest',w.chest); setValue('w-note',w.note||'');
+        openOverlay('ov-weight');
+      }
+
+      function renderExams(){
+        const q=text(document.getElementById('exam-search').value);
+        const st=document.getElementById('exam-filter-status').value;
+        const rows=[...state.exams].sort((a,b)=>compareDates(b.date,a.date)).filter(e=>{
+          return (!st || e.status===st) && [e.name,e.category,e.lab,getDoctorName(e.doctorId),e.note].some(v=>text(v).includes(q));
+        });
+        document.getElementById('exam-body').innerHTML=rows.length?rows.map(e=>`<tr>
+          <td>${fmtDate(e.date)}</td>
+          <td><div>${e.name}</div><div class="card-sub">${e.category||'—'} ${e.nextDate?`· repete ${fmtDate(e.nextDate)}`:''}</div></td>
+          <td><span class="badge ${e.status==='aguardando'?'agendado':e.status}">${labelExamStatus(e.status)}</span></td>
+          <td>${e.lab||'—'}</td>
+          <td>${getDoctorName(e.doctorId)||'—'}</td>
+          <td>${e.fileData?`<button class="btn btn-warning" onclick="window.saudeApp.openPdf('${e.id}')">Abrir PDF</button>`:'—'}</td>
+          <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editExam('${e.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteExam('${e.id}')">Excluir</button></div></td>
+        </tr>`).join(''):'<tr><td colspan="7" class="empty">Nenhum exame encontrado.</td></tr>';
+      }
+      function labelExamStatus(v){ return ({ok:'Normal',atencao:'Atenção',critico:'Crítico',aguardando:'Aguardando'})[v]||v; }
+      async function saveExam(){
+        const fileInput=document.getElementById('e-file');
+        let fileData=editing.exam?.fileData||''; let fileName=editing.exam?.fileName||'';
+        if(fileInput.files[0]){
+          const f=fileInput.files[0];
+          fileName=f.name;
+          fileData=await readFileAsDataURL(f);
+        }
+        const item={
+          id:editing.exam?.id || uid(),
+          date:document.getElementById('e-date').value,
+          name:document.getElementById('e-name').value.trim(),
+          category:document.getElementById('e-category').value,
+          status:document.getElementById('e-status').value,
+          lab:document.getElementById('e-lab').value.trim(),
+          doctorId:document.getElementById('e-doctor').value,
+          nextDate:document.getElementById('e-next-date').value,
+          note:document.getElementById('e-note').value.trim(),
+          fileName,fileData
+        };
+        if(!item.date || !item.name){ alert('Preenche data e nome do exame.'); return; }
+        upsert('exams',item,'exam');
+        closeOverlay('ov-exam');
+      }
+      function openExamModal(id){
+        editing.exam=id?state.exams.find(x=>x.id===id):null;
+        document.getElementById('exam-modal-title').textContent=editing.exam?'Editar exame':'Novo exame';
+        const e=editing.exam||{};
+        setValue('e-date',e.date||todayStr()); setValue('e-name',e.name||''); setValue('e-category',e.category||'sangue'); setValue('e-status',e.status||'ok'); setValue('e-lab',e.lab||''); setValue('e-doctor',e.doctorId||''); setValue('e-next-date',e.nextDate||''); setValue('e-note',e.note||''); document.getElementById('e-file').value='';
+        openOverlay('ov-exam');
+      }
+      function readFileAsDataURL(file){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(file); }); }
+
+      function renderConsults(){
+        const q=text(document.getElementById('consult-search').value);
+        const st=document.getElementById('consult-filter-status').value;
+        const rows=[...state.consults].sort((a,b)=>compareDates(b.date,a.date)).filter(c=>{
+          return (!st || c.status===st) && [getDoctorName(c.doctorId),c.specialty,c.reason,c.summary].some(v=>text(v).includes(q));
+        });
+        document.getElementById('consult-body').innerHTML=rows.length?rows.map(c=>`<tr>
+          <td>${fmtDate(c.date)} ${c.time?`<span class="card-sub mono">${c.time}</span>`:''}</td>
+          <td>${getDoctorName(c.doctorId)||'—'}</td>
+          <td>${c.specialty||'—'}</td>
+          <td><span class="badge ${c.status}">${labelConsultStatus(c.status)}</span></td>
+          <td>${c.nextDate?fmtDate(c.nextDate):(c.returnDays?`${c.returnDays} dias`:'—')}</td>
+          <td>${c.summary||c.reason||'—'}</td>
+          <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editConsult('${c.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteConsult('${c.id}')">Excluir</button></div></td>
+        </tr>`).join(''):'<tr><td colspan="7" class="empty">Nenhuma consulta encontrada.</td></tr>';
+      }
+      function labelConsultStatus(v){ return ({agendada:'Agendada',realizada:'Realizada',cancelada:'Cancelada'})[v]||v; }
+      function saveConsult(){
+        const returnDays=safeNum(document.getElementById('c-return-days').value);
+        const criarProxima=document.getElementById('c-criar-proxima').checked;
+        const item={
+          id:editing.consult?.id || uid(),
+          date:document.getElementById('c-date').value,
+          time:document.getElementById('c-time').value,
+          doctorId:document.getElementById('c-doctor').value,
+          specialty:document.getElementById('c-specialty').value.trim(),
+          reason:document.getElementById('c-reason').value.trim(),
+          status:document.getElementById('c-status').value,
+          returnDays,
+          nextDate:document.getElementById('c-next-date').value,
+          summary:document.getElementById('c-summary').value.trim()
+        };
+        if(!item.date){ alert('Preenche a data da consulta.'); return; }
+        if(!item.nextDate && item.status==='realizada' && item.returnDays){
+          const d=parseDate(item.date); d.setDate(d.getDate()+item.returnDays); item.nextDate=toDateInput(d);
+        }
+        upsert('consults',item,'consult');
+        if(criarProxima && item.nextDate){
+          const proxima={
+            id:uid(),
+            date:item.nextDate,
+            time:'',
+            doctorId:item.doctorId,
+            specialty:item.specialty,
+            reason:item.reason,
+            status:'agendada',
+            returnDays:item.returnDays,
+            nextDate:'',
+            summary:''
+          };
+          upsert('consults',proxima,'consult');
+        }
+        closeOverlay('ov-consult');
+      }
+      function updateConsultProximoRow(){
+        const hasNextDate=!!(document.getElementById('c-next-date').value);
+        const returnDays=document.getElementById('c-return-days').value;
+        const status=document.getElementById('c-status').value;
+        const hasNext=hasNextDate||(!!returnDays && status==='realizada');
+        const row=document.getElementById('consult-proximo-row');
+        row.style.display=hasNext?'flex':'none';
+        if(!hasNext) document.getElementById('c-criar-proxima').checked=false;
+      }
+      function openConsultModal(id){
+        editing.consult=id?state.consults.find(x=>x.id===id):null;
+        document.getElementById('consult-modal-title').textContent=editing.consult?'Editar consulta':'Nova consulta';
+        const c=editing.consult||{};
+        setValue('c-date',c.date||todayStr()); setValue('c-time',c.time||''); setValue('c-doctor',c.doctorId||''); setValue('c-specialty',c.specialty||''); setValue('c-reason',c.reason||''); setValue('c-status',c.status||'agendada'); setValue('c-return-days',c.returnDays); setValue('c-next-date',c.nextDate||''); setValue('c-summary',c.summary||'');
+        document.getElementById('c-criar-proxima').checked=false;
+        updateConsultProximoRow();
+        openOverlay('ov-consult');
+      }
+
+      function renderDoctors(){
+        const q=text(document.getElementById('doctor-search').value);
+        const rows=[...state.doctors].filter(d=>[d.name,d.specialty,d.phone,d.whats,d.email,d.clinic,d.note].some(v=>text(v).includes(q))).sort((a,b)=>a.name.localeCompare(b.name));
+        document.getElementById('doctor-body').innerHTML=rows.length?rows.map(d=>{
+          const st=doctorStatus(d); const last=doctorLastConsultDate(d.id);
+          const atendLabel={plano:'Plano',particular:'Particular',ambos:'Plano + Particular'}[d.atendimento]||'—';
+          const valorStr=d.atendimento&&d.atendimento!=='plano'&&d.valorConsulta?` · R$ ${Number(d.valorConsulta).toLocaleString('pt-BR',{minimumFractionDigits:2})}`:'';
+          return `<tr>
+            <td><div>${d.name}</div><div class="card-sub">${d.address||'—'}</div></td>
+            <td>${d.specialty||'—'}</td>
+            <td>${[d.phone,d.whats,d.email].filter(Boolean).join(' · ')||'—'}</td>
+            <td>${d.clinic||'—'}</td>
+            <td><div>${atendLabel}${valorStr}</div><div class="card-sub">${last?fmtDate(last):'—'}</div></td>
+            <td><span class="badge ${st.cls}">${st.label}</span></td>
+            <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editDoctor('${d.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteDoctor('${d.id}')">Excluir</button></div></td>
+          </tr>`;
+        }).join(''):'<tr><td colspan="7" class="empty">Nenhum médico cadastrado.</td></tr>';
+      }
+      function saveDoctor(){
+        const item={
+          id:editing.doctor?.id || uid(),
+          name:document.getElementById('d-name').value.trim(),
+          specialty:document.getElementById('d-specialty').value.trim(),
+          frequencyDays:safeNum(document.getElementById('d-frequency').value),
+          phone:document.getElementById('d-phone').value.trim(),
+          whats:document.getElementById('d-whats').value.trim(),
+          email:document.getElementById('d-email').value.trim(),
+          clinic:document.getElementById('d-clinic').value.trim(),
+          address:document.getElementById('d-address').value.trim(),
+          note:document.getElementById('d-note').value.trim(),
+          atendimento:document.querySelector('input[name="d-atend"]:checked')?.value||'',
+          valorConsulta:safeNum(document.getElementById('d-valor').value)
+        };
+        if(!item.name){ alert('Preenche o nome do médico.'); return; }
+        upsert('doctors',item,'doctor');
+        closeOverlay('ov-doctor');
+      }
+      function openDoctorModal(id){
+        editing.doctor=id?state.doctors.find(x=>x.id===id):null;
+        document.getElementById('doctor-modal-title').textContent=editing.doctor?'Editar médico':'Novo médico';
+        const d=editing.doctor||{};
+        setValue('d-name',d.name||''); setValue('d-specialty',d.specialty||''); setValue('d-frequency',d.frequencyDays); setValue('d-phone',d.phone||''); setValue('d-whats',d.whats||''); setValue('d-email',d.email||''); setValue('d-clinic',d.clinic||''); setValue('d-address',d.address||''); setValue('d-note',d.note||'');
+        // atendimento radios
+        const atend=d.atendimento||'plano';
+        document.querySelectorAll('input[name="d-atend"]').forEach(r=>r.checked=(r.value===atend));
+        setValue('d-valor',d.valorConsulta??'');
+        document.getElementById('d-valor-row').style.display=(atend==='particular'||atend==='ambos')?'block':'none';
+        openOverlay('ov-doctor');
+      }
+
+      function populateDoctorSelects(){
+        const opts=['<option value="">— Selecionar —</option>',...state.doctors.sort((a,b)=>a.name.localeCompare(b.name)).map(d=>`<option value="${d.id}">${d.name} · ${d.specialty||'Sem especialidade'}</option>`)].join('');
+        ['e-doctor','c-doctor'].forEach(id=>document.getElementById(id).innerHTML=opts);
+      }
+
+      function renderCalendar(){
+        document.getElementById('cal-label').textContent=`${MONTHS[refMonth.getMonth()]} ${refMonth.getFullYear()}`;
+        const first=new Date(refMonth.getFullYear(),refMonth.getMonth(),1);
+        const start=new Date(first); start.setDate(first.getDate()-first.getDay());
+        const body=document.getElementById('cal-body');
+        body.innerHTML='';
+        for(let i=0;i<42;i++){
+          const d=new Date(start); d.setDate(start.getDate()+i);
+          const key=toDateInput(d);
+          const sameMonth=d.getMonth()===refMonth.getMonth();
+          const day=document.createElement('div'); day.className=`cal-day ${sameMonth?'':'other'} ${key===todayStr()?'today':''}`;
+          const events=[];
+          state.weights.filter(w=>w.date===key).forEach(w=>events.push({cls:'weight',label:`Peso ${Number(w.weight).toFixed(1)}kg`}));
+          state.exams.forEach(e=>{ if(e.date===key || e.nextDate===key) events.push({cls:'exam',label:e.name}); });
+          state.consults.forEach(c=>{ if(c.date===key || c.nextDate===key) events.push({cls:'consult',label:getDoctorName(c.doctorId)||c.specialty||'Consulta'}); });
+          day.innerHTML=`<div class="cal-num">${d.getDate()}</div>${events.slice(0,3).map(ev=>`<div class="cal-event ${ev.cls}">${ev.label}</div>`).join('')}${events.length>3?`<div class="card-sub">+${events.length-3} mais</div>`:''}`;
+          body.appendChild(day);
+        }
+      }
+
+      function upsert(collection,item,kind){
+        const idx=state[collection].findIndex(x=>x.id===item.id);
+        if(idx>=0) state[collection][idx]=item; else state[collection].push(item);
+        if(deletedState[collection]) deletedState[collection]=deletedState[collection].filter(x=>x!==item.id);
+        saveDeletedState();
+        editing[kind]=null;
+        saveState();
+        // sync com API
+        if(collection==='weights')syncWeight(item).catch(()=>null);
+        else if(collection==='doctors')syncMedico(item).catch(()=>null);
+        else if(collection==='exams')syncExame(item).catch(()=>null);
+        else if(collection==='consults')syncConsulta(item).catch(()=>null);
+        renderAll();
+      }
+      function setValue(id,v){ document.getElementById(id).value=(v ?? ''); }
+
+      // Expande window.saudeApp com as actions
+      Object.assign(window.saudeApp,{
+        closeModal:(id)=>closeOverlay(id),
+        saveRemedio:()=>saveRemedio(),
+        saveConsumo:()=>saveConsumo(),
+        editWeight:(id)=>openWeightModal(id),
+        deleteWeight:(id)=>remove('weights',id,'Excluir este registro de peso?'),
+        editExam:(id)=>openExamModal(id),
+        deleteExam:(id)=>remove('exams',id,'Excluir este exame?'),
+        editConsult:(id)=>openConsultModal(id),
+        deleteConsult:(id)=>remove('consults',id,'Excluir esta consulta?'),
+        editDoctor:(id)=>openDoctorModal(id),
+        deleteDoctor:(id)=>remove('doctors',id,'Excluir este médico?'),
+        openPdf:(id)=>{
+          const e=state.exams.find(x=>x.id===id); if(!e?.fileData) return;
+          const win=window.open(); if(win) win.document.write(`<iframe src="${e.fileData}" style="border:none;width:100%;height:100vh"></iframe>`);
+        },
+        editRemedio:(id)=>openRemedioModal(id),
+        deleteRemedio:(id)=>{
+          if(!confirm('Excluir este remédio?')) return;
+          remedios=remedios.filter(x=>x.id!==id);
+          saveRemedios(); renderRemedios();
+        },
+        remedioCompra:(id)=>{
+          const r=remedios.find(x=>x.id===id); if(!r) return;
+          const addQty=Number(r.qty||30);
+          r.stock=(Number(r.stock||0))+addQty;
+          r.lastBuy=todayStr();
+          saveRemedios(); renderRemedios();
+        },
+        deleteConsumo:(id)=>{
+          if(!confirm('Excluir este registro?')) return;
+          consumos=consumos.filter(x=>x.id!==id);
+          saveConsumos(); renderConsumos();
+        },
+        vincularHabito:(id)=>{
+          const r=remedios.find(x=>x.id===id); if(!r) return;
+          if(!confirm(`Criar hábito diário "Tomar ${r.name}" no módulo Hábitos?`)) return;
+          createHabitoForRemedio(r); renderRemedios();
+        },
+        desvincularHabito:(id)=>{
+          const r=remedios.find(x=>x.id===id); if(!r||!r.habitId) return;
+          if(!confirm('Desvincular este remédio do hábito?\n\nO hábito não será excluído do módulo Hábitos.')) return;
+          r.habitId=undefined;
+          saveRemedios(); renderRemedios();
+        }
+      });
+      function remove(collection,id,msg){
+        if(!confirm(msg)) return;
+        const item=state[collection].find(x=>x.id===id);
+        if(deletedState[collection]) deletedState[collection]=[...new Set([...(deletedState[collection]||[]), id])];
+        if(collection==='doctors'){
+          state.consults=state.consults.map(c=>c.doctorId===id?{...c,doctorId:''}:c);
+          state.exams=state.exams.map(e=>e.doctorId===id?{...e,doctorId:''}:e);
+          if(item)deleteMedicoApi(item).catch(()=>null);
+        }else if(collection==='exams'&&item){
+          deleteExameApi(item).catch(()=>null);
+        }else if(collection==='consults'&&item){
+          deleteConsultaApi(item).catch(()=>null);
+        }
+        state[collection]=state[collection].filter(x=>x.id!==id);
+        saveDeletedState();
+        saveState(); renderAll();
+      }
+    });
+  </script>
+</body>
+</html>

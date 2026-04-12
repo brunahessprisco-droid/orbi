@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: the_money_postgres
+    environment:
+      POSTGRES_DB: the_money
+      POSTGRES_USER: the_money
+      POSTGRES_PASSWORD: the_money
+    ports:
+      - "5432:5432"
+    volumes:
+      - the_money_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  the_money_postgres_data:
+
