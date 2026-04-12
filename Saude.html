@@ -199,6 +199,7 @@
   .auth-field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:13px;outline:none;}
   .auth-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
   .auth-err{margin-top:12px;font-size:12px;color:var(--red);}
+  html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;transition:filter .2s;}
   </style>
 </head>
 <body>
@@ -228,6 +229,7 @@
     <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <button class="btn-primary" id="quick-add-btn" type="button">+ Novo registro</button>
+      <button class="btn-icon" id="btn-privacy" type="button" onclick="togglePrivacy()" title="Ocultar valores sensíveis">👁️</button>
       <button class="btn-icon" id="btn-theme" type="button">🌙</button>
     </div>
   </nav>
@@ -244,8 +246,8 @@
   <div class="app">
     <div id="page-dashboard" class="page active">
       <div class="summary">
-        <div class="card"><div class="card-label">Peso atual</div><div class="card-value health" id="sum-weight">—</div><div class="card-sub" id="sum-weight-sub">sem registros</div></div>
-        <div class="card"><div class="card-label">Variação 7 dias</div><div class="card-value purple" id="sum-var-7">—</div><div class="card-sub">comparado com 7 dias atrás</div></div>
+        <div class="card"><div class="card-label">Peso atual</div><div class="card-value health sensitive" id="sum-weight">—</div><div class="card-sub" id="sum-weight-sub">sem registros</div></div>
+        <div class="card"><div class="card-label">Variação 7 dias</div><div class="card-value purple sensitive" id="sum-var-7">—</div><div class="card-sub">comparado com 7 dias atrás</div></div>
         <div class="card"><div class="card-label">Última consulta</div><div class="card-value blue" id="sum-last-consult">—</div><div class="card-sub" id="sum-last-consult-sub">—</div></div>
         <div class="card"><div class="card-label">Próximo exame</div><div class="card-value green" id="sum-next-exam">—</div><div class="card-sub" id="sum-next-exam-sub">—</div></div>
         <div class="card"><div class="card-label">Médicos em atraso</div><div class="card-value red" id="sum-doctors-late">0</div><div class="card-sub">sem retorno há muito tempo</div></div>
@@ -290,10 +292,10 @@
           <button class="btn-primary" id="new-weight-btn" type="button">+ Registrar peso</button>
         </div>
         <div class="summary" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
-          <div class="card"><div class="card-label">Meta</div><div class="card-value health" id="goal-weight-card">—</div><div class="card-sub">peso objetivo</div></div>
-          <div class="card"><div class="card-label">IMC atual</div><div class="card-value blue" id="current-bmi-card">—</div><div class="card-sub">com altura configurada</div></div>
-          <div class="card"><div class="card-label">Média 30 dias</div><div class="card-value purple" id="avg-weight-card">—</div><div class="card-sub">média recente</div></div>
-          <div class="card"><div class="card-label">Dif. da meta</div><div class="card-value green" id="goal-diff-card">—</div><div class="card-sub">peso atual x meta</div></div>
+          <div class="card"><div class="card-label">Meta</div><div class="card-value health sensitive" id="goal-weight-card">—</div><div class="card-sub">peso objetivo</div></div>
+          <div class="card"><div class="card-label">IMC atual</div><div class="card-value blue sensitive" id="current-bmi-card">—</div><div class="card-sub">com altura configurada</div></div>
+          <div class="card"><div class="card-label">Média 30 dias</div><div class="card-value purple sensitive" id="avg-weight-card">—</div><div class="card-sub">média recente</div></div>
+          <div class="card"><div class="card-label">Dif. da meta</div><div class="card-value green sensitive" id="goal-diff-card">—</div><div class="card-sub">peso atual x meta</div></div>
         </div>
         <div id="weight-metric-toggles" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
         <div class="chart-wrap" style="margin-bottom:16px"><canvas id="chart-weight-detail"></canvas></div>
@@ -815,6 +817,7 @@
       const KEY_HAB_HABITS='habitos_app_v5';
 
       applyTheme(localStorage.getItem('app_theme')||state.settings.theme||'dark');
+      applyPrivacy();
       bind();
       renderAll();
       checkAuthSaude().then(ok=>{
@@ -1018,6 +1021,8 @@
         saveState();
       }
       function toggleTheme(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); renderAll(); }
+      function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.textContent=on?'🙈':'👁️'; }
+      function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
       function toggleNavMenu(){ document.getElementById('nav-menu').classList.toggle('open'); }
       function closeNavMenu(){ document.getElementById('nav-menu').classList.remove('open'); }
       function showPage(page,btn){

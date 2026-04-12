@@ -229,6 +229,10 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .profile-msg.ok{color:var(--green);}
 .profile-msg.err{color:var(--red);}
 .profile-divider{border:none;border-top:1px solid var(--border);margin:0 0 20px;}
+html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;transition:filter .2s;}
+.btn-eye{border:1px solid var(--border);background:none;color:var(--muted);width:32px;height:32px;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;flex-shrink:0;}
+.btn-eye:hover{color:var(--text);}
+.hub-filters{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px;}
 </style>
 </head>
 <body>
@@ -319,6 +323,7 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
     </div>
     <!-- Filters: above both today card + calendar -->
     <div class="hub-filters">
+      <button class="btn-eye" id="btn-privacy" onclick="togglePrivacy()" title="Ocultar valores sensíveis">👁️</button>
       <div class="filter-group">
         <button class="filter-btn active" data-f="todos" onclick="setFilter('todos',this)">Todos</button>
         <button class="filter-btn" data-f="hab" onclick="setFilter('hab',this)"><img src="assets/Hábitos.png" alt="Hábitos"></button>
@@ -484,6 +489,8 @@ async function submitAuth(){
 
 function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; localStorage.removeItem(AUTH_KEY); location.reload(); }
 function toggleTheme(){ const isDark=document.documentElement.getAttribute('data-theme')==='dark'; const next=isDark?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('app_theme',next); }
+function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.textContent=on?'🙈':'👁️'; }
+function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
 function showPage(id){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+id).classList.add('active'); document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); }
 // storage helpers – isolamento por usuário (hub_user_id é global)
 function _lsGet(k){const uid=localStorage.getItem('hub_user_id')||'anon';const ns='u_'+uid+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
@@ -577,9 +584,9 @@ function rendCal(){
     const dots=[];
     const f=calFilter;
     if(f==='todos'||f==='fin'){
-      if(day.receitas.length){const r=day.receitas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin">+ ${fmt(r)}</div>`);}
-      if(day.despesas.length){const d=day.despesas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin desp">- ${fmt(d)}</div>`);}
-      if(day.parcelados.length){const p=day.parcelados.reduce((a,t)=>a+Number(t.valorParcela),0);dots.push(`<div class="cal-dot fin par">📦 - ${fmt(p)}</div>`);}
+      if(day.receitas.length){const r=day.receitas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin">+ <span class="sensitive">${fmt(r)}</span></div>`);}
+      if(day.despesas.length){const d=day.despesas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin desp">- <span class="sensitive">${fmt(d)}</span></div>`);}
+      if(day.parcelados.length){const p=day.parcelados.reduce((a,t)=>a+Number(t.valorParcela),0);dots.push(`<div class="cal-dot fin par">📦 - <span class="sensitive">${fmt(p)}</span></div>`);}
     }
     if(f==='todos'||f==='ex'){
       if(day.treinos.length)dots.push(`<div class="cal-dot ex">💪 ${day.treinos.length} treino${day.treinos.length!==1?'s':''}</div>`);
@@ -603,21 +610,21 @@ function openDay(dateStr){
   document.getElementById('popup-date').textContent=dateStr.split('-').reverse().join('/');
   if(!hasAny){ document.getElementById('popup-body').innerHTML=`<div class="empty-day">Nenhum dado registrado neste dia.</div>`; document.getElementById('ov-day').classList.add('open'); return; }
   const chips=[];
-  if(receitas.length){ const r=receitas.reduce((a,t)=>a+Number(t.valor),0); chips.push(`<div class="popup-sum-chip fin">+ ${fmt(r)}</div>`); }
-  if(despesas.length){ const d=despesas.reduce((a,t)=>a+Number(t.valor),0); chips.push(`<div class="popup-sum-chip" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">- ${fmt(d)}</div>`); }
-  if(parcelados.length){ const p=parcelados.reduce((a,t)=>a+Number(t.valorParcela),0); chips.push(`<div class="popup-sum-chip ali">📦 - ${fmt(p)}</div>`); }
+  if(receitas.length){ const r=receitas.reduce((a,t)=>a+Number(t.valor),0); chips.push(`<div class="popup-sum-chip fin">+ <span class="sensitive">${fmt(r)}</span></div>`); }
+  if(despesas.length){ const d=despesas.reduce((a,t)=>a+Number(t.valor),0); chips.push(`<div class="popup-sum-chip" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">- <span class="sensitive">${fmt(d)}</span></div>`); }
+  if(parcelados.length){ const p=parcelados.reduce((a,t)=>a+Number(t.valorParcela),0); chips.push(`<div class="popup-sum-chip ali">📦 - <span class="sensitive">${fmt(p)}</span></div>`); }
   if(treinos.length) chips.push(`<div class="popup-sum-chip ex">💪 ${treinos.length} treino${treinos.length!==1?'s':''}</div>`);
   if(tarefas.length) chips.push(`<div class="popup-sum-chip cas">🏠 ${tarefas.length} tarefa${tarefas.length!==1?'s':''}</div>`);
   if(pesos.length||consultas.length||exames.length){ const p=[];if(pesos.length&&pesos[0].weight)p.push(`${pesos[0].weight}kg`);if(consultas.length)p.push(`${consultas.length} consulta${consultas.length!==1?'s':''}`); chips.push(`<div class="popup-sum-chip sau">❤️ ${p.join(' · ')||'Saúde'}</div>`); }
   if(habitosFeitos.length) chips.push(`<div class="popup-sum-chip hab">🔁 ${habitosFeitos.length}/${todosHabitos.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
   if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); chips.push(`<div class="popup-sum-chip ali">🍽️ ${refeicoes.length} refeição${refeicoes.length!==1?'ões':''} · ${fmtNum(kcal)} kcal</div>`); }
   let html=`<div class="popup-summary">${chips.join('')}</div>`;
-  if(receitas.length){ html+=`<div class="popup-section"><div class="popup-section-title fin">💚 Receitas</div>${receitas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val green">+ ${fmt(t.valor)}</div></div>`).join('')}</div>`; }
-  if(despesas.length){ html+=`<div class="popup-section"><div class="popup-section-title" style="color:var(--red);">🔴 Despesas</div>${despesas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val red">- ${fmt(t.valor)}</div></div>`).join('')}</div>`; }
-  if(parcelados.length){ html+=`<div class="popup-section"><div class="popup-section-title ali">📦 Parcelados</div>${parcelados.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val amber">- ${fmt(t.valorParcela)}</div></div>`).join('')}</div>`; }
+  if(receitas.length){ html+=`<div class="popup-section"><div class="popup-section-title fin">💚 Receitas</div>${receitas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val green">+ <span class="sensitive">${fmt(t.valor)}</span></div></div>`).join('')}</div>`; }
+  if(despesas.length){ html+=`<div class="popup-section"><div class="popup-section-title" style="color:var(--red);">🔴 Despesas</div>${despesas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val red">- <span class="sensitive">${fmt(t.valor)}</span></div></div>`).join('')}</div>`; }
+  if(parcelados.length){ html+=`<div class="popup-section"><div class="popup-section-title ali">📦 Parcelados</div>${parcelados.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val amber">- <span class="sensitive">${fmt(t.valorParcela)}</span></div></div>`).join('')}</div>`; }
   if(treinos.length){ html+=`<div class="popup-section"><div class="popup-section-title ex">💪 Exercícios</div>${treinos.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.titulo||t.nome||'Treino'}${t.local?` <span style="color:var(--hint);font-size:10px;">· ${t.local}</span>`:''}</div><div class="popup-item-val purple">${t.duracao?t.duracao+'min':t.tipo_cat||''}</div></div>`).join('')}</div>`; }
   if(tarefas.length){ html+=`<div class="popup-section"><div class="popup-section-title cas">🏠 Casinha</div>${tarefas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.titulo||'Tarefa'}${t.ambiente?` <span style="color:var(--hint);font-size:10px;">· ${t.ambiente}</span>`:''}</div><div class="popup-item-val pink">✓ concluída</div></div>`).join('')}</div>`; }
-  if(pesos.length||exames.length||consultas.length){ html+=`<div class="popup-section"><div class="popup-section-title sau">❤️ Saúde</div>${pesos.map(w=>`<div class="popup-item"><div class="popup-item-name">Peso registrado</div><div class="popup-item-val" style="color:var(--sau-c);">${w.weight?w.weight+'kg':'—'}${w.fat?` · ${w.fat}% gordura`:''}</div></div>`).join('')}${exames.map(e=>`<div class="popup-item"><div class="popup-item-name">${e.name||'Exame'}</div><div class="popup-item-val muted">${e.status||'exame'}</div></div>`).join('')}${consultas.map(c=>`<div class="popup-item"><div class="popup-item-name">${c.doctor||c.specialty||'Consulta'}</div><div class="popup-item-val muted">${c.status||'consulta'}</div></div>`).join('')}</div>`; }
+  if(pesos.length||exames.length||consultas.length){ html+=`<div class="popup-section"><div class="popup-section-title sau">❤️ Saúde</div>${pesos.map(w=>`<div class="popup-item"><div class="popup-item-name">Peso registrado</div><div class="popup-item-val" style="color:var(--sau-c);"><span class="sensitive">${w.weight?w.weight+'kg':'—'}${w.fat?` · ${w.fat}% gordura`:''}</span></div></div>`).join('')}${exames.map(e=>`<div class="popup-item"><div class="popup-item-name">${e.name||'Exame'}</div><div class="popup-item-val muted">${e.status||'exame'}</div></div>`).join('')}${consultas.map(c=>`<div class="popup-item"><div class="popup-item-name">${c.doctor||c.specialty||'Consulta'}</div><div class="popup-item-val muted">${c.status||'consulta'}</div></div>`).join('')}</div>`; }
   if(habitosFeitos.length){
     const POP_GROUPS=[
       {label:'Manual',    filter:h=>!h.autoType&&h.tipo!=='controle'},
@@ -880,6 +887,7 @@ async function changePassword(){
 }
 
 setAuthMode('login');
+applyPrivacy();
 rendTodaySummary();
 rendCal();
 document.querySelector('#profile-overlay .profile-modal').addEventListener('input',()=>_profileDirty=true);

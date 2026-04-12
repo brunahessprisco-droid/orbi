@@ -561,6 +561,9 @@ thead th.sortable.asc .sort-icon,thead th.sortable.desc .sort-icon{opacity:1;col
 .hub-card-desc{font-size:12px;color:var(--muted);line-height:1.5;}
 .hub-card-badge{font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;background:var(--surface3);color:var(--hint);border:1px solid var(--border);margin-top:auto;}
 .hub-card-badge.active{background:var(--green-bg);color:var(--green);border-color:var(--green-border);}
+html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;transition:filter .2s;}
+.btn-eye{border:1px solid var(--border);background:none;color:var(--muted);width:32px;height:32px;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;flex-shrink:0;}
+.btn-eye:hover{color:var(--text);}
 
 </style>
 </head>
@@ -681,6 +684,7 @@ thead th.sortable.asc .sort-icon,thead th.sortable.desc .sort-icon{opacity:1;col
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Nova transação
     </button>
+    <button class="btn-eye" id="btn-privacy" onclick="togglePrivacy()" title="Ocultar valores sensíveis">👁️</button>
     <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Alternar tema">🌙</button>
   </div>
 </nav>
@@ -698,11 +702,11 @@ thead th.sortable.asc .sort-icon,thead th.sortable.desc .sort-icon{opacity:1;col
 
 <!-- SUMMARY -->
 <div class="summary" style="grid-template-columns:repeat(5,1fr)">
-  <div class="card"><div class="card-label">Receitas</div><div class="card-value green" id="sum-r">—</div><div class="card-sub" id="sum-r-c">—</div></div>
-  <div class="card"><div class="card-label">Despesas</div><div class="card-value red" id="sum-d">—</div><div class="card-sub" id="sum-d-c">—</div></div>
-  <div class="card"><div class="card-label">Parcelados</div><div class="card-value blue" id="sum-p">—</div><div class="card-sub" id="sum-p-c">—</div></div>
-  <div class="card"><div class="card-label">Saldo acumulado</div><div class="card-value" id="sum-acum">—</div><div class="card-sub" id="sum-acum-l">—</div></div>
-  <div class="card"><div class="card-label">Saldo projetado</div><div class="card-value" id="sum-s">—</div><div class="card-sub" id="sum-s-l">—</div></div>
+  <div class="card"><div class="card-label">Receitas</div><div class="card-value green sensitive" id="sum-r">—</div><div class="card-sub" id="sum-r-c">—</div></div>
+  <div class="card"><div class="card-label">Despesas</div><div class="card-value red sensitive" id="sum-d">—</div><div class="card-sub" id="sum-d-c">—</div></div>
+  <div class="card"><div class="card-label">Parcelados</div><div class="card-value blue sensitive" id="sum-p">—</div><div class="card-sub" id="sum-p-c">—</div></div>
+  <div class="card"><div class="card-label">Saldo acumulado</div><div class="card-value sensitive" id="sum-acum">—</div><div class="card-sub" id="sum-acum-l">—</div></div>
+  <div class="card"><div class="card-label">Saldo projetado</div><div class="card-value sensitive" id="sum-s">—</div><div class="card-sub" id="sum-s-l">—</div></div>
 </div>
 
 <!-- TOOLBAR -->
@@ -2557,6 +2561,8 @@ function toggleTheme(){
   localStorage.setItem(SK_THEME,isDark?'light':'dark');
   setTimeout(()=>{Object.keys(charts).forEach(k=>{if(charts[k])charts[k].destroy();});charts={};rendDash();},50);
 }
+function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.textContent=on?'🙈':'👁️'; }
+function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
 
 // COLOR PICKER
 function buildCP(containerId,sel,key){
@@ -3358,6 +3364,7 @@ function rendAnalises(){
   const theme=localStorage.getItem(SK_THEME)||'dark';
   document.documentElement.setAttribute('data-theme',theme);
   document.getElementById('btn-theme').textContent=theme==='dark'?'🌙':'☀️';
+  applyPrivacy();
   // Data
   txs=[];
   cartoes=[];
