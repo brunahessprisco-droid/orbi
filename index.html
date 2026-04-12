@@ -593,7 +593,7 @@ function rendCal(){
       if(day.treinosPlanejados.length)dots.push(`<div class="cal-dot ex" style="opacity:.6;border-style:dashed;">📋 ${day.treinosPlanejados.length} planejado${day.treinosPlanejados.length!==1?'s':''}</div>`);
     }
     if((f==='todos'||f==='cas')&&day.tarefas.length){dots.push(`<div class="cal-dot cas">🏠 ${day.tarefas.length} tarefa${day.tarefas.length!==1?'s':''}</div>`);}
-    if((f==='todos'||f==='sau')&&(day.pesos.length||day.consultas.length||day.exames.length)){const parts=[];if(day.pesos.length)parts.push(day.pesos[0].weight?`${day.pesos[0].weight}kg`:'Peso');if(day.consultas.length)parts.push(`${day.consultas.length} consulta${day.consultas.length!==1?'s':''}`);dots.push(`<div class="cal-dot sau">❤️ ${parts.join(' · ')}</div>`);}
+    if((f==='todos'||f==='sau')&&(day.pesos.length||day.consultas.length||day.exames.length)){const parts=[];if(day.pesos.length)parts.push(day.pesos[0].weight?`<span class="sensitive">${day.pesos[0].weight}kg</span>`:'Peso');if(day.consultas.length)parts.push(`${day.consultas.length} consulta${day.consultas.length!==1?'s':''}`);dots.push(`<div class="cal-dot sau">❤️ ${parts.join(' · ')}</div>`);}
     if((f==='todos'||f==='hab')&&day.habitosFeitos.length){dots.push(`<div class="cal-dot hab">🔁 ${day.habitosFeitos.length}/${day.todosHabitos.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
     if((f==='todos'||f==='ali')&&day.refeicoes.length){const kcal=day.refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);dots.push(`<div class="cal-dot ali">🍽️ ${day.refeicoes.length} ref${kcal?` · ${fmtNum(kcal)} kcal`:''}</div>`);}
     const hasData=dots.length>0;
@@ -615,7 +615,7 @@ function openDay(dateStr){
   if(parcelados.length){ const p=parcelados.reduce((a,t)=>a+Number(t.valorParcela),0); chips.push(`<div class="popup-sum-chip ali">📦 - <span class="sensitive">${fmt(p)}</span></div>`); }
   if(treinos.length) chips.push(`<div class="popup-sum-chip ex">💪 ${treinos.length} treino${treinos.length!==1?'s':''}</div>`);
   if(tarefas.length) chips.push(`<div class="popup-sum-chip cas">🏠 ${tarefas.length} tarefa${tarefas.length!==1?'s':''}</div>`);
-  if(pesos.length||consultas.length||exames.length){ const p=[];if(pesos.length&&pesos[0].weight)p.push(`${pesos[0].weight}kg`);if(consultas.length)p.push(`${consultas.length} consulta${consultas.length!==1?'s':''}`); chips.push(`<div class="popup-sum-chip sau">❤️ ${p.join(' · ')||'Saúde'}</div>`); }
+  if(pesos.length||consultas.length||exames.length){ const p=[];if(pesos.length&&pesos[0].weight)p.push(`<span class="sensitive">${pesos[0].weight}kg</span>`);if(consultas.length)p.push(`${consultas.length} consulta${consultas.length!==1?'s':''}`); chips.push(`<div class="popup-sum-chip sau">❤️ ${p.join(' · ')||'Saúde'}</div>`); }
   if(habitosFeitos.length) chips.push(`<div class="popup-sum-chip hab">🔁 ${habitosFeitos.length}/${todosHabitos.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
   if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); chips.push(`<div class="popup-sum-chip ali">🍽️ ${refeicoes.length} refeição${refeicoes.length!==1?'ões':''} · ${fmtNum(kcal)} kcal</div>`); }
   let html=`<div class="popup-summary">${chips.join('')}</div>`;
