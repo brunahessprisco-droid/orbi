@@ -1731,10 +1731,11 @@ document.getElementById('modal-box').addEventListener('input',_markDirty);
 document.getElementById('modal-box').addEventListener('change',_markDirty);
 
 // ===== AUTH & API =====
-const API_BASE='http://localhost:3333/api';
 const SK_AUTH='fin_auth_token_v1';
+const SK_API_BASE='fin_api_base_v1';
 let authToken=localStorage.getItem(SK_AUTH)||'';
 let API_USER_ID=null;
+function getApiBase(){return(localStorage.getItem(SK_API_BASE)||'http://localhost:3333/api').replace(/\/+$/,'');}
 
 function canUseApi(){return!!(authToken&&API_USER_ID);}
 
@@ -1742,7 +1743,7 @@ async function apiReq(path,opts={}){
   const headers={'Content-Type':'application/json',...(opts.headers||{})};
   if(authToken)headers.Authorization='Bearer '+authToken;
   let res;
-  try{res=await fetch(API_BASE+path,{...opts,headers});}
+  try{res=await fetch(getApiBase()+path,{...opts,headers});}
   catch(e){throw new Error('Falha de rede: '+e.message);}
   if(!res.ok){
     let msg='Erro na API';
