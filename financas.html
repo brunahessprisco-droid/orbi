@@ -1859,14 +1859,14 @@ function updSummary(){
   const nProj=all.filter(t=>t.projecao).length;
   const elS=document.getElementById('sum-s');
   elS.textContent=fmtS(saldoProj);
-  elS.className='card-value '+(saldoProj>=0?'proj':'red');
+  elS.className='card-value sensitive '+(saldoProj>=0?'proj':'red');
   const projSub=nProj>0?` · ${nProj} proj. este mês`:'';
   const mesStr=saldo>=0?'+ '+fmt(saldo)+' este mês':'− '+fmt(Math.abs(saldo))+' este mês';
   document.getElementById('sum-s-l').textContent=mesStr+projSub;
 
   const elA=document.getElementById('sum-acum');
   elA.textContent=fmtS(saldoAcum);
-  elA.className='card-value '+(saldoAcum>=0?'green':'red');
+  elA.className='card-value sensitive '+(saldoAcum>=0?'green':'red');
   const diffStr=saldiRealMes>=0?'+ '+fmt(saldiRealMes)+' este mês':'− '+fmt(Math.abs(saldiRealMes))+' este mês';
   document.getElementById('sum-acum-l').textContent=diffStr;
 }
