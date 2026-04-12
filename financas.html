@@ -1130,15 +1130,7 @@ const DEF_CATS=[
   {id:'cat24',nome:'Supermercado',cor:'#84cc16'},{id:'cat25',nome:'Uber',cor:'#06b6d4'},
   {id:'cat26',nome:'Online',cor:'#8b5cf6'},{id:'cat27',nome:'Cerveja',cor:'#f97316'},
 ];
-const DEF_CARTOES=[
-  {id:'c1',nome:'CC Banco Inter',banco:'Banco Inter',tipo:'credito',vencimento:7,limite:5000,cor:'#7b9cff'},
-  {id:'c2',nome:'Banco Inter Crédito',banco:'Banco Inter',tipo:'parcelado',vencimento:7,limite:0,cor:'#2dd4a0'},
-  {id:'c3',nome:'CC Itaú',banco:'Itaú',tipo:'credito',vencimento:7,limite:5000,cor:'#f06292'},
-  {id:'c4',nome:'CC Parcelado Itaú',banco:'Itaú',tipo:'parcelado',vencimento:7,limite:0,cor:'#fbbf24'},
-  {id:'c5',nome:'Banco Inter Débito',banco:'Banco Inter',tipo:'debito',vencimento:0,limite:0,cor:'#06b6d4'},
-  {id:'c6',nome:'Itaú Débito',banco:'Itaú',tipo:'debito',vencimento:0,limite:0,cor:'#f97316'},
-  {id:'c7',nome:'Zaffari',banco:'Zaffari',tipo:'credito',vencimento:10,limite:2000,cor:'#a855f7'},
-];
+const DEF_CARTOES=[];
 
 let txs=[],cartoes=[],cats=[],fixas=[],fixaVals={};
 let budgets={};
@@ -1662,9 +1654,7 @@ async function bootstrapApi(){
       apiCats=await apiReq(`/categorias?usuario_id=${API_USER_ID}`);
     }
     if(apiContas.length===0){
-      cartoes=[...DEF_CARTOES];
-      await syncContasToApi();
-      apiContas=await apiReq(`/contas?usuario_id=${API_USER_ID}`);
+      cartoes=[];
     }
     if(apiBudgets.length===0&&Object.keys(budgets||{}).length>0){
       await syncBudgetsToApi();
@@ -3324,7 +3314,7 @@ function rendAnalises(){
   document.getElementById('btn-theme').textContent=theme==='dark'?'🌙':'☀️';
   // Data
   txs=[];
-  cartoes=[...DEF_CARTOES];
+  cartoes=[];
   cats=[...DEF_CATS];
   fixas=[];
   fixaVals={};
