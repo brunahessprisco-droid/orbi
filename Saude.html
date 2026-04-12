@@ -167,6 +167,18 @@
 
     @media(max-width:1180px){.summary{grid-template-columns:repeat(3,1fr)}.dash-grid,.dash-grid-3{grid-template-columns:1fr}}
     @media(max-width:700px){.app{padding:12px 10px 40px}.summary{grid-template-columns:1fr 1fr}.form-row,.form-row.triple{grid-template-columns:1fr}.search{max-width:none}.summary{grid-template-columns:1fr}}
+    @media(max-width:480px){
+      .summary{grid-template-columns:1fr}
+      .nav-brand-name{display:none}
+      .cal-label{min-width:120px;font-size:13px}
+      .cal-day{min-height:70px;padding:5px}
+      .cal-num{font-size:11px}
+      .rem-cards{grid-template-columns:1fr}
+      .modal{max-width:100%!important;border-radius:16px 16px 0 0;position:fixed;bottom:0;left:0;right:0;margin:0;max-height:85vh}
+      .overlay{align-items:flex-end;padding:0}
+      .modal-title{font-size:16px}
+      .dash-grid,.dash-grid-3{grid-template-columns:1fr}
+    }
   /* AUTH */
   .auth-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.7);z-index:500;}
   .auth-overlay.open{display:flex;}

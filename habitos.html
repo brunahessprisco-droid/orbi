@@ -496,9 +496,31 @@
     }
     @media(max-width:680px){
       .app{padding:12px 10px 40px}
-      .summary{grid-template-columns:1fr}
+      .summary{grid-template-columns:1fr 1fr}
       .form-row{grid-template-columns:1fr}
       .search{max-width:none}
+      .nav-logo span{display:none}
+      .month-label{min-width:120px;font-size:13px}
+      .modal{max-width:calc(100% - 24px);margin:12px}
+      .btn-primary{padding:8px 10px;font-size:12px}
+    }
+    @media(max-width:480px){
+      .summary{grid-template-columns:1fr}
+      .nav{padding:0 12px;gap:4px}
+      .nav-tabs{gap:2px}
+      .nav-btn{padding:6px 8px;font-size:12px}
+      .app{padding:10px 8px 40px}
+      .card{padding:14px}
+      .month-label{min-width:90px;font-size:12px}
+      .toolbar{flex-wrap:wrap;gap:6px}
+      .toolbar .search,.toolbar .sel{width:100%;max-width:none}
+      .items-grid{grid-template-columns:1fr}
+      .item-actions{flex-shrink:0}
+      .btn{min-height:40px}
+      .btn-primary{min-height:40px}
+      .modal{max-width:100%;border-radius:12px 12px 0 0;margin:0;position:fixed;bottom:0;left:0;right:0;max-height:90vh;overflow-y:auto}
+      .overlay{align-items:flex-end}
+      .cal-day-panel{max-width:100%;border-radius:12px 12px 0 0;position:fixed;bottom:0;left:0;right:0}
     }
   /* AUTO-SYNC BANNER */
   .auto-banner{
@@ -543,6 +565,7 @@
   .cal-page-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
   .cal-dow{text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:6px 0;}
   .cal-day-cell{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:7px 6px 6px;min-height:90px;cursor:pointer;transition:border-color .15s,background .12s;display:flex;flex-direction:column;}
+  @media(max-width:480px){.cal-day-cell{min-height:60px;padding:4px 3px;border-radius:6px;}.cal-dow{font-size:9px;padding:4px 0;}}
   .cal-day-cell:hover{border-color:var(--blue-border);background:var(--surface2);}
   .cal-day-cell.today-cell{border-color:var(--blue);background:var(--blue-bg);}
   .cal-day-cell.empty-cell{pointer-events:none;}
@@ -1805,12 +1828,15 @@
       });
 
       box.innerHTML=`
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div style="min-width:420px;">
         <div class="heatmap-months">
           ${labels.map(l=>`<div class="heatmap-month-label">${l}</div>`).join('')}
         </div>
         <div class="heatmap">
           ${items.map(x=>`<div class="heat-cell ${level(x.done)}" title="${x.key} · ${x.done} concluído${x.done!==1?'s':''}"></div>`).join('')}
         </div>
+        </div></div>
         <div class="heat-legend">
           <span>Menos</span>
           <div class="heat-dot"></div>
