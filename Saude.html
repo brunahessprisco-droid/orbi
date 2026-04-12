@@ -47,6 +47,12 @@
     .nav-btn.active{background:var(--health-bg);color:var(--health)}
     .nav-btn:hover:not(.active){background:var(--surface2);color:var(--text)}
     .nav-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .btn-hamburger{display:none;border:none;background:none;color:var(--text);font-size:22px;padding:6px 8px;cursor:pointer;line-height:1;flex-shrink:0;}
+    .nav-menu{display:none;position:fixed;top:56px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:19;flex-direction:column;padding:8px 12px;gap:2px;}
+    .nav-menu.open{display:flex;}
+    .nav-menu-item{padding:11px 14px;font-size:14px;font-weight:500;color:var(--muted);border-radius:8px;cursor:pointer;border:none;background:none;font-family:inherit;text-align:left;width:100%;}
+    .nav-menu-item:hover{background:var(--surface2);color:var(--text);}
+    .nav-menu-item.active{background:var(--health-bg);color:var(--health);}
 
     .btn,.btn-icon,.btn-primary{border-radius:var(--radius-sm);cursor:pointer;transition:.15s}
     .btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:8px 12px}
@@ -166,7 +172,7 @@
 
 
     @media(max-width:1180px){.summary{grid-template-columns:repeat(3,1fr)}.dash-grid,.dash-grid-3{grid-template-columns:1fr}}
-    @media(max-width:700px){.app{padding:12px 10px 40px}.summary{grid-template-columns:1fr 1fr}.form-row,.form-row.triple{grid-template-columns:1fr}.search{max-width:none}.summary{grid-template-columns:1fr}}
+    @media(max-width:700px){.app{padding:12px 10px 40px}.summary{grid-template-columns:1fr 1fr}.form-row,.form-row.triple{grid-template-columns:1fr}.search{max-width:none}.summary{grid-template-columns:1fr}.nav > .nav-btn{display:none;}.btn-hamburger{display:flex;align-items:center;justify-content:center;}}
     @media(max-width:480px){
       .summary{grid-template-columns:1fr}
       .nav-brand-name{display:none}
@@ -216,11 +222,21 @@
     <button class="nav-btn" data-page="consultas">Consultas</button>
     <button class="nav-btn" data-page="medicos">Médicos</button>
     <button class="nav-btn" data-page="remedios">Remédios</button>
+    <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <button class="btn-primary" id="quick-add-btn" type="button">+ Novo registro</button>
       <button class="btn-icon" id="btn-theme" type="button">🌙</button>
     </div>
   </nav>
+  <div class="nav-menu" id="nav-menu">
+    <button class="nav-menu-item active" data-page="dashboard" onclick="showPage('dashboard');closeNavMenu()">Dashboard</button>
+    <button class="nav-menu-item" data-page="calendario" onclick="showPage('calendario');closeNavMenu()">Calendário</button>
+    <button class="nav-menu-item" data-page="peso" onclick="showPage('peso');closeNavMenu()">Peso</button>
+    <button class="nav-menu-item" data-page="exames" onclick="showPage('exames');closeNavMenu()">Exames</button>
+    <button class="nav-menu-item" data-page="consultas" onclick="showPage('consultas');closeNavMenu()">Consultas</button>
+    <button class="nav-menu-item" data-page="medicos" onclick="showPage('medicos');closeNavMenu()">Médicos</button>
+    <button class="nav-menu-item" data-page="remedios" onclick="showPage('remedios');closeNavMenu()">Remédios</button>
+  </div>
 
   <div class="app">
     <div id="page-dashboard" class="page active">
@@ -989,11 +1005,14 @@
         saveState();
       }
       function toggleTheme(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); renderAll(); }
+      function toggleNavMenu(){ document.getElementById('nav-menu').classList.toggle('open'); }
+      function closeNavMenu(){ document.getElementById('nav-menu').classList.remove('open'); }
       function showPage(page,btn){
         document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
         document.getElementById(`page-${page}`).classList.add('active');
         document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
         (btn || document.querySelector(`.nav-btn[data-page="${page}"]`))?.classList.add('active');
+        document.querySelectorAll('.nav-menu-item').forEach(x=>{x.classList.remove('active');if(x.dataset.page===page)x.classList.add('active');});
       }
       function openOverlay(id){ _saudeDirty=false; document.getElementById(id).classList.add('open'); }
       function closeOverlay(id){ _saudeDirty=false; document.getElementById(id).classList.remove('open'); }

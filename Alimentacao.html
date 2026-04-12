@@ -45,6 +45,12 @@
     .nav-btn.active{background:var(--accent-bg);color:var(--accent)}
     .nav-btn:hover:not(.active){background:var(--surface2);color:var(--text)}
     .nav-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .btn-hamburger{display:none;border:none;background:none;color:var(--text);font-size:22px;padding:6px 8px;cursor:pointer;line-height:1;flex-shrink:0;}
+    .nav-menu{display:none;position:fixed;top:56px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:19;flex-direction:column;padding:8px 12px;gap:2px;}
+    .nav-menu.open{display:flex;}
+    .nav-menu-item{padding:11px 14px;font-size:14px;font-weight:500;color:var(--muted);border-radius:8px;cursor:pointer;border:none;background:none;font-family:inherit;text-align:left;width:100%;}
+    .nav-menu-item:hover{background:var(--surface2);color:var(--text);}
+    .nav-menu-item.active{background:var(--accent-bg);color:var(--accent);}
     .btn,.btn-icon,.btn-primary{border-radius:var(--radius-sm);cursor:pointer;transition:.15s}
     .btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:8px 12px}
     .btn:hover{border-color:var(--border2)}
@@ -107,7 +113,7 @@
     .field{display:flex;flex-direction:column;gap:5px} label{font-size:12px;color:var(--muted)}
     .modal-footer{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
     @media(max-width:1100px){.summary{grid-template-columns:1fr 1fr}.dash-grid,.week-grid{grid-template-columns:1fr}}
-    @media(max-width:700px){.app{padding:12px 10px 40px}.summary{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.search{max-width:none}}
+    @media(max-width:700px){.app{padding:12px 10px 40px}.summary{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.search{max-width:none}.nav > .nav-btn{display:none;}.btn-hamburger{display:flex;align-items:center;justify-content:center;}}
     @media(max-width:480px){
       .summary{grid-template-columns:1fr}
       .nav-brand-name{display:none}
@@ -155,6 +161,7 @@
     <button class="nav-btn" data-page="calendario">Calendário</button>
     <button class="nav-btn" data-page="refeicoes">Refeições</button>
     <button class="nav-btn" data-page="planejamento">Planejamento</button>
+    <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <div style="position:relative;display:inline-block">
         <button class="btn-primary" id="new-meal-btn" type="button">+ Novo</button>
@@ -166,6 +173,12 @@
       <button class="btn-icon" id="btn-theme" type="button">🌙</button>
     </div>
   </nav>
+  <div class="nav-menu" id="nav-menu">
+    <button class="nav-menu-item active" data-page="dashboard" onclick="showPage('dashboard');closeNavMenu()">Dashboard</button>
+    <button class="nav-menu-item" data-page="calendario" onclick="showPage('calendario');closeNavMenu()">Calendário</button>
+    <button class="nav-menu-item" data-page="refeicoes" onclick="showPage('refeicoes');closeNavMenu()">Refeições</button>
+    <button class="nav-menu-item" data-page="planejamento" onclick="showPage('planejamento');closeNavMenu()">Planejamento</button>
+  </div>
 
   <div class="app">
     <div id="page-dashboard" class="page active">
@@ -482,11 +495,14 @@
 
       function goHub(){ try{window.location.href='index.html';}catch(e){ console.warn(e); } }
 
+      function toggleNavMenu(){ document.getElementById('nav-menu').classList.toggle('open'); }
+      function closeNavMenu(){ document.getElementById('nav-menu').classList.remove('open'); }
       function showPage(id){
         qsa('.page').forEach(p=>p.classList.remove('active'));
         const page=$('page-'+id); if(page) page.classList.add('active');
         qsa('.nav-btn').forEach(b=>b.classList.remove('active'));
         const btn=qs(`.nav-btn[data-page="${id}"]`); if(btn) btn.classList.add('active');
+        qsa('.nav-menu-item').forEach(x=>{x.classList.remove('active');if(x.dataset.page===id)x.classList.add('active');});
         if(id==='planejamento') renderPlanning();
         if(id==='calendario') renderCalendar();
       }
