@@ -34,6 +34,8 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--text);min-height:100vh;font-size:14px;transition:background .3s,color .2s;}
 
+.month-short{display:none}
+@media(max-width:900px){.nav-label{display:none}.nav-btn:not(.btn-hamburger){padding:6px 10px}.month-full{display:none}.month-short{display:inline}}
 /* AUTH */
 .auth-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.65);z-index:500;}
 .auth-overlay.open{display:flex;}
@@ -660,13 +662,13 @@ thead th.sortable.asc .sort-icon,thead th.sortable.desc .sort-icon{opacity:1;col
     </div>
     <span class="nav-logo-text">Finanças</span>
   </div>
-  <button class="nav-btn active" onclick="showPage('dashboard',this)">Dashboard</button>
-  <button class="nav-btn" onclick="showPage('calendario',this)">Calendário</button>
-  <button class="nav-btn" onclick="showPage('transacoes',this)">Transações</button>
-  <button class="nav-btn" onclick="showPage('categorias',this)">Categorias</button>
-  <button class="nav-btn" onclick="showPage('cartoes',this)">Cartões</button>
-  <button class="nav-btn" onclick="showPage('fixas',this)">Contas fixas</button>
-  <button class="nav-btn" onclick="showPage('planejamento',this)">Planejamento</button>
+  <button class="nav-btn active" onclick="showPage('dashboard',this)"><span class="nav-icon">📊</span><span class="nav-label"> Dashboard</span></button>
+  <button class="nav-btn" onclick="showPage('calendario',this)"><span class="nav-icon">📅</span><span class="nav-label"> Calendário</span></button>
+  <button class="nav-btn" onclick="showPage('transacoes',this)"><span class="nav-icon">💸</span><span class="nav-label"> Transações</span></button>
+  <button class="nav-btn" onclick="showPage('categorias',this)"><span class="nav-icon">🏷️</span><span class="nav-label"> Categorias</span></button>
+  <button class="nav-btn" onclick="showPage('cartoes',this)"><span class="nav-icon">💳</span><span class="nav-label"> Cartões</span></button>
+  <button class="nav-btn" onclick="showPage('fixas',this)"><span class="nav-icon">🔁</span><span class="nav-label"> Contas fixas</span></button>
+  <button class="nav-btn" onclick="showPage('planejamento',this)"><span class="nav-icon">📋</span><span class="nav-label"> Planejamento</span></button>
   <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-right">
     <div class="fat-nav nav-month" title="Mês selecionado">
@@ -1785,11 +1787,14 @@ function goToCurrentMonth(){
 }
 function updFatLabels(){
   const l=MESES[curFat.m-1]+' '+curFat.y;
+  const short=String(curFat.m).padStart(2,'0')+'/'+String(curFat.y).slice(-2);
+  const spans=`<span class="month-full">${l}</span><span class="month-short">${short}</span>`;
+  const setHTML=(id,html)=>{const el=document.getElementById(id);if(el)el.innerHTML=html;};
   const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
-  set('fat-label',l);
-  set('cat-fat-label',l);
-  set('fixas-fat-label',l);
-  set('budget-nav-label',l);
+  setHTML('fat-label',spans);
+  setHTML('cat-fat-label',spans);
+  setHTML('fixas-fat-label',spans);
+  setHTML('budget-nav-label',spans);
   set('budget-fat-label','Orçamento de '+l);
 }
 function setFilter(t,btn){filterType=t;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderAll();}

@@ -186,6 +186,8 @@
       .modal-title{font-size:16px}
       .dash-grid,.dash-grid-3{grid-template-columns:1fr}
     }
+  .month-short{display:none}
+  @media(max-width:900px){.nav-label{display:none}.nav-btn:not(.btn-hamburger){padding:6px 10px}.month-full{display:none}.month-short{display:inline}}
   /* AUTH */
   .auth-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.7);z-index:500;}
   .auth-overlay.open{display:flex;}
@@ -216,13 +218,13 @@
       <div class="nav-logo-mark"><img src="assets/Saúde.png" class="nav-logo-img" alt="Saúde"></div>
       <div class="nav-logo-text">Saúde</div>
     </div>
-    <button class="nav-btn active" data-page="dashboard">Dashboard</button>
-    <button class="nav-btn" data-page="calendario">Calendário</button>
-    <button class="nav-btn" data-page="peso">Peso</button>
-    <button class="nav-btn" data-page="exames">Exames</button>
-    <button class="nav-btn" data-page="consultas">Consultas</button>
-    <button class="nav-btn" data-page="medicos">Médicos</button>
-    <button class="nav-btn" data-page="remedios">Remédios</button>
+    <button class="nav-btn active" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label"> Dashboard</span></button>
+    <button class="nav-btn" data-page="calendario"><span class="nav-icon">📅</span><span class="nav-label"> Calendário</span></button>
+    <button class="nav-btn" data-page="peso"><span class="nav-icon">⚖️</span><span class="nav-label"> Peso</span></button>
+    <button class="nav-btn" data-page="exames"><span class="nav-icon">🧪</span><span class="nav-label"> Exames</span></button>
+    <button class="nav-btn" data-page="consultas"><span class="nav-icon">🩺</span><span class="nav-label"> Consultas</span></button>
+    <button class="nav-btn" data-page="medicos"><span class="nav-icon">👨‍⚕️</span><span class="nav-label"> Médicos</span></button>
+    <button class="nav-btn" data-page="remedios"><span class="nav-icon">💊</span><span class="nav-label"> Remédios</span></button>
     <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <button class="btn-primary" id="quick-add-btn" type="button">+ Novo registro</button>

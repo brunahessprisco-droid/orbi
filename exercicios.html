@@ -254,6 +254,8 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
 .recent-time{font-family:var(--mono);font-size:12px;color:var(--muted);}
 .recent-cal{font-size:11px;color:var(--hint);margin-top:2px;}
 
+.month-short{display:none}
+@media(max-width:900px){.nav-label{display:none}.nav-btn:not(.btn-hamburger){padding:6px 10px}.month-full{display:none}.month-short{display:inline}}
 /* AUTH */
 .auth-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.65);z-index:500;}
 .auth-overlay.open{display:flex;}
@@ -364,12 +366,12 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
     </div>
     <span class="nav-logo-text">Exercícios</span>
   </div>
-  <button class="nav-btn active" onclick="showPage('dashboard',this)">Dashboard</button>
-  <button class="nav-btn" onclick="showPage('calendario',this)">Calendário</button>
-  <button class="nav-btn" onclick="showPage('treinos',this)">Treinos</button>
-  <button class="nav-btn" onclick="showPage('locais',this)">Locais</button>
-  <button class="nav-btn" onclick="showPage('tipos',this)">Tipos</button>
-  <button class="nav-btn" onclick="showPage('planejamento',this)">Planejamento</button>
+  <button class="nav-btn active" onclick="showPage('dashboard',this)"><span class="nav-icon">📊</span><span class="nav-label"> Dashboard</span></button>
+  <button class="nav-btn" onclick="showPage('calendario',this)"><span class="nav-icon">📅</span><span class="nav-label"> Calendário</span></button>
+  <button class="nav-btn" onclick="showPage('treinos',this)"><span class="nav-icon">💪</span><span class="nav-label"> Treinos</span></button>
+  <button class="nav-btn" onclick="showPage('locais',this)"><span class="nav-icon">📍</span><span class="nav-label"> Locais</span></button>
+  <button class="nav-btn" onclick="showPage('tipos',this)"><span class="nav-icon">🏷️</span><span class="nav-label"> Tipos</span></button>
+  <button class="nav-btn" onclick="showPage('planejamento',this)"><span class="nav-icon">📋</span><span class="nav-label"> Planejamento</span></button>
   <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
   <div class="nav-right">
     <div class="nav-month">
@@ -953,16 +955,23 @@ function treinosMes(){
   return base.filter(t=>!t.planejado&&!t.naoFeito);
 }
 
+function fmtMonthShort(k){
+  if(!k)return'—';
+  const [y,m]=k.split('-');
+  return String(parseInt(m)).padStart(2,'0')+'/'+String(y).slice(-2);
+}
 function updMonthLabel(){
   const el=document.getElementById('nav-month-label');
   if(!el)return;
   if(selectedMonths.size<=1){
-    el.textContent=fmtMonth(curMonth);
+    const full=fmtMonth(curMonth),short=fmtMonthShort(curMonth);
+    el.innerHTML=`<span class="month-full">${full}</span><span class="month-short">${short}</span>`;
     document.getElementById('btn-period').classList.remove('active');
   } else {
     const sorted=[...selectedMonths].sort();
     const first=fmtMonth(sorted[0]),last=fmtMonth(sorted[sorted.length-1]);
-    el.textContent=first+' – '+last;
+    const firstS=fmtMonthShort(sorted[0]),lastS=fmtMonthShort(sorted[sorted.length-1]);
+    el.innerHTML=`<span class="month-full">${first} – ${last}</span><span class="month-short">${firstS} – ${lastS}</span>`;
     document.getElementById('btn-period').classList.add('active');
   }
 }

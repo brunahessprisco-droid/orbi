@@ -127,6 +127,8 @@
       .modal-title{font-size:16px}
       .dash-grid{grid-template-columns:1fr}
     }
+  .month-short{display:none}
+  @media(max-width:900px){.nav-label{display:none}.nav-btn:not(.btn-hamburger){padding:6px 10px}.month-full{display:none}.month-short{display:inline}}
   /* AUTH */
   .auth-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.7);z-index:500;}
   .auth-overlay.open{display:flex;}
@@ -157,10 +159,10 @@
       <div class="nav-logo-mark"><img src="assets/Alimentação.png" class="nav-logo-img" alt="Alimentação"></div>
       <div class="nav-logo-text">Alimentação</div>
     </div>
-    <button class="nav-btn active" data-page="dashboard">Dashboard</button>
-    <button class="nav-btn" data-page="calendario">Calendário</button>
-    <button class="nav-btn" data-page="refeicoes">Refeições</button>
-    <button class="nav-btn" data-page="planejamento">Planejamento</button>
+    <button class="nav-btn active" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label"> Dashboard</span></button>
+    <button class="nav-btn" data-page="calendario"><span class="nav-icon">📅</span><span class="nav-label"> Calendário</span></button>
+    <button class="nav-btn" data-page="refeicoes"><span class="nav-icon">🍽️</span><span class="nav-label"> Refeições</span></button>
+    <button class="nav-btn" data-page="planejamento"><span class="nav-icon">📋</span><span class="nav-label"> Planejamento</span></button>
     <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <div style="position:relative;display:inline-block">
