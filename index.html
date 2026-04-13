@@ -582,7 +582,7 @@ async function hubBootstrapGcal(){
   const token=localStorage.getItem(AUTH_KEY);
   if(!token)return;
   try{
-    const r=await fetch(`${getApiBase()}/google/events`,{headers:{Authorization:'Bearer '+token}});
+    const r=await fetch(`${getApiBase()}/google/events`,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
     if(!r.ok)return;
     const events=await r.json();
     if(Array.isArray(events)){
@@ -642,10 +642,11 @@ async function checkGcalStatus(){
   const token=localStorage.getItem(AUTH_KEY);
   if(!token)return;
   try{
-    const r=await fetch(`${getApiBase()}/google/status`,{headers:{Authorization:'Bearer '+token}});
+    const r=await fetch(`${getApiBase()}/google/status`,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
     if(!r.ok)return;
     const{connected}=await r.json();
     updateGcalUI(connected);
+    if(connected) hubBootstrapGcal();
   }catch(e){}
 }
 
