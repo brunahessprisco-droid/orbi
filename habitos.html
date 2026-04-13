@@ -650,6 +650,12 @@
   .icon-item.selected{border-color:var(--purple);background:var(--purple-bg);color:var(--purple);}
   .icon-item.hidden{display:none;}
   .hab-emoji{font-size:1em;}
+  .icon-picker-footer{border-top:1px solid var(--border);margin-top:10px;padding-top:10px;font-size:11px;color:var(--muted);line-height:1.5;}
+  .icon-picker-footer a{color:var(--purple);text-decoration:none;}
+  .icon-picker-footer a:hover{text-decoration:underline;}
+  .icon-custom-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .icon-custom-row .icon-search{margin-bottom:0;flex:1;}
+  .icon-custom-preview{font-size:18px;width:28px;flex-shrink:0;text-align:center;display:flex;align-items:center;justify-content:center;}
   </style>
 </head>
 <body>
@@ -822,6 +828,13 @@
             <div class="icon-picker-panel" id="icon-picker-panel">
               <input class="icon-search" id="icon-search" placeholder="Buscar…" oninput="filterIcons(this.value)">
               <div id="icon-grid-container"></div>
+              <div class="icon-picker-footer">
+                Não achou? Procura em <a href="https://icons.getbootstrap.com" target="_blank">icons.getbootstrap.com</a> e cola o nome aqui:
+                <div class="icon-custom-row">
+                  <input class="icon-search" id="icon-custom-input" placeholder="ex: bi-pizza" oninput="previewCustomIcon(this.value)" onkeydown="if(event.key==='Enter')confirmCustomIcon()">
+                  <span class="icon-custom-preview" id="icon-custom-preview"></span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1280,6 +1293,23 @@
         lbl.style.display=visible?'':'none';
         grid.style.display=visible?'':'none';
       });
+    }
+
+    function previewCustomIcon(val){
+      val=val.trim();
+      const prev=document.getElementById('icon-custom-preview');
+      if(!prev) return;
+      prev.innerHTML=val.startsWith('bi-')?`<i class="bi ${val}"></i>`:'';
+    }
+
+    function confirmCustomIcon(){
+      const input=document.getElementById('icon-custom-input');
+      const val=input.value.trim();
+      if(!val.startsWith('bi-')) return;
+      selectIcon(val);
+      input.value='';
+      const prev=document.getElementById('icon-custom-preview');
+      if(prev) prev.innerHTML='';
     }
 
     function resetForm(){
