@@ -1683,7 +1683,7 @@ function scheduleProjExtrasSync(){
 async function bootstrapApi(){
   if(!canUseApi())return;
   try{
-    let [apiCats,apiTxs,apiContas,apiFixas,apiFixaVals,apiBudgets,apiSaving,apiPoupanca,apiProjExtras]=await Promise.all([
+    const _results=await Promise.allSettled([
       apiReq(`/categorias?usuario_id=${API_USER_ID}`),
       apiReq(`/transacoes?usuario_id=${API_USER_ID}`),
       apiReq(`/contas?usuario_id=${API_USER_ID}`),
@@ -1694,15 +1694,17 @@ async function bootstrapApi(){
       apiReq(`/poupanca?usuario_id=${API_USER_ID}`),
       apiReq(`/projecao-extras?usuario_id=${API_USER_ID}`)
     ]);
+    const _ok=r=>r.status==='fulfilled'?r.value:null;
+    let [apiCats,apiTxs,apiContas,apiFixas,apiFixaVals,apiBudgets,apiSaving,apiPoupanca,apiProjExtras]=_results.map(_ok);
 
     // Seed inicial no banco (somente quando vazio)
-    if(apiCats.length===0){
+    if(apiCats!==null&&apiCats.length===0){
       cats=[];
     }
-    if(apiContas.length===0){
+    if(apiContas!==null&&apiContas.length===0){
       cartoes=[];
     }
-    if(apiBudgets.length===0&&Object.keys(budgets||{}).length>0){
+    if(apiBudgets!==null&&apiBudgets.length===0&&Object.keys(budgets||{}).length>0){
       await syncBudgetsToApi();
       apiBudgets=await apiReq(`/orcamentos-config?usuario_id=${API_USER_ID}`);
     }
@@ -1716,19 +1718,21 @@ async function bootstrapApi(){
       await syncPoupancaToApi();
       apiPoupanca=await apiReq(`/poupanca?usuario_id=${API_USER_ID}`);
     }
-    if(apiProjExtras.length===0&&receitasProj.length>0){
+    if(apiProjExtras!==null&&apiProjExtras.length===0&&receitasProj.length>0){
       await syncProjExtrasToApi();
       apiProjExtras=await apiReq(`/projecao-extras?usuario_id=${API_USER_ID}`);
     }
 
-    // Sempre espelha do banco para o estado local
-    cats=apiCats.map(c=>({id:String(c.client_id||c.id),nome:c.nome,cor:c.cor||'#7b9cff'}));
-    txs=apiTxs.map(txFromApi);
-    // Cache para o hub
-    try{{const _fuid=localStorage.getItem('hub_user_id')||'anon';localStorage.setItem('u_'+_fuid+'_hub_fin_cache',JSON.stringify(txs.map(t=>({data:t.data,valor:t.valor,valorParcela:t.valorParcela,descricao:t.descricao,categoria:t.categoria,tipo:t.tipo}))));}localStorage.setItem('hub_user_id',API_USER_ID);}catch(e){}
-    cartoes=apiContas.map(contaFromApi);
-    fixas=apiFixas.map(fixaFromApi);
-    fixaVals=fixaValsFromApiRows(apiFixaVals);
+    // Sempre espelha do banco para o estado local (apenas se o endpoint respondeu)
+    if(apiCats!==null) cats=apiCats.map(c=>({id:String(c.client_id||c.id),nome:c.nome,cor:c.cor||'#7b9cff'}));
+    if(apiTxs!==null){
+      txs=apiTxs.map(txFromApi);
+      // Cache para o hub
+      try{{const _fuid=localStorage.getItem('hub_user_id')||'anon';localStorage.setItem('u_'+_fuid+'_hub_fin_cache',JSON.stringify(txs.map(t=>({data:t.data,valor:t.valor,valorParcela:t.valorParcela,descricao:t.descricao,categoria:t.categoria,tipo:t.tipo}))));}localStorage.setItem('hub_user_id',API_USER_ID);}catch(e){}
+    }
+    if(apiContas!==null) cartoes=apiContas.map(contaFromApi);
+    if(apiFixas!==null) fixas=apiFixas.map(fixaFromApi);
+    if(apiFixaVals!==null) fixaVals=fixaValsFromApiRows(apiFixaVals);
     budgets={};
     (apiBudgets||[]).forEach(b=>{budgets[b.categoria_nome]={limite:Number(b.limite_valor)||0};});
     savingGoal=Number(apiSaving?.saving_goal||0);

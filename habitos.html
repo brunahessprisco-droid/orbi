@@ -1018,7 +1018,7 @@
 
     async function deleteHabitoApi(h){
       if(!canUseApi()||!h._dbId)return;
-      await apiReq(`/habitos/${h._dbId}`,{method:'DELETE'}).catch(()=>null);
+      await apiReq(`/habitos/${h._dbId}`,{method:'DELETE'});
     }
 
     async function bootstrapApi(){
@@ -1413,7 +1413,6 @@
       const h=habits.find(x=>x.id===id);
       if(!h) return;
       if(!confirm(`Excluir o hábito "${h.name}"?`)) return;
-      deleteHabitoApi(h).catch(()=>null);
       habits=habits.filter(x=>x.id!==id);
       save();
       // Reset filters so deleted habit doesn't appear due to stale filter state
@@ -1421,6 +1420,7 @@
       document.getElementById('habit-filter-cat').value='';
       document.getElementById('habit-filter-auto').value='';
       renderAll();
+      deleteHabitoApi(h).catch(()=>{habits.push(h);save();renderAll();alert('Erro ao excluir. O item foi restaurado.');});
     }
 
     function isPlannedForDate(h, dateStr){

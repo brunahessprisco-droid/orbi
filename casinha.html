@@ -1126,9 +1126,10 @@ function adiarTarefa(id){
 function deletarTarefa(id){
   if(!confirm('Excluir esta tarefa?'))return false;
   const t=tarefas.find(x=>x.id===id);
-  if(t)deleteTarefaApi(t).catch(()=>null);
   tarefas=tarefas.filter(x=>x.id!==id);
-  saveT();renderCurrent();return true;
+  saveT();renderCurrent();
+  if(t)deleteTarefaApi(t).catch(()=>{tarefas.push(t);saveT();renderCurrent();alert('Erro ao excluir. O item foi restaurado.');});
+  return true;
 }
 
 function calcNextDate(fromDate,rec){
@@ -1326,8 +1327,8 @@ function checkRotinas(){
 function deletarRotina(id){
   if(!confirm('Excluir esta rotina?'))return;
   const r=rotinas.find(x=>x.id===id);
-  if(r)deleteRotinaApi(r).catch(()=>null);
   rotinas=rotinas.filter(x=>x.id!==id);saveR();renderRotinas();
+  if(r)deleteRotinaApi(r).catch(()=>{rotinas.push(r);saveR();renderRotinas();alert('Erro ao excluir. O item foi restaurado.');});
 }
 
 // ===== CADASTROS =====
@@ -1717,8 +1718,8 @@ function saveAmbiente(){
 function deletarAmbiente(id){
   if(!confirm('Excluir este ambiente?'))return;
   const a=ambientes.find(x=>x.id===id);
-  if(a)deleteAmbienteApi(a).catch(()=>null);
   ambientes=ambientes.filter(x=>x.id!==id);saveA();closeModal();renderCurrent();
+  if(a)deleteAmbienteApi(a).catch(()=>{ambientes.push(a);saveA();renderCurrent();alert('Erro ao excluir. O item foi restaurado.');});
 }
 
 // ===== MODAL: PESSOA =====
@@ -1764,8 +1765,8 @@ function savePessoa(){
 function deletarPessoa(id){
   if(!confirm('Excluir esta pessoa?'))return;
   const p=pessoas.find(x=>x.id===id);
-  if(p)deletePessoaApi(p).catch(()=>null);
   pessoas=pessoas.filter(x=>x.id!==id);saveP();closeModal();renderCurrent();
+  if(p)deletePessoaApi(p).catch(()=>{pessoas.push(p);saveP();renderCurrent();alert('Erro ao excluir. O item foi restaurado.');});
 }
 
 // ===== PICKERS =====
@@ -1975,7 +1976,7 @@ async function syncAmbiente(a){
 }
 async function deleteAmbienteApi(a){
   if(!canUseApi()||!a._dbId)return;
-  await apiReq(`/casinha/ambientes/${a._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReq(`/casinha/ambientes/${a._dbId}`,{method:'DELETE'});
 }
 async function syncPessoa(p){
   if(!canUseApi())return;
@@ -1984,7 +1985,7 @@ async function syncPessoa(p){
 }
 async function deletePessoaApi(p){
   if(!canUseApi()||!p._dbId)return;
-  await apiReq(`/casinha/pessoas/${p._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReq(`/casinha/pessoas/${p._dbId}`,{method:'DELETE'});
 }
 async function syncTarefa(t){
   if(!canUseApi())return;
@@ -2000,7 +2001,7 @@ async function syncTarefa(t){
 }
 async function deleteTarefaApi(t){
   if(!canUseApi()||!t._dbId)return;
-  await apiReq(`/casinha/tarefas/${t._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReq(`/casinha/tarefas/${t._dbId}`,{method:'DELETE'});
 }
 async function syncRotina(r){
   if(!canUseApi())return;
@@ -2015,7 +2016,7 @@ async function syncRotina(r){
 }
 async function deleteRotinaApi(r){
   if(!canUseApi()||!r._dbId)return;
-  await apiReq(`/casinha/rotinas/${r._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReq(`/casinha/rotinas/${r._dbId}`,{method:'DELETE'});
 }
 
 // ===== INIT =====

@@ -893,29 +893,27 @@ function _openControleModal(h,dateStr){
 function _closeControleModal(){ document.getElementById('ov-hab-controle').classList.remove('open'); _controleState={id:null,dateStr:null}; }
 async function _clearControleModal(){
   const{id,dateStr}=_controleState; if(!id)return;
-  const arr=loadHabitos(); const h=arr.find(x=>x.id===id); if(!h)return;
-  const prev=h.logs&&h.logs[dateStr];
+  const snapshot=_lsGet('habitos_app_v5')||'[]';
+  const arr=JSON.parse(snapshot); const h=arr.find(x=>x.id===id); if(!h)return;
   if(h.logs)delete h.logs[dateStr];
   _lsSet('habitos_app_v5',JSON.stringify(arr));
   _closeControleModal(); rendTodaySummary(); rendCal();
   try{ await hubSyncHabito(h); }catch(_){
-    if(prev!==undefined&&h.logs)h.logs[dateStr]=prev;
-    _lsSet('habitos_app_v5',JSON.stringify(arr));
+    _lsSet('habitos_app_v5',snapshot);
     rendTodaySummary(); rendCal();
   }
 }
 async function _saveControleModal(){
   const{id,dateStr}=_controleState; if(!id)return;
   const val=document.getElementById('hc-input').value.trim();
-  const arr=loadHabitos(); const h=arr.find(x=>x.id===id); if(!h)return;
+  const snapshot=_lsGet('habitos_app_v5')||'[]';
+  const arr=JSON.parse(snapshot); const h=arr.find(x=>x.id===id); if(!h)return;
   if(!h.logs)h.logs={};
-  const prev=h.logs[dateStr];
   if(val)h.logs[dateStr]=val; else delete h.logs[dateStr];
   _lsSet('habitos_app_v5',JSON.stringify(arr));
   _closeControleModal(); rendTodaySummary(); rendCal();
   try{ await hubSyncHabito(h); }catch(_){
-    if(prev!==undefined)h.logs[dateStr]=prev; else delete h.logs[dateStr];
-    _lsSet('habitos_app_v5',JSON.stringify(arr));
+    _lsSet('habitos_app_v5',snapshot);
     rendTodaySummary(); rendCal();
   }
 }
@@ -1145,7 +1143,7 @@ async function saveProfile(){
       headers: { 'Content-Type':'application/json', Authorization: 'Bearer '+token },
       body: JSON.stringify({ nome, email }),
     });
-    const data = await r.json();
+    let data = {}; try{ data = await r.json(); }catch(_){}
     if(!r.ok){
       const map = { EMAIL_ALREADY_EXISTS: 'Este e-mail já está em uso.', INVALID_INPUT: 'Dados inválidos.' };
       setMsg('pf-msg', map[data.error] || data.error || 'Erro ao salvar.', false);
@@ -1173,7 +1171,7 @@ async function changePassword(){
       headers: { 'Content-Type':'application/json', Authorization: 'Bearer '+token },
       body: JSON.stringify({ senhaAtual, novaSenha }),
     });
-    const data = await r.json();
+    let data = {}; try{ data = await r.json(); }catch(_){}
     if(!r.ok){
       const map = { WRONG_PASSWORD: 'Senha atual incorreta.', INVALID_INPUT: 'Dados inválidos.' };
       setMsg('pf-pass-msg', map[data.error] || data.error || 'Erro ao alterar senha.', false);

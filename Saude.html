@@ -696,7 +696,7 @@
     }
     async function deleteMedicoApi(d){
       if(!canUseApi()||!d._dbId)return;
-      await apiReqRetry(`/saude/medicos/${d._dbId}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/medicos/${d._dbId}`,{method:'DELETE'});
     }
     async function syncExame(e){
       if(!canUseApi())return;
@@ -709,7 +709,7 @@
     }
     async function deleteExameApi(e){
       if(!canUseApi()||!e._dbId)return;
-      await apiReqRetry(`/saude/exames/${e._dbId}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/exames/${e._dbId}`,{method:'DELETE'});
     }
     async function syncConsulta(c){
       if(!canUseApi())return;
@@ -722,7 +722,7 @@
     }
     async function deleteConsultaApi(c){
       if(!canUseApi()||!c._dbId)return;
-      await apiReqRetry(`/saude/consultas/${c._dbId}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/consultas/${c._dbId}`,{method:'DELETE'});
     }
     async function syncRemedio(r){
       if(!canUseApi())return;
@@ -734,7 +734,7 @@
     }
     async function deleteRemedioApi(r){
       if(!canUseApi())return;
-      await apiReqRetry(`/saude/remedios/${r.id}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/remedios/${r.id}`,{method:'DELETE'});
     }
     async function syncConsumo(c){
       if(!canUseApi())return;
@@ -745,7 +745,7 @@
     }
     async function deleteConsumoApi(c){
       if(!canUseApi())return;
-      await apiReqRetry(`/saude/consumos/${c.id}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/consumos/${c.id}`,{method:'DELETE'});
     }
 
     async function saudeBootstrap(){
@@ -1759,7 +1759,7 @@
           const r=remedios.find(x=>x.id===id);
           remedios=remedios.filter(x=>x.id!==id);
           saveRemedios(); renderRemedios();
-          if(r) deleteRemedioApi(r).catch(()=>null);
+          if(r) deleteRemedioApi(r).catch(()=>{remedios.push(r);saveRemedios();renderRemedios();alert('Erro ao excluir. O item foi restaurado.');});
         },
         remedioCompra:(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r) return;
@@ -1773,7 +1773,7 @@
           const c=consumos.find(x=>x.id===id);
           consumos=consumos.filter(x=>x.id!==id);
           saveConsumos(); renderConsumos();
-          if(c) deleteConsumoApi(c).catch(()=>null);
+          if(c) deleteConsumoApi(c).catch(()=>{consumos.push(c);saveConsumos();renderConsumos();alert('Erro ao excluir. O item foi restaurado.');});
         },
         vincularHabito:(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r) return;
@@ -1791,18 +1791,27 @@
         if(!confirm(msg)) return;
         const item=state[collection].find(x=>x.id===id);
         if(deletedState[collection]) deletedState[collection]=[...new Set([...(deletedState[collection]||[]), id])];
+        const prevConsults=state.consults;
+        const prevExams=state.exams;
         if(collection==='doctors'){
           state.consults=state.consults.map(c=>c.doctorId===id?{...c,doctorId:''}:c);
           state.exams=state.exams.map(e=>e.doctorId===id?{...e,doctorId:''}:e);
-          if(item)deleteMedicoApi(item).catch(()=>null);
-        }else if(collection==='exams'&&item){
-          deleteExameApi(item).catch(()=>null);
-        }else if(collection==='consults'&&item){
-          deleteConsultaApi(item).catch(()=>null);
         }
         state[collection]=state[collection].filter(x=>x.id!==id);
-        saveDeletedState();
-        saveState(); renderAll();
+        saveDeletedState(); saveState(); renderAll();
+        if(item){
+          let del;
+          if(collection==='doctors') del=deleteMedicoApi(item);
+          else if(collection==='exams') del=deleteExameApi(item);
+          else if(collection==='consults') del=deleteConsultaApi(item);
+          if(del) del.catch(()=>{
+            state[collection].push(item);
+            if(collection==='doctors'){state.consults=prevConsults;state.exams=prevExams;}
+            if(deletedState[collection]) deletedState[collection]=deletedState[collection].filter(x=>x!==id);
+            saveDeletedState(); saveState(); renderAll();
+            alert('Erro ao excluir. O item foi restaurado.');
+          });
+        }
       }
     });
   </script>

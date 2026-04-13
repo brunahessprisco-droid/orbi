@@ -962,7 +962,7 @@ async function syncLocal(l){
 }
 async function deleteLocalApi(l){
   if(!canUseApi()||!l._dbId)return;
-  await apiReqRetry(`/locais-treino/${l._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReqRetry(`/locais-treino/${l._dbId}`,{method:'DELETE'});
 }
 async function syncTipo(t){
   if(!canUseApi())return;
@@ -970,7 +970,7 @@ async function syncTipo(t){
 }
 async function deleteTipoApi(t){
   if(!canUseApi()||!t._dbId)return;
-  await apiReqRetry(`/tipos-exercicio/${t._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReqRetry(`/tipos-exercicio/${t._dbId}`,{method:'DELETE'});
 }
 
 function fmtMonth(k){
@@ -1852,7 +1852,7 @@ async function delLocal(id){
   const l=locais.find(x=>x.id===id);
   locais=locais.filter(x=>x.id!==id);
   saveLocal_();
-  if(l)await deleteLocalApi(l).catch(e=>console.error(e));
+  try{if(l)await deleteLocalApi(l);}catch(e){locais.push(l);saveLocal_();renderAll();alert('Erro ao excluir. O item foi restaurado.');return;}
   renderAll();
 }
 
@@ -1879,7 +1879,7 @@ async function delTipo(id){
   const t=tipos.find(x=>x.id===id);
   tipos=tipos.filter(x=>x.id!==id);
   saveLocal_();
-  if(t)await deleteTipoApi(t).catch(e=>console.error(e));
+  try{if(t)await deleteTipoApi(t);}catch(e){tipos.push(t);saveLocal_();renderAll();alert('Erro ao excluir. O item foi restaurado.');return;}
   renderAll();
 }
 
