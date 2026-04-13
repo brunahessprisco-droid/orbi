@@ -831,7 +831,7 @@
               <div class="icon-picker-footer">
                 Não achou? Procura em <a href="https://icons.getbootstrap.com" target="_blank">icons.getbootstrap.com</a> e cola o nome aqui:
                 <div class="icon-custom-row">
-                  <input class="icon-search" id="icon-custom-input" placeholder="ex: pizza ou bi-pizza" oninput="previewCustomIcon(this.value)" onkeydown="if(event.key==='Enter')confirmCustomIcon()">
+                  <input class="icon-search" id="icon-custom-input" placeholder="ex: pizza, bi-pizza ou 💧" oninput="previewCustomIcon(this.value)" onkeydown="if(event.key==='Enter')confirmCustomIcon()">
                   <span class="icon-custom-preview" id="icon-custom-preview"></span>
                   <button type="button" class="btn btn-primary" style="padding:6px 10px;font-size:12px;white-space:nowrap;" onclick="confirmCustomIcon()">Usar</button>
                 </div>
@@ -1296,22 +1296,25 @@
       });
     }
 
-    function _normalizeIconName(val){
-      val=val.trim().toLowerCase();
+    function _parseCustomIconInput(val){
+      val=val.trim();
       if(!val) return '';
-      return val.startsWith('bi-')?val:'bi-'+val;
+      // Palavra simples (letras, números, hífen) → trata como nome de Bootstrap Icon
+      if(/^[a-zA-Z0-9-]+$/.test(val)) return val.startsWith('bi-')?val:'bi-'+val;
+      // Emoji ou texto livre → usa como está
+      return val;
     }
 
     function previewCustomIcon(val){
-      const ic=_normalizeIconName(val);
+      const ic=_parseCustomIconInput(val);
       const prev=document.getElementById('icon-custom-preview');
       if(!prev) return;
-      prev.innerHTML=ic?`<i class="bi ${ic}"></i>`:'';
+      prev.innerHTML=ic?hIcon(ic):'';
     }
 
     function confirmCustomIcon(){
       const input=document.getElementById('icon-custom-input');
-      const ic=_normalizeIconName(input.value);
+      const ic=_parseCustomIconInput(input.value);
       if(!ic) return;
       selectIcon(ic);
       input.value='';
