@@ -775,6 +775,12 @@ async function doLogin(){
 }
 
 async function logoutUser(){
+  const dirtySets = [SK_DIRTY, SK_DIRTY_L, SK_DIRTY_TP].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
+  const hasPending = dirtySets.some(s=>s.size>0);
+  if(hasPending){
+    const proceed = confirm('Alguns dados de exercícios podem não ter sido sincronizados. Deseja sair mesmo assim?');
+    if(!proceed) return;
+  }
   try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
   authToken='';API_USER_ID=null;
   localStorage.removeItem(SK_AUTH);
@@ -2111,6 +2117,30 @@ async function stravaHandleCallback(){
     showLogin();
   }
 })();
+
+// --- beforeunload: flush pending sync before page close ---
+window.addEventListener('beforeunload', function(e) {
+  if (getDirty().size > 0 || getDeleted().size > 0) {
+    const token = authToken;
+    const uid = API_USER_ID;
+    if (token && uid) {
+      try {
+        navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
+      } catch(_) {}
+      // synchronous XHR fallback
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', getApiBase() + '/health', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.send(JSON.stringify({flush: true}));
+      } catch(_) {}
+    }
+    e.preventDefault();
+    e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
+    return e.returnValue;
+  }
+});
 </script>
 </body>
 </html>

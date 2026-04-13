@@ -672,6 +672,12 @@
       }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
     }
     async function saudeLogout(){
+      const dirtySets = ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'].map(k=>{try{return new Set(JSON.parse(localStorage.getItem(k)||'[]'));}catch{return new Set();}});
+      const hasPending = dirtySets.some(s=>s.size>0);
+      if(hasPending){
+        const proceed = confirm('Alguns dados de saúde podem não ter sido sincronizados. Deseja sair mesmo assim?');
+        if(!proceed) return;
+      }
       if(authToken)try{await apiReq('/auth/logout',{method:'POST'});}catch(_){}
       authToken='';API_USER_ID=null;localStorage.removeItem(SK_AUTH);
       document.getElementById('auth-overlay').classList.add('open');
@@ -1866,6 +1872,40 @@
             alert('Erro ao excluir. O item foi restaurado.');
           });
         }
+      }
+    });
+
+    // --- beforeunload: flush pending sync before page close ---
+    window.addEventListener('beforeunload', function(e) {
+      const dirtyKeys = ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'];
+      let hasDirty = false;
+      for (const k of dirtyKeys) {
+        try {
+          const raw = JSON.parse(localStorage.getItem('u_' + _uid() + '_' + k) || '[]');
+          if (raw && (Array.isArray(raw) ? raw.length > 0 : Object.keys(raw).length > 0)) { hasDirty = true; break; }
+        } catch(_) {}
+      }
+      const ds = typeof getDeletedState === 'function' ? getDeletedState() : {};
+      const hasDeleted = Object.values(ds).some(arr => arr && arr.length > 0);
+      if (hasDirty || hasDeleted) {
+        const token = authToken;
+        const uid = _uid();
+        if (token && uid) {
+          try {
+            navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
+          } catch(_) {}
+          // synchronous XHR fallback
+          try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', getApiBase() + '/health', false);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            xhr.send(JSON.stringify({flush: true}));
+          } catch(_) {}
+        }
+        e.preventDefault();
+        e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
+        return e.returnValue;
       }
     });
   </script>

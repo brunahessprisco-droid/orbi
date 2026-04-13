@@ -1923,6 +1923,10 @@ async function doLogin(){
 }
 
 async function logoutUser(){
+  if(hasPendingSync()){
+    const proceed = confirm('Alguns dados da casa podem não ter sido sincronizados. Deseja sair mesmo assim?');
+    if(!proceed) return;
+  }
   try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
   authToken='';API_USER_ID=null;
   localStorage.removeItem(SK_AUTH);
@@ -2135,6 +2139,30 @@ function closeTaskQuick(){
   if(bdDesk)bdDesk.style.display='none';
   document.getElementById('task-quick-panel').style.display='none';
 }
+
+// --- beforeunload: flush pending sync before page close ---
+window.addEventListener('beforeunload', function(e) {
+  if (hasPendingSync()) {
+    const token = authToken;
+    const uid = _uid();
+    if (token && uid) {
+      try {
+        navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
+      } catch(_) {}
+      // synchronous XHR fallback
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', getApiBase() + '/health', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.send(JSON.stringify({flush: true}));
+      } catch(_) {}
+    }
+    e.preventDefault();
+    e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
+    return e.returnValue;
+  }
+});
 </script>
 
 <div id="task-quick-backdrop" onclick="closeTaskQuick()"></div>

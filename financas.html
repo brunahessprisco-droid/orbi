@@ -1382,6 +1382,10 @@ async function restoreSession(){
 }
 
 async function logoutUser(){
+  if(hasPendingSync()){
+    const proceed = confirm('Alguns dados financeiros podem não ter sido sincronizados. Deseja sair mesmo assim?');
+    if(!proceed) return;
+  }
   try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
   authToken='';
   API_USER_ID=null;
@@ -3637,6 +3641,30 @@ async function relançarFaltantes(){
   _faltantes=[];
   document.getElementById('revisar-btn-fix').style.display='none';
 }
+
+// --- beforeunload: flush pending sync before page close ---
+window.addEventListener('beforeunload', function(e) {
+  if (hasPendingSync()) {
+    const token = authToken;
+    const uid = API_USER_ID;
+    if (token && uid) {
+      try {
+        navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
+      } catch(_) {}
+      // synchronous XHR fallback
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', getApiBase() + '/health', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.send(JSON.stringify({flush: true}));
+      } catch(_) {}
+    }
+    e.preventDefault();
+    e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
+    return e.returnValue;
+  }
+});
 </script>
 </body>
 </html>

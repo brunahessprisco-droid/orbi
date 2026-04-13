@@ -341,6 +341,13 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <button class="filter-btn" data-f="gcal" onclick="setFilter('gcal',this)" id="filter-gcal" style="display:none">📅</button>
       </div>
     </div>
+    <!-- Sync status indicator -->
+    <div id="hub-sync-status" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px;padding:0 2px;">
+      <span id="hub-sync-label" style="font-size:10px;color:var(--hint);">Sincronizando...</span>
+      <button id="hub-refresh-btn" onclick="refreshHubData()" style="border:1px solid var(--border);background:var(--surface2);color:var(--muted);border-radius:6px;padding:2px 8px;font-family:inherit;font-size:10px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;" title="Atualizar dados">
+        <span id="hub-refresh-icon">↻</span> Atualizar
+      </button>
+    </div>
     <!-- Bottom: today card (2/6) + calendar (4/6) -->
     <div class="hub-bottom">
       <!-- TODAY CARD -->
@@ -520,7 +527,7 @@ async function submitAuth(){
   }
 }
 
-function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
+async function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; if(typeof _hubActionQueue !== 'undefined' && _hubActionQueue){ try{ await Promise.race([_hubActionQueue, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))); }catch(_){} } try{ await apiReq('/auth/logout',{method:'POST'}); }catch(_){} localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
 function toggleTheme(){ const isDark=document.documentElement.getAttribute('data-theme')==='dark'; const next=isDark?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('app_theme',next); }
 function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.innerHTML=on?'<i class="bi bi-eye-slash-fill"></i>':'<i class="bi bi-eye-fill"></i>'; }
 function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
@@ -528,6 +535,46 @@ function showPage(id){ document.querySelectorAll('.page').forEach(p=>p.classList
 // storage helpers – isolamento por usuário (hub_user_id é global)
 function _lsGet(k){const uid=localStorage.getItem('hub_user_id')||'anon';const ns='u_'+uid+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
 function _lsSet(k,v){const uid=localStorage.getItem('hub_user_id')||'anon';localStorage.setItem('u_'+uid+'_'+k,v);}
+
+function updateHubSyncIndicator(){
+  const label=document.getElementById('hub-sync-label');
+  const btn=document.getElementById('hub-refresh-btn');
+  if(!label||!btn)return;
+  const lastSync=localStorage.getItem('u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1');
+  if(!lastSync){
+    label.textContent='Nunca sincronizado';
+    label.style.color='var(--red)';
+    return;
+  }
+  const ago=Date.now()-Number(lastSync);
+  const mins=Math.floor(ago/60000);
+  const hours=Math.floor(ago/3600000);
+  if(mins<1){
+    label.textContent='Atualizado agora';
+    label.style.color='var(--green)';
+  }else if(mins<5){
+    label.textContent=`Atualizado há ${mins}min`;
+    label.style.color='var(--green)';
+  }else if(mins<30){
+    label.textContent=`Atualizado há ${mins}min`;
+    label.style.color='var(--amber)';
+  }else if(hours<2){
+    label.textContent=`Atualizado há ${hours}h${mins%60>0?mins%60+'min':''}`;
+    label.style.color='var(--amber)';
+  }else{
+    label.textContent=`Atualizado há ${hours}h — dados podem estar desatualizados`;
+    label.style.color='var(--red)';
+  }
+}
+
+function refreshHubData(){
+  const icon=document.getElementById('hub-refresh-icon');
+  if(icon)icon.textContent='⟳';
+  hubBootstrap().finally(()=>{
+    if(icon)icon.textContent='↻';
+    updateHubSyncIndicator();
+  });
+}
 function loadTxs(){ try{return JSON.parse(_lsGet('hub_fin_cache')||'[]');}catch{return [];} }
 function loadTreinos(){ try{return JSON.parse(_lsGet('saude_treinos_v1')||'[]');}catch{return [];} }
 function loadTarefas(){ try{return JSON.parse(_lsGet('casinha_tarefas')||'[]');}catch{return [];} }
@@ -573,7 +620,12 @@ async function hubBootstrap(){
     if(rCfg!==null) _lsSet('alimentacao_plan_v3_light',JSON.stringify(plan));
     if(rW!==null&&rE!==null&&rC!==null) _lsSet('saude_app_v1',JSON.stringify({weights,exams,consults,doctors:[]}));
     rendTodaySummary(); rendCal();
-  }catch(e){console.warn('Hub bootstrap:',e);}
+    localStorage.setItem('u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1', String(Date.now()));
+    updateHubSyncIndicator();
+  }catch(e){console.warn('Hub bootstrap:',e);
+    const label=document.getElementById('hub-sync-label');
+    if(label){label.textContent='Erro na sincronização';label.style.color='var(--red)';}
+  }
   hubBootstrapGcal();
 }
 
@@ -587,6 +639,7 @@ async function hubBootstrapGcal(){
     if(Array.isArray(events)){
       _lsSet('hub_gcal_events',JSON.stringify(events));
       rendTodaySummary(); rendCal();
+      updateHubSyncIndicator();
     }
   }catch(e){console.warn('GCal bootstrap:',e);}
 }
@@ -1186,6 +1239,7 @@ async function changePassword(){
 
 setAuthMode('login');
 applyPrivacy();
+updateHubSyncIndicator();
 rendTodaySummary();
 rendCal();
 document.querySelector('#profile-overlay .profile-modal').addEventListener('input',()=>_profileDirty=true);
