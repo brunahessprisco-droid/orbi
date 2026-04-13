@@ -496,6 +496,7 @@ async function submitAuth(){
     if(data.user?.nome) localStorage.setItem('hub_user_nome',data.user.nome);
     document.getElementById('auth-overlay').classList.remove('open');
     fetchFinancas();
+    hubBootstrap();
     loadProfileData();
   }catch(e){
     msg.textContent = 'Erro ao conectar à API.';
@@ -521,6 +522,42 @@ function getMealPlanForDate(dateStr){ const p=loadMealPlan(); for(const week of 
 function fmt(v){return 'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtNum(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:0});}
 function hIcon(icon){if(!icon)return'<i class="bi bi-stars"></i>';if(icon.startsWith('bi-'))return`<i class="bi ${icon}"></i>`;const d=document.createElement('span');d.textContent=icon;return d.outerHTML;}
+
+async function hubBootstrap(){
+  const token=localStorage.getItem(AUTH_KEY);
+  const uid=localStorage.getItem('hub_user_id');
+  const base=getApiBase();
+  if(!token||!uid)return;
+  const h=url=>fetch(`${base}${url}`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.ok?r.json():[]).catch(()=>[]);
+  try{
+    const[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC]=await Promise.all([
+      h(`/treinos?usuario_id=${uid}`),
+      h(`/casinha/tarefas?usuario_id=${uid}`),
+      h(`/habitos?usuario_id=${uid}`),
+      h(`/alimentacao/refeicoes?usuario_id=${uid}`),
+      h(`/alimentacao/config?usuario_id=${uid}`),
+      h('/health/weights'),
+      h(`/saude/exames?usuario_id=${uid}`),
+      h(`/saude/consultas?usuario_id=${uid}`),
+    ]);
+    const treinos=(Array.isArray(rTre)?rTre:[]).map(r=>({id:r.client_id,_dbId:r.id,data:(r.data||'').slice(0,10),hora_inicio:r.hora_inicio||'',titulo:r.titulo||'',nome:r.titulo||'',tipo_ex:r.tipo_exercicio_nome||'',tipo_cat:r.tipo_cat||'',local:r.local_nome||'',duracao:r.duracao,planejado:r.planejado||false,naoFeito:r.nao_feito||false}));
+    const tarefas=(Array.isArray(rTar)?rTar:[]).map(r=>({id:r.client_id,_dbId:r.id,titulo:r.titulo||'',status:r.status||'',ambiente:r.ambiente||'',pessoa:r.responsavel||'',prioridade:r.prioridade||'',tipo:r.tipo||'',dataVenc:r.data_venc||'',horario:r.horario||'',dataConclusao:r.data_conclusao||''}));
+    const habitos=(Array.isArray(rHab)?rHab:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',icon:r.icone||'',cat:r.categoria||'',freq:r.frequencia||'',weekdays:r.weekdays||[],note:r.obs||'',autoType:r.autoType||'',autoKeyword:r.autoKeyword||'',tipo:r.tipo||'check',unit:r.unit||'',startDate:r.startDate||'',logs:r.logs||{}}));
+    const meals=(Array.isArray(rAli)?rAli:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',type:r.tipo||'',date:(r.date||'').slice(0,10),time:r.time||'',calories:r.calorias,note:r.obs||''}));
+    const plan=(rCfg&&!Array.isArray(rCfg)&&rCfg.plan)||{};
+    const rWArr=Array.isArray(rW)?rW:(Array.isArray(rW?.data)?rW.data:[]);
+    const weights=rWArr.map(r=>({id:r.client_id||r.id,_dbId:r.id,date:typeof r.date==='string'?r.date.slice(0,10):new Date(r.date).toISOString().slice(0,10),weight:r.weight!=null?Number(r.weight):null,fat:r.fat!=null?Number(r.fat):null,height:r.height!=null?Number(r.height):null}));
+    const exams=(Array.isArray(rE)?rE:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',status:r.status||'',date:(r.date||'').slice(0,10)}));
+    const consults=(Array.isArray(rC)?rC:[]).map(r=>({id:r.client_id,_dbId:r.id,date:(r.date||'').slice(0,10),time:r.time||'',specialty:r.especialidade||'',status:r.status||''}));
+    _lsSet('saude_treinos_v1',JSON.stringify(treinos));
+    _lsSet('casinha_tarefas',JSON.stringify(tarefas));
+    _lsSet('habitos_app_v5',JSON.stringify(habitos));
+    _lsSet('alimentacao_meals_v3_light',JSON.stringify(meals));
+    _lsSet('alimentacao_plan_v3_light',JSON.stringify(plan));
+    _lsSet('saude_app_v1',JSON.stringify({weights,exams,consults,doctors:[]}));
+    rendTodaySummary(); rendCal();
+  }catch(e){console.warn('Hub bootstrap:',e);}
+}
 
 async function fetchFinancas(){
   const token=localStorage.getItem(AUTH_KEY);
@@ -939,7 +976,7 @@ applyPrivacy();
 rendTodaySummary();
 rendCal();
 document.querySelector('#profile-overlay .profile-modal').addEventListener('input',()=>_profileDirty=true);
-if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { fetchFinancas(); loadProfileData(); }
+if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { fetchFinancas(); hubBootstrap(); loadProfileData(); }
 </script>
 </body>
 </html>

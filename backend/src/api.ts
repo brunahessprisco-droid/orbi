@@ -1091,16 +1091,26 @@ apiRouter.get("/alimentacao/water", requireAuth, async (req: AuthedRequest, res)
   res.json(rows);
 });
 apiRouter.post("/alimentacao/water", requireAuth, async (req: AuthedRequest, res) => {
-  const schema = z.object({ usuario_id: z.string().min(1), date: z.string().min(10), ml: z.coerce.number().int().positive() });
+  const schema = z.object({ usuario_id: z.string().min(1), date: z.string().min(10), ml: z.coerce.number().int().positive(), client_id: z.string().optional() });
   const input = schema.parse(req.body);
   if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
-  const row = await prisma.alimentacaoWater.create({ data: { userId: req.userId!, date: input.date, ml: input.ml } });
+  let row;
+  if (input.client_id) {
+    const existing = await prisma.alimentacaoWater.findFirst({ where: { userId: req.userId!, clientId: input.client_id } });
+    if (existing) {
+      row = await prisma.alimentacaoWater.update({ where: { id: existing.id }, data: { date: input.date, ml: input.ml } });
+    } else {
+      row = await prisma.alimentacaoWater.create({ data: { userId: req.userId!, clientId: input.client_id, date: input.date, ml: input.ml } });
+    }
+  } else {
+    row = await prisma.alimentacaoWater.create({ data: { userId: req.userId!, date: input.date, ml: input.ml } });
+  }
   res.status(201).json(row);
 });
 apiRouter.delete("/alimentacao/water/:id", requireAuth, async (req: AuthedRequest, res) => {
   const id = readRouteParam(req, "id");
   if (!id) return res.status(400).end();
-  await prisma.alimentacaoWater.deleteMany({ where: { id, userId: req.userId! } });
+  await prisma.alimentacaoWater.deleteMany({ where: { userId: req.userId!, OR: [{ id }, { clientId: id }] } });
   res.status(204).end();
 });
 apiRouter.delete("/alimentacao/water/date/:date", requireAuth, async (req: AuthedRequest, res) => {

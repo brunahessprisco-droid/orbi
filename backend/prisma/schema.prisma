@@ -533,6 +533,7 @@ model AlimentacaoConfig {
 model AlimentacaoWater {
   id         String   @id @default(uuid())
   userId     String
+  clientId   String?
   date       String
   ml         Int
   createdAt  DateTime @default(now())
@@ -540,6 +541,7 @@ model AlimentacaoWater {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
+  @@index([userId, clientId])
 }
 
 model SaudeRemedio {

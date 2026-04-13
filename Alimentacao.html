@@ -152,7 +152,7 @@
     <div class="auth-sub">Entre com seu e-mail e senha para continuar</div>
     <div class="auth-field"><label>E-mail</label><input id="auth-email" type="email" placeholder="voce@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="auth-field"><label>Senha</label><input id="auth-pass" type="password" placeholder="Sua senha" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div class="auth-field"><label>API (avançado)</label><input id="auth-api" type="text" placeholder="http://localhost:3333/api"></div>
+    <div class="auth-field"><label>API (avançado)</label><input id="auth-api" type="text" placeholder="https://orbi-api-b9ev.onrender.com/api"></div>
     <div class="auth-actions"><button class="btn-primary" onclick="doLogin()">Entrar</button></div>
     <div class="auth-err" id="auth-msg"></div>
   </div>
@@ -376,23 +376,33 @@
     // ── AUTH + API ──────────────────────────────────────────────────────────────
     const SK_AUTH='fin_auth_token_v1',SK_API_BASE='fin_api_base_v1';
     let authToken=localStorage.getItem(SK_AUTH)||'';
-    let apiBase=localStorage.getItem(SK_API_BASE)||'http://localhost:3333/api';
+    let apiBase=localStorage.getItem(SK_API_BASE)||'https://orbi-api-b9ev.onrender.com/api';
     let API_USER_ID=null;
-    function getApiBase(){return(apiBase||'http://localhost:3333/api').replace(/\/+$/,'');}
+    function getApiBase(){return(apiBase||'https://orbi-api-b9ev.onrender.com/api').replace(/\/+$/,'');}
     function canUseApi(){return!!(authToken&&API_USER_ID);}
     async function apiReq(path,opts={}){
       const headers={'Content-Type':'application/json',...(opts.headers||{})};
       if(authToken)headers.Authorization='Bearer '+authToken;
       let res;
-      try{res=await fetch(getApiBase()+path,{...opts,headers});}catch(e){throw new Error('Falha de rede');}
+      try{res=await fetch(getApiBase()+path,{...opts,headers});}catch(e){const err=new Error('Falha de rede');err.network=true;throw err;}
       if(!res.ok){let msg='Erro';try{const j=await res.json();msg=j.error||msg;}catch(_){}throw new Error(msg);}
       if(res.status===204)return null;
       return res.json();
     }
+    async function apiReqRetry(path,opts={},maxTries=4){
+      const delays=[3000,8000,15000];
+      for(let i=0;i<maxTries;i++){
+        try{return await apiReq(path,opts);}
+        catch(e){
+          if(!e.network||i===maxTries-1)throw e;
+          await new Promise(r=>setTimeout(r,delays[i]||15000));
+        }
+      }
+    }
     async function checkAuth(){
       if(!authToken)return false;
-      try{const d=await apiReq('/auth/me',{method:'GET'});API_USER_ID=d.user.id;return true;}
-      catch(_){authToken='';API_USER_ID=null;return false;}
+      try{const d=await apiReqRetry('/auth/me',{method:'GET'});API_USER_ID=d.user.id;return true;}
+      catch(e){if(e.message&&(e.message.includes('401')||e.message.includes('UNAUTHORIZED'))){authToken='';API_USER_ID=null;}return false;}
     }
     document.addEventListener('DOMContentLoaded', () => {
       const KEY_MEALS='alimentacao_meals_v3_light';
@@ -409,18 +419,11 @@
       const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
       const TYPE_LABEL={cafe:'Café da manhã',almoco:'Almoço',lanche:'Lanche',jantar:'Jantar',ceia:'Ceia',pre_treino:'Pré treino',pos_treino:'Pós treino',outra:'Outra'};
 
-      let meals=JSON.parse(lsGet(KEY_MEALS)||'[]');
-      let _rawGoals=JSON.parse(lsGet(KEY_GOALS)||'null')||{calories:2000,water:2500};
-      // Migrate old {calories} format → {caloriesMin, caloriesMax, water}
-      let goals=_rawGoals;
-      if(_rawGoals.calories && !_rawGoals.caloriesMin){
-        goals={caloriesMin:_rawGoals.calories,caloriesMax:_rawGoals.calories,water:_rawGoals.water||2500};
-        lsSet(KEY_GOALS,JSON.stringify(goals));
-      }
-      if(!goals.caloriesMin && !goals.caloriesMax) goals={caloriesMin:1800,caloriesMax:2200,water:goals.water||2500};
-      let plan=JSON.parse(lsGet(KEY_PLAN)||'{}');
+      let meals=[];
+      let goals={caloriesMin:1800,caloriesMax:2200,water:2500};
+      let plan={};
       let deletedMealIds=JSON.parse(lsGet(KEY_DELETED)||'[]');
-      let waterLogs=JSON.parse(lsGet(KEY_WATER)||'[]');
+      let waterLogs=[];
       let refMonth=new Date();
       let refWeek=new Date();
       let editingMealId=null;
@@ -475,9 +478,10 @@
       async function bootstrapApi(){
         if(!canUseApi())return;
         try{
-          const[rRef,rCfg]=await Promise.all([
-            apiReq(`/alimentacao/refeicoes?usuario_id=${API_USER_ID}`),
-            apiReq(`/alimentacao/config?usuario_id=${API_USER_ID}`),
+          const[rRef,rCfg,rWater]=await Promise.all([
+            apiReqRetry(`/alimentacao/refeicoes?usuario_id=${API_USER_ID}`),
+            apiReqRetry(`/alimentacao/config?usuario_id=${API_USER_ID}`),
+            apiReqRetry(`/alimentacao/water`),
           ]);
           const deletedIds=new Set(JSON.parse(lsGet(KEY_DELETED)||'[]'));
           const apiMeals=rRef
@@ -490,6 +494,18 @@
           for(const m of naoSinc)await syncRefeicao(m).catch(()=>null);
           if(rCfg&&rCfg.goals)goals=rCfg.goals;
           if(rCfg&&rCfg.plan)plan=rCfg.plan;
+          if(Array.isArray(rWater)){
+            if(rWater.length){
+              waterLogs=rWater.map(r=>({id:r.clientId||r.id,date:r.date,ml:r.ml,time:''}));
+            } else {
+              // Migrar água local para API
+              const localWater=JSON.parse(lsGet(KEY_WATER)||'[]');
+              for(const w of localWater){
+                apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:w.date,ml:w.ml})}).catch(()=>null);
+              }
+            }
+            lsSet(KEY_WATER,JSON.stringify(waterLogs));
+          }
           saveMeals();saveGoalsStore();savePlan();
           renderAll();
         }catch(e){console.error('Bootstrap alimentação:',e);}
@@ -765,17 +781,25 @@
       }
       function openWaterModal(){ $('ov-water').classList.add('open'); $('water-ml').value=''; _waterDirty=false; setTimeout(()=>$('water-ml').focus(),50); }
       function closeWaterModal(){ $('ov-water').classList.remove('open'); _waterDirty=false; }
+      async function syncWaterLog(log){
+        if(!canUseApi())return;
+        await apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:log.date,ml:log.ml,client_id:log.id})}).catch(()=>null);
+      }
       function saveWater(){
         const ml=Number($('water-ml').value||0);
         if(!ml||ml<1){ alert('Informe a quantidade em ml.'); return; }
-        waterLogs.push({id:uid(),date:todayStr(),ml,time:nowTime()});
+        const log={id:uid(),date:todayStr(),ml,time:nowTime()};
+        waterLogs.push(log);
         lsSet(KEY_WATER,JSON.stringify(waterLogs));
+        syncWaterLog(log);
         closeWaterModal();
         renderDashboard();
       }
       function quickAddWater(ml){
-        waterLogs.push({id:uid(),date:todayStr(),ml,time:nowTime()});
+        const log={id:uid(),date:todayStr(),ml,time:nowTime()};
+        waterLogs.push(log);
         lsSet(KEY_WATER,JSON.stringify(waterLogs));
+        syncWaterLog(log);
         renderDashboard();
       }
 
@@ -880,10 +904,12 @@
       $('water-quick-remove').addEventListener('click',e=>{
         e.stopPropagation();
         const today=todayStr();
-        const idx=[...waterLogs].map((w,i)=>({w,i})).filter(({w})=>w.date===today).sort((a,b)=>String(b.w.time||'').localeCompare(String(a.w.time||''))).map(x=>x.i)[0];
-        if(idx==null) return;
-        waterLogs.splice(idx,1);
+        const sorted=[...waterLogs].map((w,i)=>({w,i})).filter(({w})=>w.date===today).sort((a,b)=>String(b.w.time||'').localeCompare(String(a.w.time||'')));
+        if(!sorted.length) return;
+        const {w,i}=sorted[0];
+        waterLogs.splice(i,1);
         lsSet(KEY_WATER,JSON.stringify(waterLogs));
+        if(canUseApi()&&w.id)apiReq(`/alimentacao/water/${w.id}`,{method:'DELETE'}).catch(()=>null);
         renderDashboard();
       });
       $('sum-water-card').addEventListener('click',openWaterModal);
@@ -912,9 +938,9 @@
 
       (function(){const th=localStorage.getItem('app_theme')||'dark';document.documentElement.setAttribute('data-theme',th);$('btn-theme').textContent=th==='dark'?'🌙':'☀️';})();
       checkAuth().then(ok=>{
-        if(!ok){document.getElementById('auth-overlay').classList.add('open');renderAll();return;}
+        if(!ok){document.getElementById('auth-overlay').classList.add('open');return;}
         applyUserIsolation(API_USER_ID);
-        bootstrapApi().then(()=>renderAll());
+        bootstrapApi().then(()=>renderAll()).catch(()=>{renderAll();});
       });
     });
   </script>
