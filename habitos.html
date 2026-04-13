@@ -970,6 +970,19 @@
           logs:r.logs||{},
         }));
         const localHabits=JSON.parse(lsGet(KEY)||'[]');
+        // Backfill tipo/unit/startDate from localStorage for habits that have null in the API
+        // (happens for habits created before these columns were added to the schema)
+        const localById=Object.fromEntries(localHabits.map(h=>[h.id,h]));
+        const toResync=[];
+        apiHabitos.forEach(h=>{
+          const loc=localById[h.id];
+          if(!loc) return;
+          let changed=false;
+          if(!rows.find(r=>r.client_id===h.id)?.tipo && loc.tipo && loc.tipo!=='check'){ h.tipo=loc.tipo; changed=true; }
+          if(!rows.find(r=>r.client_id===h.id)?.unit && loc.unit){ h.unit=loc.unit; changed=true; }
+          if(!rows.find(r=>r.client_id===h.id)?.startDate && loc.startDate){ h.startDate=loc.startDate; changed=true; }
+          if(changed) toResync.push(h);
+        });
         // Preserve user-defined order from local state
         const localOrder=localHabits.map(h=>h.id);
         apiHabitos.sort((a,b)=>{
@@ -982,6 +995,8 @@
         const naoSinc=localHabits.filter(h=>!apiIds.has(h.id));
         habits=[...apiHabitos,...naoSinc];
         for(const h of naoSinc)await syncHabito(h).catch(()=>null);
+        // Resync habits that had tipo/unit/startDate backfilled from localStorage → grava no banco
+        for(const h of toResync)await syncHabito(h).catch(()=>null);
         if(habits.length===0){
           habits=[
             {id:uid(),name:'Beber água',icon:'💧',cat:'saude',freq:'diario',weekdays:[],note:'',autoType:'',autoKeyword:'',logs:{}},
