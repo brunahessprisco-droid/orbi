@@ -912,7 +912,7 @@ async function bootstrapApi(){
     const naoSincronizados=localCache.filter(t=>!apiIds.has(t.id)&&!deleted.has(t._dbId)&&!t._dbId);
     for(const t of naoSincronizados){
       treinos.push(t);
-      syncTreino(t).catch(()=>null);
+      syncTreino(t).catch(e=>console.warn('Migração pendente:',t.id,e));
     }
     if(naoSincronizados.length)console.log(`Migração exercícios: ${naoSincronizados.length} treinos enviados ao banco`);
     // Restaurar edições locais pendentes (sync falhou antes)
@@ -922,7 +922,7 @@ async function bootstrapApi(){
       treinos=treinos.map(t=>{
         if(dirty.has(t.id)&&localById[t.id]){
           const local=localById[t.id];
-          syncTreino(local).then(()=>clearDirty(local.id)).catch(()=>null);
+          syncTreino(local).then(()=>clearDirty(local.id)).catch(e=>console.warn('Dirty sync falhou:',local.id,e));
           return local;
         }
         return t;

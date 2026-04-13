@@ -1421,11 +1421,9 @@ function renderCadBody(){
       const atr=tarefas.filter(t=>t.responsavel===p.nome&&t.status==='atrasada').length;
       const conc=tarefas.filter(t=>t.responsavel===p.nome&&t.status==='concluida').length;
       const pct=Math.round(count/maxT*100);
-      const membro=p.tipoMembro==='crianca'?'🧒 Criança':'👤 Adulto';
       return`<div class="pessoa-card" onclick="openPessoaModal('${p.id}')">
         <div class="pessoa-avatar" style="background:${p.cor}">${pessoaInit(p.nome)}</div>
         <div class="pessoa-nome">${esc(p.nome)}</div>
-        <div style="font-size:10px;font-weight:600;color:var(--muted);margin-top:2px;">${membro}</div>
         <div class="pessoa-count">${count} pendente${count!==1?'s':''}${atr?` · <span style="color:var(--red)">${atr} atrasada${atr!==1?'s':''}</span>`:''}</div>
         <div style="font-size:11px;color:var(--hint);margin-top:2px;">${conc} concluída${conc!==1?'s':''}</div>
         <div class="pessoa-bar"><div class="pessoa-bar-fill" style="width:${pct}%;background:${p.cor}"></div></div>
@@ -1768,12 +1766,6 @@ function openPessoaModal(id=null){
   const selCor=p?.cor||CORES[0];
   document.getElementById('modal-body').innerHTML=`<div class="form-grid">
     <div class="form-group"><label class="form-label">Nome *</label><input class="form-input" id="p-nome" value="${esc(p?.nome||'')}" placeholder="Ex: Maria"></div>
-    <div class="form-group"><label class="form-label">Tipo de Membro</label>
-      <select class="form-select" id="p-tipo-membro">
-        <option value="adulto"${p?.tipoMembro==='crianca'?'':' selected'}>👤 Adulto</option>
-        <option value="crianca"${p?.tipoMembro==='crianca'?' selected':''}>🧒 Criança</option>
-      </select>
-    </div>
     <div class="form-group"><label class="form-label">Cor</label>
       <div class="color-picker-row">${CORES.map(c=>`<div class="color-dot${c===selCor?' selected':''}" style="background:${c}" onclick="pickCor(this,'${c}','p-cor')"></div>`).join('')}</div>
       <input type="hidden" id="p-cor" value="${selCor}">
@@ -1790,16 +1782,15 @@ async function savePessoa(){
   const nome=document.getElementById('p-nome').value.trim();
   if(!nome){alert('Informe o nome');return;}
   const cor=document.getElementById('p-cor').value;
-  const tipoMembro=document.getElementById('p-tipo-membro')?.value||'adulto';
   const snapshotP=lsGet(SK_P)||'[]';
   const snapshotT=lsGet(SK_T)||'[]';
   let syncTarget=null;
   if(editingId){
     const p=pessoas.find(x=>x.id===editingId);if(!p)return;
-    const old=p.nome;p.nome=nome;p.cor=cor;p.tipoMembro=tipoMembro;
+    const old=p.nome;p.nome=nome;p.cor=cor;
     if(old!==nome){tarefas.forEach(t=>{if(t.responsavel===old)t.responsavel=nome;});saveT();}
     syncTarget=p;
-  } else {const p={id:uid(),nome,cor,tipoMembro};pessoas.push(p);syncTarget=p;}
+  } else {const p={id:uid(),nome,cor};pessoas.push(p);syncTarget=p;}
   saveP();closeModal();renderCurrent();
   try{ await syncPessoa(syncTarget); }catch(_){
     pessoas=JSON.parse(snapshotP); tarefas=JSON.parse(snapshotT);
@@ -1937,11 +1928,7 @@ async function bootstrapApi(){
       apiReq(`/casinha/rotinas?usuario_id=${API_USER_ID}`),
     ]);
     ambientes=rAmb.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor,icone:r.icone}));
-    const _localPessData=JSON.parse(lsGet(SK_P)||'[]');
-    pessoas=rPess.map(r=>{
-      const lp=_localPessData.find(x=>x.id===r.client_id)||{};
-      return{id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor,tipoMembro:lp.tipoMembro||'adulto'};
-    });
+    pessoas=rPess.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor}));
     tarefas=rTar.map(r=>({
       id:r.client_id,_dbId:r.id,titulo:r.titulo,descricao:r.descricao||'',
       tipo:r.tipo||'',ambiente:r.ambiente||'',responsavel:r.responsavel||'',

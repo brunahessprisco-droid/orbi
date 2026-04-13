@@ -233,18 +233,8 @@ Todos os outros módulos usam `crypto.randomUUID()`. Exercícios usa `Date.now()
 
 ---
 
-### [ ] 29. Casinha: campo `tipoMembro` não existe no schema Prisma — não sincroniza
-**Módulo:** `casinha.html`, linha 1897; `backend/prisma/schema.prisma`
-
-```javascript
-// casinha.html:1897 — lido do localStorage, NÃO enviado para a API
-const lp=_localPessData.find(x=>x.id===r.client_id)||{};
-return{id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor,tipoMembro:lp.tipoMembro||'adulto'};
-```
-
-O payload de `POST /casinha/pessoas` não inclui `tipoMembro`. O schema `CasinhaPessoa` no Prisma não tem esse campo. O valor existe apenas no localStorage do dispositivo que o definiu.
-
-**Impacto:** trocar de dispositivo = perder o tipo de membro de todas as pessoas. O campo não tem nenhuma indicação visual de que é local-only.
+### [x] 29. Casinha: campo `tipoMembro` removido do app ✓ FIXED
+Campo era puramente visual (rótulo 👤/🧒 sem lógica condicional). Removido do card de pessoa, do modal de edição e do bootstrap. `_localPessData` também removido.
 
 ---
 
@@ -266,7 +256,7 @@ Sem `requireAuth` nem verificação de secret. Qualquer request anônimo recebe 
 
 ## BAIXO
 
-### [ ] 31. Exercícios: migração de itens locais no bootstrap é fire-and-forget
+### [x] 31. Exercícios: migração de itens locais no bootstrap é fire-and-forget ✓ FIXED
 **Módulo:** `exercicios.html`, linhas 912–916
 
 ```javascript
@@ -283,7 +273,7 @@ Se `syncTreino` falha durante a migração de bootstrap, o treino continua em lo
 
 ---
 
-### [ ] 32. Exercícios: dirty sync no bootstrap usa `.catch(()=>null)` — sem retry garantido
+### [x] 32. Exercícios: dirty sync no bootstrap usa `.catch(()=>null)` — sem retry garantido ✓ FIXED
 **Módulo:** `exercicios.html`, linha 925
 
 ```javascript
