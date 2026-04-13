@@ -737,7 +737,7 @@ async function checkAuth(){
     const d=await apiReqRetry('/auth/me',{method:'GET'});
     API_USER_ID=d.user.id;
     return true;
-  }catch(_){authToken='';API_USER_ID=null;return false;}
+  }catch(e){if(e.message&&(e.message.includes('401')||e.message.includes('UNAUTHORIZED'))){authToken='';API_USER_ID=null;}return false;}
 }
 
 const SK_LAST_USER='app_last_user_id';
@@ -1819,6 +1819,14 @@ async function saveTreino(){
 async function delTreino(id){
   if(!confirm('Excluir este treino?'))return;
   const t=treinos.find(x=>x.id===id);
+  // Se não tem _dbId, busca da API pelo client_id
+  if(t&&!t._dbId&&canUseApi()){
+    try{
+      const rows=await apiReq(`/treinos?usuario_id=${API_USER_ID}`);
+      const found=rows.find(r=>r.client_id===t.id);
+      if(found)t._dbId=found.id;
+    }catch(_){}
+  }
   treinos=treinos.filter(x=>x.id!==id);
   saveLocal_();
   if(t)await deleteTreinoApi(t).catch(e=>console.error(e));
