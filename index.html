@@ -144,6 +144,7 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .td-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:7px;background:var(--surface2);margin-bottom:3px;gap:8px;font-size:12px;min-width:0;}
 .td-item-time{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0;min-width:32px;}
 .td-item-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.td-item-mod-icon{width:14px;height:14px;object-fit:contain;flex-shrink:0;opacity:.85;}
 .td-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .td-item-hint{color:var(--hint);font-size:10px;}
 .td-divider{height:1px;background:var(--border);margin:6px 0;}
@@ -583,19 +584,20 @@ function rendCal(){
     const isToday=day.dateStr===todayStr;
     const dots=[];
     const f=calFilter;
+    const _ci=(src,cls='')=>`<img src="${src}" style="width:10px;height:10px;object-fit:contain;vertical-align:middle;margin-right:2px;${cls}" alt="">`;
     if(f==='todos'||f==='fin'){
-      if(day.receitas.length){const r=day.receitas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin">+ <span class="sensitive">${fmt(r)}</span></div>`);}
-      if(day.despesas.length){const d=day.despesas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin desp">- <span class="sensitive">${fmt(d)}</span></div>`);}
-      if(day.parcelados.length){const p=day.parcelados.reduce((a,t)=>a+Number(t.valorParcela),0);dots.push(`<div class="cal-dot fin par">📦 - <span class="sensitive">${fmt(p)}</span></div>`);}
+      if(day.receitas.length){const r=day.receitas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin">${_ci('assets/Finanças.png')}+ <span class="sensitive">${fmt(r)}</span></div>`);}
+      if(day.despesas.length){const d=day.despesas.reduce((a,t)=>a+Number(t.valor),0);dots.push(`<div class="cal-dot fin desp">${_ci('assets/Finanças.png')}- <span class="sensitive">${fmt(d)}</span></div>`);}
+      if(day.parcelados.length){const p=day.parcelados.reduce((a,t)=>a+Number(t.valorParcela),0);dots.push(`<div class="cal-dot fin par">${_ci('assets/Finanças.png')}- <span class="sensitive">${fmt(p)}</span></div>`);}
     }
     if(f==='todos'||f==='ex'){
-      if(day.treinos.length)dots.push(`<div class="cal-dot ex">💪 ${day.treinos.length} treino${day.treinos.length!==1?'s':''}</div>`);
-      if(day.treinosPlanejados.length)dots.push(`<div class="cal-dot ex" style="opacity:.6;border-style:dashed;">📋 ${day.treinosPlanejados.length} planejado${day.treinosPlanejados.length!==1?'s':''}</div>`);
+      if(day.treinos.length)dots.push(`<div class="cal-dot ex">${_ci('assets/Exercício.png')} ${day.treinos.length} treino${day.treinos.length!==1?'s':''}</div>`);
+      if(day.treinosPlanejados.length)dots.push(`<div class="cal-dot ex" style="opacity:.6;border-style:dashed;">${_ci('assets/Exercício.png')} ${day.treinosPlanejados.length} planejado${day.treinosPlanejados.length!==1?'s':''}</div>`);
     }
-    if((f==='todos'||f==='cas')&&day.tarefas.length){dots.push(`<div class="cal-dot cas">🏠 ${day.tarefas.length} tarefa${day.tarefas.length!==1?'s':''}</div>`);}
-    if((f==='todos'||f==='sau')&&(day.pesos.length||day.consultas.length||day.exames.length)){const parts=[];if(day.pesos.length)parts.push(day.pesos[0].weight?`<span class="sensitive">${day.pesos[0].weight}kg</span>`:'Peso');if(day.consultas.length)parts.push(`${day.consultas.length} consulta${day.consultas.length!==1?'s':''}`);dots.push(`<div class="cal-dot sau">❤️ ${parts.join(' · ')}</div>`);}
-    if((f==='todos'||f==='hab')&&day.habitosFeitos.length){dots.push(`<div class="cal-dot hab">🔁 ${day.habitosFeitos.length}/${day.todosHabitos.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
-    if((f==='todos'||f==='ali')&&day.refeicoes.length){const kcal=day.refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);dots.push(`<div class="cal-dot ali">🍽️ ${day.refeicoes.length} ref${kcal?` · ${fmtNum(kcal)} kcal`:''}</div>`);}
+    if((f==='todos'||f==='cas')&&day.tarefas.length){dots.push(`<div class="cal-dot cas">${_ci('assets/Casinha.png')} ${day.tarefas.length} tarefa${day.tarefas.length!==1?'s':''}</div>`);}
+    if((f==='todos'||f==='sau')&&(day.pesos.length||day.consultas.length||day.exames.length)){const parts=[];if(day.pesos.length)parts.push(day.pesos[0].weight?`<span class="sensitive">${day.pesos[0].weight}kg</span>`:'Peso');if(day.consultas.length)parts.push(`${day.consultas.length} consulta${day.consultas.length!==1?'s':''}`);dots.push(`<div class="cal-dot sau">${_ci('assets/Saúde.png')} ${parts.join(' · ')}</div>`);}
+    if((f==='todos'||f==='hab')&&day.habitosFeitos.length){dots.push(`<div class="cal-dot hab">${_ci('assets/Hábitos.png')} ${day.habitosFeitos.length}/${day.todosHabitos.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
+    if((f==='todos'||f==='ali')&&day.refeicoes.length){const kcal=day.refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);dots.push(`<div class="cal-dot ali">${_ci('assets/Alimentação.png')} ${day.refeicoes.length} ref${kcal?` · ${fmtNum(kcal)} kcal`:''}</div>`);}
     const hasData=dots.length>0;
     const MAX=4; const visible=dots.slice(0,MAX); const extra=dots.length>MAX?`<div class="cal-more">+${dots.length-MAX} mais</div>`:'';
     return`<div class="cal-day${isToday?' today':''}${hasData?' has-data':''}" onclick="openDay('${day.dateStr}')"><div class="cal-day-num">${day.date.getDate()}</div><div class="cal-dots">${visible.join('')}${extra}</div></div>`;
@@ -761,7 +763,7 @@ function rendTodaySummary(){
   if(f==='todos'||f==='sau'){
     consultas.forEach(c=>item(c.time,'var(--sau-c)',c.doctor||c.specialty||'Consulta',c.specialty&&c.doctor?c.specialty:'','consulta','muted',{module:'Saude.html'}));
     exames.forEach(e=>item(null,'var(--sau-c)',e.name||'Exame','','exame','muted',{module:'Saude.html'}));
-    pesos.forEach(w=>item(null,'var(--sau-c)','Peso registrado','',w.weight?`<span class="sensitive">${w.weight} kg</span>`:'','',{module:'Saude.html'}));
+    pesos.forEach(w=>item(w.time||null,'var(--sau-c)','Peso registrado','',w.weight?`<span class="sensitive">${w.weight} kg</span>`:'','',{module:'Saude.html'}));
   }
   if(f==='todos'||f==='ali'){
     refeicoes.forEach(r=>item(r.time,'var(--ali-c)',r.name||'Refeição','',r.calories?fmtNum(r.calories)+' kcal':'','sage',{module:'Alimentacao.html'}));
@@ -781,14 +783,19 @@ function rendTodaySummary(){
   const comHora=items.filter(i=>i.time).sort((a,b)=>a.time.localeCompare(b.time));
   const semHora=items.filter(i=>!i.time);
 
+  const MODULE_ICONS={'exercicios.html':'assets/Exercício.png','casinha.html':'assets/Casinha.png','Alimentacao.html':'assets/Alimentação.png','Saude.html':'assets/Saúde.png','financas.html':'assets/Finanças.png','habitos.html':'assets/Hábitos.png'};
   function renderItem(i){
     const cls='td-item'+(i.planned?' planned':'')+(i.done?' td-item-done':'')+(i.module?' td-item-link':'');
     const clickAttr=i.module?`onclick="window.location='${i.module}'"` : '';
     const badge=i.planned?`<span class="td-item-planned-badge">Planejado</span>`:'';
     const checkBtn=i.checkFn&&i.id?`<button class="td-check-btn" onclick="event.stopPropagation();${i.checkFn}('${i.id}')" title="Marcar como concluído">✓</button>`:'';
+    const modIcon=MODULE_ICONS[i.module];
+    const dotHtml=modIcon
+      ?`<img src="${modIcon}" class="td-item-mod-icon" style="${i.done?'opacity:.3':''}" alt="">`
+      :`<span class="td-item-dot" style="background:${i.dot};${i.done?'opacity:.4':''}"></span>`;
     return`<div class="${cls}" ${clickAttr}>
       ${i.time?`<span class="td-item-time">${i.time}</span>`:'<span class="td-item-time"></span>'}
-      <span class="td-item-dot" style="background:${i.dot};${i.done?'opacity:.4':''}"></span>
+      ${dotHtml}
       <span class="td-item-name" style="${i.done?'opacity:.5;text-decoration:line-through':''}">${i.name}${i.hint?` <span class="td-item-hint">· ${i.hint}</span>`:''}</span>
       ${badge}
       ${i.val?`<span class="td-val ${i.valCls}">${i.val}</span>`:''}
