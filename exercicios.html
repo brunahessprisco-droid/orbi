@@ -734,7 +734,7 @@ async function apiReqRetry(path,opts={},maxTries=4){
 async function checkAuth(){
   if(!authToken)return false;
   try{
-    const d=await apiReq('/auth/me',{method:'GET'});
+    const d=await apiReqRetry('/auth/me',{method:'GET'});
     API_USER_ID=d.user.id;
     return true;
   }catch(_){authToken='';API_USER_ID=null;return false;}
@@ -909,7 +909,7 @@ async function bootstrapApi(){
     // Migração: sobe qualquer treino local que não está na API
     const localCache=JSON.parse(lsGet(SK_T)||'[]');
     const apiIds=new Set(treinos.map(t=>t.id));
-    const naoSincronizados=localCache.filter(t=>!apiIds.has(t.id)&&!deleted.has(t._dbId));
+    const naoSincronizados=localCache.filter(t=>!apiIds.has(t.id)&&!deleted.has(t._dbId)&&!t._dbId);
     for(const t of naoSincronizados){
       treinos.push(t);
       syncTreino(t).catch(()=>null);
