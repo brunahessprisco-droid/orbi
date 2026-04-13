@@ -57,8 +57,9 @@ Retornava `[]` em qualquer erro e gravava esse vazio no localStorage. Dados ante
 `_clearControleModal` e `_saveControleModal` usam referência de objeto em vez de snapshot string.
 Rollback pode não restaurar estado correto.
 
-### [ ] 12. Google/Strava disconnect: revogação do token externo silenciada
+### [x] 12. Google/Strava disconnect: revogação do token externo silenciada ✓ FIXED
 Token deletado localmente, mas se revogação na API externa falha, o token continua válido lá.
+**Fix:** `disconnectGoogleCalendar` agora verifica `r.ok`; se o servidor retornar erro, UI não atualiza e exibe mensagem de falha. `catch` adiciona `console.warn`.
 
 ### [x] 13. `saveProfile` e `changePassword` parseiam JSON antes de checar `r.ok` ✓ FIXED
 Se a API retornar HTML de erro, `r.json()` lança exceção não tratada.
@@ -70,11 +71,13 @@ Se 1 endpoint falhar, bootstrap inteiro falha e usuário fica sem nenhum dado fi
 
 ## BAIXO
 
-### [ ] 15. Inicialização do hub sem await
+### [x] 15. Inicialização do hub sem await ✓ FIXED
 `fetchFinancas()`, `hubBootstrap()`, `loadProfileData()` disparados em paralelo sem sincronização.
+**Fix:** `loadProfileData()` agora aguarda `hubBootstrap()` via `.then()` — elimina double-fetch do GCal (hubBootstrap termina chamando hubBootstrapGcal; loadProfileData→checkGcalStatus também chamava hubBootstrapGcal se conectado).
 
-### [ ] 16. `checkGcalStatus` silencia erros completamente
+### [x] 16. `checkGcalStatus` silencia erros completamente ✓ FIXED
 `catch(e){}` vazio — falhas de rede passam sem log.
+**Fix:** `catch(e){console.warn('checkGcalStatus:',e)}`.
 
 ### [x] 17. Inconsistência de validação em `/saude/remedios` e `/saude/consumos` ✓ FIXED
 Únicos endpoints que não incluem `usuario_id` no schema (funcionalmente seguro, mas inconsistente).

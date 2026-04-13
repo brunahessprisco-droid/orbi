@@ -514,8 +514,7 @@ async function submitAuth(){
     if(data.user?.nome) localStorage.setItem('hub_user_nome',data.user.nome);
     document.getElementById('auth-overlay').classList.remove('open');
     fetchFinancas();
-    hubBootstrap();
-    loadProfileData();
+    hubBootstrap().then(()=>loadProfileData());
   }catch(e){
     msg.textContent = 'Erro ao conectar à API.';
   }
@@ -615,12 +614,13 @@ async function disconnectGoogleCalendar(){
   const token=localStorage.getItem(AUTH_KEY);
   if(!token)return;
   try{
-    await fetch(`${getApiBase()}/google/disconnect`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+    const r=await fetch(`${getApiBase()}/google/disconnect`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+    if(!r.ok){ document.getElementById('pf-gcal-msg').textContent='Erro ao desconectar (servidor).'; return; }
     _lsSet('hub_gcal_events','[]');
     updateGcalUI(false);
     rendTodaySummary(); rendCal();
     document.getElementById('pf-gcal-msg').textContent='Google Calendar desconectado.';
-  }catch(e){document.getElementById('pf-gcal-msg').textContent='Erro ao desconectar.';}
+  }catch(e){console.warn('disconnectGoogleCalendar:',e); document.getElementById('pf-gcal-msg').textContent='Erro ao desconectar.';}
 }
 
 function updateGcalUI(connected){
@@ -647,7 +647,7 @@ async function checkGcalStatus(){
     const{connected}=await r.json();
     updateGcalUI(connected);
     if(connected) hubBootstrapGcal();
-  }catch(e){}
+  }catch(e){console.warn('checkGcalStatus:',e);}
 }
 
 async function fetchFinancas(){
@@ -1216,7 +1216,7 @@ document.querySelector('#profile-overlay .profile-modal').addEventListener('inpu
   }catch(e){console.warn('GCal exchange error:',e);}
 })();
 
-if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { fetchFinancas(); hubBootstrap(); loadProfileData(); }
+if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { fetchFinancas(); hubBootstrap().then(()=>loadProfileData()); }
 </script>
 </body>
 </html>
