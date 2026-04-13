@@ -292,10 +292,10 @@
           <button class="btn-primary" id="new-weight-btn" type="button">+ Registrar peso</button>
         </div>
         <div class="summary" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
-          <div class="card"><div class="card-label">Meta</div><div class="card-value health sensitive" id="goal-weight-card">—</div><div class="card-sub">peso objetivo</div></div>
+          <div class="card"><div class="card-label">Peso atual</div><div class="card-value health sensitive" id="goal-weight-card">—</div><div class="card-sub" id="goal-weight-card-sub">sem registros</div></div>
           <div class="card"><div class="card-label">IMC atual</div><div class="card-value blue sensitive" id="current-bmi-card">—</div><div class="card-sub">com altura configurada</div></div>
           <div class="card"><div class="card-label">Média 30 dias</div><div class="card-value purple sensitive" id="avg-weight-card">—</div><div class="card-sub">média recente</div></div>
-          <div class="card"><div class="card-label">Dif. da meta</div><div class="card-value green sensitive" id="goal-diff-card">—</div><div class="card-sub">peso atual x meta</div></div>
+          <div class="card"><div class="card-label">Dif. da meta</div><div class="card-value green sensitive" id="goal-diff-card">—</div><div class="card-sub" id="goal-diff-card-sub">peso atual x meta</div></div>
         </div>
         <div id="weight-metric-toggles" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
         <div class="chart-wrap" style="margin-bottom:16px"><canvas id="chart-weight-detail"></canvas></div>
@@ -1480,11 +1480,13 @@
           if(wh){state.goals.height=wh.height;saveState();}
         }
         const h=lw?.height || state.goals.height;
-        document.getElementById('goal-weight-card').textContent=goal?asKg(goal):'—';
+        document.getElementById('goal-weight-card').textContent=lw?asKg(lw.weight):'—';
+        document.getElementById('goal-weight-card-sub').textContent=lw?fmtDate(lw.date):'sem registros';
         document.getElementById('current-bmi-card').textContent=lw&&h?bmi(lw.weight,h).toFixed(1):'—';
         const recent=state.weights.filter(w=>daysBetween(w.date,todayStr())<=30).map(w=>w.weight);
         document.getElementById('avg-weight-card').textContent=recent.length?asKg(average(recent)):'—';
         document.getElementById('goal-diff-card').textContent=lw&&goal?`${(lw.weight-goal>0?'+':'')}${(lw.weight-goal).toFixed(1)} kg`:'—';
+        document.getElementById('goal-diff-card-sub').textContent=goal?`meta: ${asKg(goal)}`:'meta não definida';
         renderWeightChart('chart-weight-detail',[...state.weights].sort((a,b)=>compareDates(a.date,b.date)),'weightDetail',weightCols);
       }
 
