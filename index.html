@@ -540,7 +540,7 @@ async function hubBootstrap(){
       h(`/saude/exames?usuario_id=${uid}`),
       h(`/saude/consultas?usuario_id=${uid}`),
     ]);
-    const treinos=(Array.isArray(rTre)?rTre:[]).map(r=>({id:r.client_id,_dbId:r.id,data:(r.data||'').slice(0,10),hora_inicio:r.hora_inicio||'',titulo:r.titulo||'',nome:r.titulo||'',tipo_ex:r.tipo_exercicio_nome||'',tipo_cat:r.tipo_cat||'',local:r.local_nome||'',duracao:r.duracao,planejado:r.planejado||false,naoFeito:r.nao_feito||false}));
+    const treinos=(Array.isArray(rTre)?rTre:[]).map(r=>{const rawObs=r.obs||'';const planejado=rawObs.startsWith('[PLAN]');const naoFeito=rawObs.startsWith('[SKIP]');const obs=planejado?rawObs.slice(6):naoFeito?rawObs.slice(6):rawObs;return{id:r.client_id,_dbId:r.id,data:(r.data||'').slice(0,10),hora_inicio:r.hora_inicio||'',titulo:r.titulo||'',nome:r.titulo||'',tipo_ex:r.tipo_ex||'',tipo_cat:r.tipo_cat||'cardio',local:r.local_nome||'',duracao:r.duracao,obs,planejado,naoFeito};});
     const tarefas=(Array.isArray(rTar)?rTar:[]).map(r=>({id:r.client_id,_dbId:r.id,titulo:r.titulo||'',status:r.status||'',ambiente:r.ambiente||'',pessoa:r.responsavel||'',prioridade:r.prioridade||'',tipo:r.tipo||'',dataVenc:r.data_venc||'',horario:r.horario||'',dataConclusao:r.data_conclusao||''}));
     const habitos=(Array.isArray(rHab)?rHab:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',icon:r.icone||'',cat:r.categoria||'',freq:r.frequencia||'',weekdays:r.weekdays||[],note:r.obs||'',autoType:r.autoType||'',autoKeyword:r.autoKeyword||'',tipo:r.tipo||'check',unit:r.unit||'',startDate:r.startDate||'',logs:r.logs||{}}));
     const meals=(Array.isArray(rAli)?rAli:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',type:r.tipo||'',date:(r.date||'').slice(0,10),time:r.time||'',calories:r.calorias,note:r.obs||''}));
@@ -761,12 +761,18 @@ function _saveControleModal(){
 function hubCheckTreino(id){
   const arr=loadTreinos(); const t=arr.find(x=>x.id===id); if(!t)return;
   t.planejado=false; t.naoFeito=false;
-  _lsSet('saude_treinos_v1',JSON.stringify(arr)); rendTodaySummary(); rendCal();
+  _lsSet('saude_treinos_v1',JSON.stringify(arr));
+  const token=localStorage.getItem(AUTH_KEY); const uid=localStorage.getItem('hub_user_id');
+  if(token&&uid&&t.id) fetch(`${getApiBase()}/treinos`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({usuario_id:uid,client_id:t.id,titulo:t.titulo||'Treino',data:t.data,hora_inicio:t.hora_inicio||undefined,duracao:t.duracao||null,tipo_cat:t.tipo_cat||'cardio',local_nome:t.local||null,obs:t.obs||null})}).catch(()=>null);
+  rendTodaySummary(); rendCal();
 }
 function hubCheckTarefa(id){
   const arr=loadTarefas(); const t=arr.find(x=>x.id===id); if(!t)return;
   t.status='concluida'; t.dataConclusao=ds(new Date());
-  _lsSet('casinha_tarefas',JSON.stringify(arr)); rendTodaySummary(); rendCal();
+  _lsSet('casinha_tarefas',JSON.stringify(arr));
+  const token=localStorage.getItem(AUTH_KEY); const uid=localStorage.getItem('hub_user_id');
+  if(token&&uid&&t.id) fetch(`${getApiBase()}/casinha/tarefas`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({usuario_id:uid,client_id:t.id,titulo:t.titulo||'Tarefa',status:'concluida',dataConclusao:ds(new Date()),prioridade:t.prioridade||'media',ambiente:t.ambiente||null,dataVenc:t.dataVenc||null,horario:t.horario||null})}).catch(()=>null);
+  rendTodaySummary(); rendCal();
 }
 
 let cardDate=new Date();
