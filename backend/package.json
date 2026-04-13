@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --include src src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "prisma migrate resolve --applied 20260412100000_add_strava_excluded; prisma migrate resolve --applied 20260412200000_habito_tipo_unit_startdate; prisma migrate deploy && node dist/server.js",
+    "start": "prisma migrate resolve --applied 20260412100000_add_strava_excluded; prisma migrate resolve --applied 20260412200000_habito_tipo_unit_startdate; prisma migrate resolve --rolled-back 20260412300000_add_alimentacao_water; prisma migrate resolve --applied 20260412300000_add_alimentacao_water; prisma migrate deploy && node dist/server.js",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
