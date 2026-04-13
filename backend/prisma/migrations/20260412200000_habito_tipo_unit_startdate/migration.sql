@@ -1,0 +1,3 @@
+ALTER TABLE "Habito" ADD COLUMN "tipo" TEXT;
+ALTER TABLE "Habito" ADD COLUMN "unit" TEXT;
+ALTER TABLE "Habito" ADD COLUMN "startDate" TEXT;

@@ -505,6 +505,7 @@
       .dashboard-top-grid,.dashboard-grid,.stats-grid,.list{grid-template-columns:1fr}
     }
     @media(max-width:680px){
+      .hname,.hab-grid-spacer,.hab-group-hd{position:static;}
       .app{padding:12px 10px 40px}
       .summary{grid-template-columns:1fr 1fr}
       .form-row{grid-template-columns:1fr}
@@ -969,15 +970,6 @@
           logs:r.logs||{},
         }));
         const localHabits=JSON.parse(lsGet(KEY)||'[]');
-        // Re-apply local-only fields that the API backend doesn't store
-        const localById=Object.fromEntries(localHabits.map(h=>[h.id,h]));
-        apiHabitos.forEach(h=>{
-          const loc=localById[h.id];
-          if(!loc) return;
-          if(loc.tipo && loc.tipo!=='check') h.tipo=loc.tipo;
-          if(loc.unit) h.unit=loc.unit;
-          if(loc.startDate) h.startDate=loc.startDate;
-        });
         // Preserve user-defined order from local state
         const localOrder=localHabits.map(h=>h.id);
         apiHabitos.sort((a,b)=>{

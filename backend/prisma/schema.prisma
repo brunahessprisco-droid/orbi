@@ -482,6 +482,9 @@ model Habito {
   obs         String?
   autoType    String?
   autoKeyword String?
+  tipo        String?
+  unit        String?
+  startDate   String?
   logs        Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

@@ -1029,11 +1029,15 @@ apiRouter.post("/habitos", requireAuth, async (req: AuthedRequest, res) => {
     icone: z.string().nullable().optional(), categoria: z.string().nullable().optional(),
     frequencia: z.string().nullable().optional(), weekdays: z.any().optional(),
     obs: z.string().nullable().optional(), autoType: z.string().nullable().optional(),
-    autoKeyword: z.string().nullable().optional(), logs: z.any().optional(),
+    autoKeyword: z.string().nullable().optional(),
+    tipo: z.string().nullable().optional(),
+    unit: z.string().nullable().optional(),
+    startDate: z.string().nullable().optional(),
+    logs: z.any().optional(),
   });
   const input = schema.parse(req.body);
   if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
-  const data = { nome: input.nome, icone: input.icone ?? null, categoria: input.categoria ?? null, frequencia: input.frequencia ?? null, weekdays: input.weekdays ?? null, obs: input.obs ?? null, autoType: input.autoType ?? null, autoKeyword: input.autoKeyword ?? null, logs: input.logs ?? null };
+  const data = { nome: input.nome, icone: input.icone ?? null, categoria: input.categoria ?? null, frequencia: input.frequencia ?? null, weekdays: input.weekdays ?? null, obs: input.obs ?? null, autoType: input.autoType ?? null, autoKeyword: input.autoKeyword ?? null, tipo: input.tipo ?? null, unit: input.unit ?? null, startDate: input.startDate ?? null, logs: input.logs ?? null };
   const row = await prisma.habito.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
   res.status(201).json(row);
 });
