@@ -940,8 +940,8 @@ async function syncTreino(t){
   if(!canUseApi())return;
   const r=await apiReqRetry('/treinos',{method:'POST',body:JSON.stringify({
     usuario_id:API_USER_ID, client_id:t.id,
-    titulo:t.titulo, data:t.data, hora_inicio:t.hora_inicio||null,
-    hora_fim:t.hora_fim||null, duracao:t.duracao||null,
+    titulo:t.titulo, data:t.data, hora_inicio:t.hora_inicio||undefined,
+    hora_fim:t.hora_fim||undefined, duracao:t.duracao||null,
     tipo_cat:t.tipo_cat||'cardio', tipo_ex:t.tipo_ex||null,
     calorias:t.calorias||null, km:t.km||null,
     local_nome:t.local||null, descricao:t.descricao||null, obs:treinoObsEncode(t),
