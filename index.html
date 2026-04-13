@@ -7,6 +7,7 @@
 <script>(function(){const t=localStorage.getItem('app_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})()</script>
 <link rel="icon" type="image/png" href="assets/Simbolo.png">
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 [data-theme="dark"]{
   --body-bg:#1A1A1B;
@@ -61,6 +62,8 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .nav-tab.active{background:var(--surface3);color:var(--text);}
 .btn-theme{border:1px solid var(--border);background:none;color:var(--muted);width:32px;height:32px;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;}
 .btn-theme:hover{color:var(--text);}
+[data-theme="dark"] .bi-sun-fill{display:none;}
+[data-theme="light"] .bi-moon-stars-fill{display:none;}
 .main{max-width:1680px;margin:0 auto;padding:28px 24px 40px;}
 .page{display:none;}.page.active{display:block;}
 .sistemas-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:32px;}
@@ -172,7 +175,7 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .popup-header{padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between;}
 .popup-title{font-size:16px;font-weight:700;}
 .popup-date{font-size:12px;color:var(--muted);margin-top:2px;}
-.btn-close{border:none;background:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:4px;}
+.btn-close{border:none;background:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:4px;}
 .popup-body{padding:16px 20px 20px;}
 .popup-section{margin-bottom:18px;}
 .popup-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
@@ -215,7 +218,7 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .profile-avatar{width:52px;height:52px;border-radius:50%;background:var(--accent-bg);border:2px solid var(--accent-border);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--accent);flex-shrink:0;}
 .profile-name{font-size:16px;font-weight:700;}
 .profile-email{font-size:12px;color:var(--muted);margin-top:2px;}
-.profile-close{margin-left:auto;border:none;background:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:4px;}
+.profile-close{margin-left:auto;border:none;background:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:4px;}
 .profile-body{padding:20px;}
 .profile-section{margin-bottom:20px;}
 .profile-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px;}
@@ -290,8 +293,8 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
   </div>
 
   <button class="btn-avatar" id="btn-profile" onclick="openProfile()" title="Meu perfil">?</button>
-  <button class="btn-theme" onclick="toggleTheme()" title="Tema">☀</button>
-  <button class="btn-theme" onclick="logout()" title="Sair" style="font-size:16px;">🚪</button>
+  <button class="btn-theme" onclick="toggleTheme()" title="Tema"><i class="bi bi-sun-fill"></i><i class="bi bi-moon-stars-fill"></i></button>
+  <button class="btn-theme" onclick="logout()" title="Sair"><i class="bi bi-box-arrow-right"></i></button>
 </nav>
 
 <div class="main">
@@ -324,7 +327,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
     </div>
     <!-- Filters: above both today card + calendar -->
     <div class="hub-filters">
-      <button class="btn-eye" id="btn-privacy" onclick="togglePrivacy()" title="Ocultar valores sensíveis">👁️</button>
+      <button class="btn-eye" id="btn-privacy" onclick="togglePrivacy()" title="Ocultar valores sensíveis"><i class="bi bi-eye-fill"></i></button>
       <div class="filter-group">
         <button class="filter-btn active" data-f="todos" onclick="setFilter('todos',this)">Todos</button>
         <button class="filter-btn" data-f="hab" onclick="setFilter('hab',this)"><img src="assets/Hábitos.png" alt="Hábitos"></button>
@@ -365,7 +368,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <div class="popup-title" id="hc-title">Registrar valor</div>
         <div class="popup-date" id="hc-unit"></div>
       </div>
-      <button class="btn-close" onclick="_closeControleModal()">×</button>
+      <button class="btn-close" onclick="_closeControleModal()"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="popup-body" style="padding-top:12px;">
       <input id="hc-input" type="text" inputmode="numeric" maxlength="6" placeholder="0"
@@ -387,7 +390,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <div class="popup-title" id="popup-title">—</div>
         <div class="popup-date" id="popup-date">—</div>
       </div>
-      <button class="btn-close" onclick="closeOv()">×</button>
+      <button class="btn-close" onclick="closeOv()"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="popup-body" id="popup-body"></div>
   </div>
@@ -402,7 +405,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <div class="profile-name" id="profile-header-name">—</div>
         <div class="profile-email" id="profile-header-email">—</div>
       </div>
-      <button class="profile-close" onclick="closeProfile()">×</button>
+      <button class="profile-close" onclick="closeProfile()"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="profile-body">
       <div class="profile-section">
@@ -490,7 +493,7 @@ async function submitAuth(){
 
 function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; localStorage.removeItem(AUTH_KEY); location.reload(); }
 function toggleTheme(){ const isDark=document.documentElement.getAttribute('data-theme')==='dark'; const next=isDark?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('app_theme',next); }
-function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.textContent=on?'🙈':'👁️'; }
+function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.innerHTML=on?'<i class="bi bi-eye-slash-fill"></i>':'<i class="bi bi-eye-fill"></i>'; }
 function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
 function showPage(id){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+id).classList.add('active'); document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); }
 // storage helpers – isolamento por usuário (hub_user_id é global)
@@ -789,7 +792,7 @@ function rendTodaySummary(){
     const cls='td-item'+(i.planned?' planned':'')+(i.done?' td-item-done':'')+(i.module?' td-item-link':'');
     const clickAttr=i.module?`onclick="window.location='${i.module}'"` : '';
     const badge=i.planned?`<span class="td-item-planned-badge">Planejado</span>`:'';
-    const checkBtn=i.checkFn&&i.id?`<button class="td-check-btn" onclick="event.stopPropagation();${i.checkFn}('${i.id}')" title="Marcar como concluído">✓</button>`:'';
+    const checkBtn=i.checkFn&&i.id?`<button class="td-check-btn" onclick="event.stopPropagation();${i.checkFn}('${i.id}')" title="Marcar como concluído"><i class="bi bi-check-lg"></i></button>`:'';
     const modIcon=MODULE_ICONS[i.module];
     const dotHtml=modIcon
       ?`<img src="${modIcon}" class="td-item-mod-icon" style="${i.done?'opacity:.3':''}" alt="">`
