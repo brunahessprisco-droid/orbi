@@ -2073,11 +2073,10 @@ async function stravaHandleCallback(){
   const npData=document.getElementById('np-data');
   if(npData)npData.value=dateStr(new Date());
 
-  // Carrega cache local primeiro (resposta imediata)
-  loadLocal();
-  renderAll();
+  // API é a fonte de verdade — inicia vazio e carrega da API
+  treinos=[];locais=DEF_LOCAIS;tipos=DEF_TIPOS;
+  setStatus('Carregando...');
 
-  // Depois sincroniza com API se autenticado
   const ok=await checkAuth();
   if(ok){
     applyUserIsolation(API_USER_ID);

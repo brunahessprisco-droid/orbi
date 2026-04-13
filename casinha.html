@@ -2020,12 +2020,12 @@ async function deleteRotinaApi(r){
 
 // ===== INIT =====
 async function init(){
-  loadData();
+  tarefas=[];pessoas=[];ambientes=[];rotinas=[];tiposPersonalizados=[];
   applyTheme();
   loadTarefasPrefs();
   const ok=await checkAuth();
-  if(!ok){showLogin();renderDashboard();return;}
-  applyUserIsolation(API_USER_ID);loadData();
+  if(!ok){showLogin();return;}
+  applyUserIsolation(API_USER_ID);
   await bootstrapApi();
   autoStatus();
   renderDashboard();
