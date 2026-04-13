@@ -22,7 +22,7 @@ Fallback `"orbi-admin-2025"` expõe listagem de usuários se a env var não esti
 
 ## ALTO
 
-### [ ] 4. Todos os deletes de frontend são fire-and-forget silenciosos
+### [x] 4. Todos os deletes de frontend são fire-and-forget silenciosos ✓ FIXED
 Finanças, Casinha, Exercícios, Hábitos, Alimentação, Saúde — todos usam `.catch(()=>null)`.
 Usuário pensa que deletou, banco mantém o registro.
 
@@ -53,17 +53,17 @@ Retornava `[]` em qualquer erro e gravava esse vazio no localStorage. Dados ante
 ### [ ] 10. CORS sem whitelist de origem — `server.ts`
 `app.use(cors())` permite qualquer origem.
 
-### [ ] 11. Rollback dos modais de controle de hábito está quebrado — `index.html`
+### [x] 11. Rollback dos modais de controle de hábito está quebrado — `index.html` ✓ FIXED
 `_clearControleModal` e `_saveControleModal` usam referência de objeto em vez de snapshot string.
 Rollback pode não restaurar estado correto.
 
 ### [ ] 12. Google/Strava disconnect: revogação do token externo silenciada
 Token deletado localmente, mas se revogação na API externa falha, o token continua válido lá.
 
-### [ ] 13. `saveProfile` e `changePassword` parseiam JSON antes de checar `r.ok`
+### [x] 13. `saveProfile` e `changePassword` parseiam JSON antes de checar `r.ok` ✓ FIXED
 Se a API retornar HTML de erro, `r.json()` lança exceção não tratada.
 
-### [ ] 14. `Promise.all` com 9 endpoints em Finanças
+### [x] 14. `Promise.all` com 9 endpoints em Finanças ✓ FIXED
 Se 1 endpoint falhar, bootstrap inteiro falha e usuário fica sem nenhum dado financeiro.
 
 ---

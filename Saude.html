@@ -874,11 +874,10 @@
       applyTheme(localStorage.getItem('app_theme')||state.settings.theme||'dark');
       applyPrivacy();
       bind();
-      renderAll();
-      checkAuthSaude().then(ok=>{
-        if(!ok){document.getElementById('auth-overlay').classList.add('open');return;}
+      checkAuthSaude().then(async ok=>{
+        if(!ok){renderAll();document.getElementById('auth-overlay').classList.add('open');return;}
         applyUserIsolation(API_USER_ID);
-        saudeBootstrap();
+        await saudeBootstrap(); // renderAll() é chamado dentro do bootstrap após dados da API
       });
 
       function loadState(){

@@ -9,7 +9,16 @@ import { apiRouter } from "./api";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS ?? "https://orbi-two-xi.vercel.app")
+  .split(",").map(s => s.trim());
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || /^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error("Not allowed by CORS"));
+  },
+}));
 app.use(express.json());
 
 app.use("/api", apiRouter);

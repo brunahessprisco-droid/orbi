@@ -1127,6 +1127,7 @@ apiRouter.get("/saude/remedios", requireAuth, async (req: AuthedRequest, res) =>
 });
 apiRouter.post("/saude/remedios", requireAuth, async (req: AuthedRequest, res) => {
   const schema = z.object({
+    usuario_id: z.string().optional(),
     client_id: z.string().min(1),
     name: z.string().min(1),
     cat: z.string().nullable().optional(),
@@ -1160,6 +1161,7 @@ apiRouter.get("/saude/consumos", requireAuth, async (req: AuthedRequest, res) =>
 });
 apiRouter.post("/saude/consumos", requireAuth, async (req: AuthedRequest, res) => {
   const schema = z.object({
+    usuario_id: z.string().optional(),
     client_id: z.string().min(1),
     date: z.string().min(10),
     time: z.string().nullable().optional(),
