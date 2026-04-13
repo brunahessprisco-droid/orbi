@@ -1056,7 +1056,9 @@
           return ia-ib;
         });
         const apiIds=new Set(apiHabitos.map(h=>h.id));
-        const naoSinc=localHabits.filter(h=>!apiIds.has(h.id));
+        // Só inclui hábitos locais sem _dbId (nunca chegaram ao banco)
+        // Hábitos com _dbId que não estão na API foram deletados em outro device — não ressuscitar
+        const naoSinc=localHabits.filter(h=>!apiIds.has(h.id)&&!h._dbId);
         habits=[...apiHabitos,...naoSinc];
         for(const h of naoSinc)await syncHabito(h).catch(()=>null);
         // Resync habits that had tipo/unit/startDate backfilled from localStorage → grava no banco
