@@ -1356,6 +1356,8 @@ function treinoFromApi(r){
   const naoFeito=obs.startsWith('[SKIP]');
   if(planejado)obs=obs.slice(6);
   if(naoFeito)obs=obs.slice(6);
+  const stravaEdited=obs.startsWith('[EDITED]');
+  if(stravaEdited)obs=obs.slice(8);
   let humor=null;
   const hm=obs.match(/^\[H:([1-5])\]/);
   if(hm){humor=parseInt(hm[1]);obs=obs.slice(hm[0].length);}
@@ -1365,13 +1367,14 @@ function treinoFromApi(r){
     duracao:r.duracao||0, tipo_cat:r.tipo_cat, tipo_ex:r.tipo_ex||'',
     calorias:r.calorias||0, km:r.km?Number(r.km):0,
     local:r.local_nome||'', descricao:r.descricao||'', obs,
-    humor, planejado, naoFeito, _dbId:r.id,
+    humor, planejado, naoFeito, stravaEdited, _dbId:r.id,
   };
 }
 function treinoObsEncode(t){
   const prefix=t.planejado?'[PLAN]':t.naoFeito?'[SKIP]':'';
+  const editedTag=t.stravaEdited?'[EDITED]':'';
   const humorTag=t.humor?`[H:${t.humor}]`:'';
-  return(prefix+humorTag+(t.obs||''))||null;
+  return(prefix+editedTag+humorTag+(t.obs||''))||null;
 }
 
 // PLANEJAMENTO
@@ -1737,6 +1740,7 @@ async function saveTreino(){
   const titulo=document.getElementById('f-titulo').value.trim();
   if(!titulo){alert('Informe o título do treino.');return;}
   const existing=editTreinoId?treinos.find(t=>t.id===editTreinoId):null;
+  const isStravaActivity=!!(editTreinoId&&editTreinoId.startsWith('strava_'));
   const obj={
     id:editTreinoId||Date.now().toString(),
     _dbId:existing?._dbId||undefined,
@@ -1753,6 +1757,9 @@ async function saveTreino(){
     descricao:document.getElementById('f-desc').value.trim(),
     obs:document.getElementById('f-obs').value.trim(),
     humor:curHumor,
+    planejado:existing?.planejado||false,
+    naoFeito:existing?.naoFeito||false,
+    stravaEdited:isStravaActivity?true:(existing?.stravaEdited||false),
   };
   if(editTreinoId)treinos=treinos.map(t=>t.id===editTreinoId?obj:t);
   else treinos.unshift(obj);

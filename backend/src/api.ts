@@ -1171,6 +1171,9 @@ apiRouter.post("/strava/sync", requireAuth, async (req: AuthedRequest, res) => {
       act.average_heartrate ? `FC ${Math.round(act.average_heartrate)}bpm` : null,
     ].filter(Boolean).join(' · ');
     const payload = { titulo: act.name, data: data_str, hora_inicio: hora, hora_fim: null as string | null, duracao, tipo_cat, tipo_ex: sportType, calorias: null as number | null, km: km != null ? toDecimal(km) : null, local_nome: null as string | null, descricao: "Importado do Strava", obs: extras || null };
+    // Skip update if user has manually edited this activity ([EDITED] marker in obs)
+    const existing = await prisma.apiTreino.findUnique({ where: { userId_client_id: { userId: req.userId!, client_id: clientId } }, select: { obs: true } });
+    if (existing?.obs?.includes('[EDITED]')) { synced++; continue; }
     await prisma.apiTreino.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: clientId } }, update: payload, create: { userId: req.userId!, client_id: clientId, ...payload } });
     synced++;
   }
