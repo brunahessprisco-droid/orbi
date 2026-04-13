@@ -1459,7 +1459,7 @@ async function addPlanejamento(){
   if(!titulo||!data){alert('Informe nome e data.');return;}
 
   const obj={
-    id:'plan_'+Date.now(), titulo, data, hora_inicio,
+    id:crypto.randomUUID(), titulo, data, hora_inicio,
     hora_fim:'', duracao:0, tipo_cat, tipo_ex,
     calorias:0, km:0, local:'', descricao:'', obs:'',
     planejado:true, naoFeito:false,
@@ -1783,7 +1783,7 @@ async function saveTreino(){
   const existing=editTreinoId?treinos.find(t=>t.id===editTreinoId):null;
   const isStravaActivity=!!(editTreinoId&&editTreinoId.startsWith('strava_'));
   const obj={
-    id:editTreinoId||Date.now().toString(),
+    id:editTreinoId||crypto.randomUUID(),
     _dbId:existing?._dbId||undefined,
     titulo,
     data:document.getElementById('f-data').value,
@@ -1840,7 +1840,7 @@ async function saveLocal(){
   const nome=document.getElementById('f-local-nome').value.trim();
   if(!nome){alert('Informe o nome.');return;}
   const existing=editLocalId?locais.find(l=>l.id===editLocalId):null;
-  const obj={id:editLocalId||('l'+Date.now()),_dbId:existing?._dbId,nome};
+  const obj={id:editLocalId||crypto.randomUUID(),_dbId:existing?._dbId,nome};
   if(editLocalId)locais=locais.map(l=>l.id===editLocalId?obj:l);
   else locais.push(obj);
   saveLocal_();
@@ -1867,7 +1867,7 @@ async function saveTipo(){
   const nome=document.getElementById('f-tipo-nome').value.trim();
   if(!nome){alert('Informe o nome.');return;}
   const existing=editTipoId?tipos.find(t=>t.id===editTipoId):null;
-  const obj={id:editTipoId||('tp'+Date.now()),_dbId:existing?._dbId,nome,cat:curTipoCat};
+  const obj={id:editTipoId||crypto.randomUUID(),_dbId:existing?._dbId,nome,cat:curTipoCat};
   if(editTipoId)tipos=tipos.map(t=>t.id===editTipoId?obj:t);
   else tipos.push(obj);
   saveLocal_();

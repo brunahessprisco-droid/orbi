@@ -451,7 +451,7 @@
         await apiReq('/alimentacao/refeicoes',{method:'POST',body:JSON.stringify({
           usuario_id:API_USER_ID,client_id:m.id,nome:m.name,tipo:m.type||null,
           date:m.date,time:m.time||null,calories:m.calories||null,obs:m.note||null,
-        })}).catch(()=>null);
+        })});
       }
       async function deleteRefeicaoApi(m){
         if(!canUseApi()||!m._dbId)return;
@@ -561,7 +561,7 @@
       }
       function closeMealModal(){ $('ov-meal').classList.remove('open'); editingMealId=null; _mealDirty=false; }
 
-      function saveMealAction(){
+      async function saveMealAction(){
         const data={
           id:editingMealId||uid(),
           name:$('m-name').value.trim(),
@@ -572,13 +572,21 @@
           note:$('m-note').value.trim()
         };
         if(!data.name){ alert('Informe o nome da refeição.'); return; }
+        const snapshotMeals=lsGet(KEY_MEALS)||'[]';
+        const snapshotDeleted=lsGet(KEY_DELETED)||'[]';
         const i=meals.findIndex(x=>x.id===data.id);
         if(i>=0) meals[i]=data; else meals.unshift(data);
         deletedMealIds=deletedMealIds.filter(id=>id!==data.id);
         saveDeletedMeals();
-        saveMeals();syncRefeicao(data).catch(()=>null);
+        saveMeals();
         closeMealModal();
         renderAll();
+        try{ await syncRefeicao(data); }catch(_){
+          meals=JSON.parse(snapshotMeals);
+          deletedMealIds=JSON.parse(snapshotDeleted);
+          saveDeletedMeals(); saveMeals(); renderAll();
+          alert('Erro ao salvar refeição. A alteração foi desfeita.');
+        }
       }
       function deleteMeal(id){ if(!confirm('Excluir refeição?')) return; const m=meals.find(x=>x.id===id); deletedMealIds=[...new Set([...deletedMealIds,id])]; saveDeletedMeals(); meals=meals.filter(x=>x.id!==id); saveMeals(); renderAll(); if(m)deleteRefeicaoApi(m).catch(()=>{meals.push(m);deletedMealIds=deletedMealIds.filter(x=>x!==id);saveDeletedMeals();saveMeals();renderAll();alert('Erro ao excluir. O item foi restaurado.');}); }
 

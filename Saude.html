@@ -671,8 +671,8 @@
         window.saudeApp&&window.saudeApp.renderAll&&window.saudeApp.renderAll();
       }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
     }
-    function saudeLogout(){
-      try{if(authToken)apiReq('/auth/logout',{method:'POST'});}catch(_){}
+    async function saudeLogout(){
+      if(authToken)try{await apiReq('/auth/logout',{method:'POST'});}catch(_){}
       authToken='';API_USER_ID=null;localStorage.removeItem(SK_AUTH);
       document.getElementById('auth-overlay').classList.add('open');
     }
@@ -684,7 +684,11 @@
         client_id:w.id,
         date:w.date,weight:w.weight,height:w.height,fat:w.fat,note:w.note||null,
         extraJson:{muscle:w.muscle,goal:w.goal,waist:w.waist,hip:w.hip,chest:w.chest},
-      })}).catch(()=>null);
+      })});
+    }
+    async function deleteWeightApi(w){
+      if(!canUseApi()||!w._dbId)return;
+      await apiReqRetry(`/health/weights/${w._dbId}`,{method:'DELETE'});
     }
     async function syncMedico(d){
       if(!canUseApi())return;
@@ -692,7 +696,7 @@
         usuario_id:API_USER_ID,client_id:d.id,nome:d.name,especialidade:d.specialty||null,
         frequencyDays:d.frequencyDays||null,phone:d.phone||null,whats:d.whats||null,
         email:d.email||null,clinica:d.clinic||null,endereco:d.address||null,obs:d.note||null,
-      })}).catch(()=>null);
+      })});
     }
     async function deleteMedicoApi(d){
       if(!canUseApi()||!d._dbId)return;
@@ -705,7 +709,7 @@
         status:e.status||null,resultado:e.resultado||null,laboratorio:e.lab||null,medicoId:e.doctorId||null,
         date:e.date,nextDate:e.nextDate||null,obs:e.note||null,
         fileName:e.fileName||null,fileData:e.fileData||null,
-      })}).catch(()=>null);
+      })});
     }
     async function deleteExameApi(e){
       if(!canUseApi()||!e._dbId)return;
@@ -718,7 +722,7 @@
         medicoId:c.doctorId||null,especialidade:c.specialty||null,motivo:c.reason||null,
         status:c.status||null,returnDays:c.returnDays||null,nextDate:c.nextDate||null,
         resumo:c.summary||null,
-      })}).catch(()=>null);
+      })});
     }
     async function deleteConsultaApi(c){
       if(!canUseApi()||!c._dbId)return;
@@ -730,7 +734,7 @@
         client_id:r.id,name:r.name,cat:r.cat||null,dose:r.dose||null,
         stock:r.stock??null,qty:r.qty??null,days:r.days??null,
         lastBuy:r.lastBuy||null,note:r.note||null,habitId:r.habitId||null,
-      })}).catch(()=>null);
+      })});
     }
     async function deleteRemedioApi(r){
       if(!canUseApi())return;
@@ -741,7 +745,7 @@
       return apiReqRetry('/saude/consumos',{method:'POST',body:JSON.stringify({
         client_id:c.id,date:c.date,time:c.time||null,
         name:c.name,dose:c.dose||null,reason:c.reason||null,
-      })}).catch(()=>null);
+      })});
     }
     async function deleteConsumoApi(c){
       if(!canUseApi())return;
@@ -829,7 +833,7 @@
         for(const c of nwCon)syncConsumo(c).catch(()=>null);
 
         app.renderAll();
-      }catch(e){console.error('Bootstrap saúde:',e);}
+      }catch(e){console.error('Bootstrap saúde:',e);window.saudeApp?.renderAll?.();}
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1238,7 +1242,7 @@
         openOverlay('ov-remedio');
       }
 
-      function saveRemedio(){
+      async function saveRemedio(){
         const name=document.getElementById('rm-name').value.trim();
         if(!name){alert('Informe o nome do remédio.');return;}
         const isNew=!editing.remedio;
@@ -1254,17 +1258,22 @@
           // preserve existing habitId if editing
           habitId:editing.remedio?.habitId||undefined
         };
+        const snapshot=lsGet(KEY_REM)||'[]';
         const idx=remedios.findIndex(x=>x.id===item.id);
         if(idx>=0) remedios[idx]=item; else remedios.push(item);
         editing.remedio=null;
         saveRemedios();
-        syncRemedio(item).catch(()=>null);
         closeOverlay('ov-remedio');
         renderRemedios();
         // create linked habit if checkbox was checked
         if(isNew && document.getElementById('rm-criar-habito').checked){
           createHabitoForRemedio(item);
           renderRemedios();
+        }
+        try{ await syncRemedio(item); }catch(_){
+          remedios=JSON.parse(snapshot);
+          saveRemedios(); renderRemedios();
+          alert('Erro ao salvar remédio. A alteração foi desfeita.');
         }
       }
 
@@ -1277,7 +1286,7 @@
         openOverlay('ov-consumo');
       }
 
-      function saveConsumo(){
+      async function saveConsumo(){
         const name=document.getElementById('co-name').value.trim();
         if(!name){alert('Informe o nome do remédio/medicamento.');return;}
         const item={
@@ -1288,13 +1297,18 @@
           dose:document.getElementById('co-dose').value.trim(),
           reason:document.getElementById('co-reason').value.trim()
         };
+        const snapshot=lsGet(KEY_CONSUMO)||'[]';
         const idx=consumos.findIndex(x=>x.id===item.id);
         if(idx>=0) consumos[idx]=item; else consumos.push(item);
         editing.consumo=null;
         saveConsumos();
-        syncConsumo(item).catch(()=>null);
         closeOverlay('ov-consumo');
         renderConsumos();
+        try{ await syncConsumo(item); }catch(_){
+          consumos=JSON.parse(snapshot);
+          saveConsumos(); renderConsumos();
+          alert('Erro ao salvar consumo. A alteração foi desfeita.');
+        }
       }
 
       function renderAll(){
@@ -1719,19 +1733,28 @@
         }
       }
 
-      function upsert(collection,item,kind){
+      async function upsert(collection,item,kind){
+        const snapshotState=lsGet(KEY)||'{}';
+        const snapshotDeleted=lsGet(KEY_DELETED)||'{}';
         const idx=state[collection].findIndex(x=>x.id===item.id);
         if(idx>=0) state[collection][idx]=item; else state[collection].push(item);
         if(deletedState[collection]) deletedState[collection]=deletedState[collection].filter(x=>x!==item.id);
         saveDeletedState();
         editing[kind]=null;
         saveState();
-        // sync com API
-        if(collection==='weights')syncWeight(item).catch(()=>null);
-        else if(collection==='doctors')syncMedico(item).catch(()=>null);
-        else if(collection==='exams')syncExame(item).catch(()=>null);
-        else if(collection==='consults')syncConsulta(item).catch(()=>null);
         renderAll();
+        // sync com API — rollback on failure
+        try{
+          if(collection==='weights') await syncWeight(item);
+          else if(collection==='doctors') await syncMedico(item);
+          else if(collection==='exams') await syncExame(item);
+          else if(collection==='consults') await syncConsulta(item);
+        }catch(_){
+          state=JSON.parse(snapshotState);
+          deletedState=JSON.parse(snapshotDeleted);
+          saveDeletedState(); saveState(); renderAll();
+          alert('Erro ao salvar. A alteração foi desfeita.');
+        }
       }
       function setValue(id,v){ document.getElementById(id).value=(v ?? ''); }
 
@@ -1760,12 +1783,14 @@
           saveRemedios(); renderRemedios();
           if(r) deleteRemedioApi(r).catch(()=>{remedios.push(r);saveRemedios();renderRemedios();alert('Erro ao excluir. O item foi restaurado.');});
         },
-        remedioCompra:(id)=>{
+        remedioCompra:async(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r) return;
+          const snapshot=lsGet(KEY_REM)||'[]';
           const addQty=Number(r.qty||30);
           r.stock=(Number(r.stock||0))+addQty;
           r.lastBuy=todayStr();
-          saveRemedios(); syncRemedio(r).catch(()=>null); renderRemedios();
+          saveRemedios(); renderRemedios();
+          try{ await syncRemedio(r); }catch(_){ remedios=JSON.parse(snapshot); saveRemedios(); renderRemedios(); alert('Erro ao atualizar estoque. A alteração foi desfeita.'); }
         },
         deleteConsumo:(id)=>{
           if(!confirm('Excluir este registro?')) return;
@@ -1779,11 +1804,13 @@
           if(!confirm(`Criar hábito diário "Tomar ${r.name}" no módulo Hábitos?`)) return;
           createHabitoForRemedio(r); renderRemedios();
         },
-        desvincularHabito:(id)=>{
+        desvincularHabito:async(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r||!r.habitId) return;
           if(!confirm('Desvincular este remédio do hábito?\n\nO hábito não será excluído do módulo Hábitos.')) return;
+          const snapshot=lsGet(KEY_REM)||'[]';
           r.habitId=undefined;
-          saveRemedios(); syncRemedio(r).catch(()=>null); renderRemedios();
+          saveRemedios(); renderRemedios();
+          try{ await syncRemedio(r); }catch(_){ remedios=JSON.parse(snapshot); saveRemedios(); renderRemedios(); alert('Erro ao desvincular hábito. A alteração foi desfeita.'); }
         }
       });
       function remove(collection,id,msg){
@@ -1800,7 +1827,8 @@
         saveDeletedState(); saveState(); renderAll();
         if(item){
           let del;
-          if(collection==='doctors') del=deleteMedicoApi(item);
+          if(collection==='weights') del=deleteWeightApi(item);
+          else if(collection==='doctors') del=deleteMedicoApi(item);
           else if(collection==='exams') del=deleteExameApi(item);
           else if(collection==='consults') del=deleteConsultaApi(item);
           if(del) del.catch(()=>{

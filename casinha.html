@@ -1096,10 +1096,11 @@ function taskCardHtml(t){
 }
 
 // ===== TASK CRUD =====
-function completarTarefa(id){
+async function completarTarefa(id){
   const t=tarefas.find(x=>x.id===id);if(!t)return;
+  const snapshotT=lsGet(SK_T)||'[]';
+  const snapshotR=lsGet(SK_R)||'[]';
   t.status='concluida';t.dataConclusao=today();
-  syncTarefa(t).catch(()=>null);
   if(t.rotinaId){
     // Tarefa de rotina: ocorrências futuras já estão pré-geradas.
     // Só garante que o horizonte continua preenchido.
@@ -1112,15 +1113,20 @@ function completarTarefa(id){
     tarefas.push(next);syncTarefa(next).catch(()=>null);
   }
   saveT();renderCurrent();
+  try{ await syncTarefa(t); }catch(_){
+    tarefas=JSON.parse(snapshotT); rotinas=JSON.parse(snapshotR);
+    saveT(); renderCurrent();
+  }
 }
 
-function adiarTarefa(id){
+async function adiarTarefa(id){
   const t=tarefas.find(x=>x.id===id);if(!t)return;
+  const snapshot=lsGet(SK_T)||'[]';
   const d=t.dataVenc?new Date(t.dataVenc+'T12:00:00'):new Date();
   d.setDate(d.getDate()+1);
   t.dataVenc=dateStr(d);t.status='adiada';
-  syncTarefa(t).catch(()=>null);
   saveT();renderCurrent();
+  try{ await syncTarefa(t); }catch(_){ tarefas=JSON.parse(snapshot); saveT(); renderCurrent(); }
 }
 
 function deletarTarefa(id){
@@ -1267,12 +1273,18 @@ function renderRotinas(){
   }).join('')}</div>`;
 }
 
-function toggleRotina(id){
+async function toggleRotina(id){
   const r=rotinas.find(x=>x.id===id);if(!r)return;
+  const snapshotR=lsGet(SK_R)||'[]';
+  const snapshotT=lsGet(SK_T)||'[]';
   r.ativo=!r.ativo;
   if(r.ativo&&!r.proximaData)r.proximaData=today();
   if(r.ativo){const ns=preencherOcorrenciasRotina(r);ns.forEach(t=>syncTarefa(t).catch(()=>null));saveT();}
-  saveR();syncRotina(r).catch(()=>null);renderRotinas();
+  saveR();renderRotinas();
+  try{ await syncRotina(r); }catch(_){
+    rotinas=JSON.parse(snapshotR); tarefas=JSON.parse(snapshotT);
+    saveR(); saveT(); renderRotinas();
+  }
 }
 
 // ── Recorrência: janela deslizante ──────────────────────────────────────────
@@ -1541,12 +1553,15 @@ function toggleRecDias(){
   document.getElementById('f-dias-wrap').style.display=v==='personalizado'?'flex':'none';
 }
 
-function saveTarefa(){
+async function saveTarefa(){
   const titulo=document.getElementById('f-titulo').value.trim();
   if(!titulo){alert('Informe o título da tarefa');return;}
   const rv=document.getElementById('f-recor').value;
   const recorrencia=rv?{tipo:rv,dias:rv==='personalizado'?parseInt(document.getElementById('f-dias').value)||7:null}:null;
   const dataVenc=document.getElementById('f-data').value;
+  const snapshotT=lsGet(SK_T)||'[]';
+  const snapshotR=lsGet(SK_R)||'[]';
+  let syncTarget=null;
   if(editingId){
     const t=tarefas.find(x=>x.id===editingId);if(!t)return;
     const oldDataVenc=t.dataVenc;
@@ -1577,6 +1592,7 @@ function saveTarefa(){
         saveR();syncRotina(r).catch(()=>null);
       }
     }
+    syncTarget=t;
   } else {
     let status='pendente';
     if(dataVenc===today())status='hoje';
@@ -1589,11 +1605,17 @@ function saveTarefa(){
       recorrencia,obs:document.getElementById('f-obs').value.trim(),
       dataConclusao:null,rotinaId:null,createdAt:new Date().toISOString()};
     tarefas.push(nova);
-    syncTarefa(nova).catch(()=>null);
+    syncTarget=nova;
   }
-  if(editingId){const t=tarefas.find(x=>x.id===editingId);if(t)syncTarefa(t).catch(()=>null);}
   autoStatus();
   saveT();closeModal();renderCurrent();
+  if(syncTarget){
+    try{ await syncTarefa(syncTarget); }catch(_){
+      tarefas=JSON.parse(snapshotT); rotinas=JSON.parse(snapshotR);
+      saveT(); saveR(); renderCurrent();
+      alert('Erro ao salvar tarefa. A alteração foi desfeita.');
+    }
+  }
 }
 
 // ===== MODAL: ROTINA =====
@@ -1647,12 +1669,15 @@ function toggleRDias(){
   document.getElementById('r-dias-wrap').style.display=v==='personalizado'?'flex':'none';
 }
 
-function saveRotina(){
+async function saveRotina(){
   const nome=document.getElementById('r-nome').value.trim();
   if(!nome){alert('Informe o nome da rotina');return;}
   const rv=document.getElementById('r-recor').value;
   const recorrencia={tipo:rv,dias:rv==='personalizado'?parseInt(document.getElementById('r-dias').value)||7:null};
   const proximaData=document.getElementById('r-prox').value||today();
+  const snapshotR=lsGet(SK_R)||'[]';
+  const snapshotT=lsGet(SK_T)||'[]';
+  let syncTarget=null;
   if(editingId){
     const r=rotinas.find(x=>x.id===editingId);if(!r)return;
     r.nome=nome;r.icone=document.getElementById('r-icone').value;
@@ -1660,7 +1685,7 @@ function saveRotina(){
     r.responsavel=document.getElementById('r-resp').value;r.prioridade=r.prioridade||'media';
     r.recorrencia=recorrencia;r.horario=document.getElementById('r-hora').value||null;
     r.tempoEst=parseInt(document.getElementById('r-test').value)||null;r.proximaData=proximaData;
-    syncRotina(r).catch(()=>null);
+    syncTarget=r;
   } else {
     const r={id:uid(),nome,icone:document.getElementById('r-icone').value,
       tipo:document.getElementById('r-tipo').value,ambiente:document.getElementById('r-amb').value,
@@ -1668,11 +1693,16 @@ function saveRotina(){
       recorrencia,horario:document.getElementById('r-hora').value||null,
       tempoEst:parseInt(document.getElementById('r-test').value)||null,proximaData,ativo:true};
     rotinas.push(r);
-    syncRotina(r).catch(()=>null);
     const ns=preencherOcorrenciasRotina(r);
     ns.forEach(t=>syncTarefa(t).catch(()=>null));
+    syncTarget=r;
   }
   saveR();closeModal();renderCurrent();
+  try{ await syncRotina(syncTarget); }catch(_){
+    rotinas=JSON.parse(snapshotR); tarefas=JSON.parse(snapshotT);
+    saveR(); saveT(); renderCurrent();
+    alert('Erro ao salvar rotina. A alteração foi desfeita.');
+  }
 }
 
 // ===== MODAL: AMBIENTE =====
@@ -1699,20 +1729,28 @@ function openAmbienteModal(id=null){
   openModal();
 }
 
-function saveAmbiente(){
+async function saveAmbiente(){
   const nome=document.getElementById('a-nome').value.trim();
   if(!nome){alert('Informe o nome');return;}
   const nomeNorm=nome.toLowerCase();
   const duplicado=ambientes.some(x=>x.id!==editingId&&(x.nome||'').trim().toLowerCase()===nomeNorm);
   if(duplicado){alert('Já existe um ambiente com esse nome');return;}
   const cor=document.getElementById('a-cor').value,icone=document.getElementById('a-icone').value;
+  const snapshotA=lsGet(SK_A)||'[]';
+  const snapshotT=lsGet(SK_T)||'[]';
+  let syncTarget=null;
   if(editingId){
     const a=ambientes.find(x=>x.id===editingId);if(!a)return;
     const old=a.nome;a.nome=nome;a.cor=cor;a.icone=icone;
     if(old!==nome){tarefas.forEach(t=>{if(t.ambiente===old)t.ambiente=nome;});saveT();}
-    syncAmbiente(a).catch(()=>null);
-  } else {const a={id:uid(),nome,cor,icone};ambientes.push(a);syncAmbiente(a).catch(()=>null);}
+    syncTarget=a;
+  } else {const a={id:uid(),nome,cor,icone};ambientes.push(a);syncTarget=a;}
   saveA();closeModal();renderCurrent();
+  try{ await syncAmbiente(syncTarget); }catch(_){
+    ambientes=JSON.parse(snapshotA); tarefas=JSON.parse(snapshotT);
+    saveA(); saveT(); renderCurrent();
+    alert('Erro ao salvar ambiente. A alteração foi desfeita.');
+  }
 }
 
 function deletarAmbiente(id){
@@ -1748,18 +1786,26 @@ function openPessoaModal(id=null){
   openModal();
 }
 
-function savePessoa(){
+async function savePessoa(){
   const nome=document.getElementById('p-nome').value.trim();
   if(!nome){alert('Informe o nome');return;}
   const cor=document.getElementById('p-cor').value;
   const tipoMembro=document.getElementById('p-tipo-membro')?.value||'adulto';
+  const snapshotP=lsGet(SK_P)||'[]';
+  const snapshotT=lsGet(SK_T)||'[]';
+  let syncTarget=null;
   if(editingId){
     const p=pessoas.find(x=>x.id===editingId);if(!p)return;
     const old=p.nome;p.nome=nome;p.cor=cor;p.tipoMembro=tipoMembro;
     if(old!==nome){tarefas.forEach(t=>{if(t.responsavel===old)t.responsavel=nome;});saveT();}
-    syncPessoa(p).catch(()=>null);
-  } else {const p={id:uid(),nome,cor,tipoMembro};pessoas.push(p);syncPessoa(p).catch(()=>null);}
+    syncTarget=p;
+  } else {const p={id:uid(),nome,cor,tipoMembro};pessoas.push(p);syncTarget=p;}
   saveP();closeModal();renderCurrent();
+  try{ await syncPessoa(syncTarget); }catch(_){
+    pessoas=JSON.parse(snapshotP); tarefas=JSON.parse(snapshotT);
+    saveP(); saveT(); renderCurrent();
+    alert('Erro ao salvar pessoa. A alteração foi desfeita.');
+  }
 }
 
 function deletarPessoa(id){

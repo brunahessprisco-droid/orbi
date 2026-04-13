@@ -90,11 +90,8 @@ apiRouter.post("/admin/create-invite", async (req, res) => {
 });
 
 apiRouter.get("/health", async (_req, res) => {
-  const rows = await prisma.$queryRaw<Array<{ db: string; schema: string }>>`
-    SELECT current_database() as db, current_schema() as schema
-  `;
-  const first = rows[0] || { db: "unknown", schema: "unknown" };
-  res.json({ ok: true, db: { name: first.db, schema: first.schema } });
+  await prisma.$queryRaw`SELECT 1`;
+  res.json({ ok: true });
 });
 
 apiRouter.post("/auth/register", async (req, res) => {
@@ -207,6 +204,13 @@ apiRouter.post("/health/weights", requireAuth, async (req: AuthedRequest, res) =
   });
 
   return res.status(201).json({ data: item });
+});
+
+apiRouter.delete("/health/weights/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).json({ error: "BAD_REQUEST" });
+  await prisma.healthWeight.deleteMany({ where: { id, userId: req.userId! } });
+  return res.status(204).send();
 });
 
 apiRouter.post("/auth/login", async (req, res) => {
@@ -1107,16 +1111,16 @@ apiRouter.post("/alimentacao/water", requireAuth, async (req: AuthedRequest, res
   }
   res.status(201).json(row);
 });
-apiRouter.delete("/alimentacao/water/:id", requireAuth, async (req: AuthedRequest, res) => {
-  const id = readRouteParam(req, "id");
-  if (!id) return res.status(400).end();
-  await prisma.alimentacaoWater.deleteMany({ where: { userId: req.userId!, OR: [{ id }, { clientId: id }] } });
-  res.status(204).end();
-});
 apiRouter.delete("/alimentacao/water/date/:date", requireAuth, async (req: AuthedRequest, res) => {
   const date = readRouteParam(req, "date");
   if (!date) return res.status(400).end();
   await prisma.alimentacaoWater.deleteMany({ where: { date, userId: req.userId! } });
+  res.status(204).end();
+});
+apiRouter.delete("/alimentacao/water/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).end();
+  await prisma.alimentacaoWater.deleteMany({ where: { userId: req.userId!, OR: [{ id }, { clientId: id }] } });
   res.status(204).end();
 });
 

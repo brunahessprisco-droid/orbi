@@ -1013,7 +1013,7 @@
         obs:h.note||null,autoType:h.autoType||null,autoKeyword:h.autoKeyword||null,
         tipo:h.tipo||'check',unit:h.unit||null,startDate:h.startDate||null,
         logs:h.logs||{},
-      })}).catch(()=>null);
+      })});
     }
 
     async function deleteHabitoApi(h){
@@ -1433,9 +1433,10 @@
       return true;
     }
 
-    function toggleLog(id,dateStr){
+    async function toggleLog(id,dateStr){
       const h=habits.find(x=>x.id===id);
       if(!h) return;
+      const snapshot=lsGet(KEY)||'[]';
       h.logs ||= {};
       const wasOn=!!h.logs[dateStr];
       h.logs[dateStr]=!wasOn;
@@ -1454,21 +1455,22 @@
       }
 
       save();
-      syncHabito(h).catch(()=>null);
       renderAll();
+      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderAll(); }
     }
 
-    function setControlLog(id, dateStr, val){
+    async function setControlLog(id, dateStr, val){
       const h=habits.find(x=>x.id===id);
       if(!h) return;
+      const snapshot=lsGet(KEY)||'[]';
       h.logs||={};
       if(val) h.logs[dateStr]=val;
       else delete h.logs[dateStr];
       save();
-      syncHabito(h).catch(()=>null);
       // Update the cell style without full re-render (keeps focus/cursor)
       const input=document.querySelector(`input.sq-val[onchange*="${id}"][onchange*="${dateStr}"]`);
       if(input){ input.className=`sq-val ${val?'has-val':''}`; input.value=val; }
+      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderAll(); }
     }
 
     function previousPlannedDate(h, date){
@@ -2347,31 +2349,33 @@
       }).join('');
     }
 
-    function toggleCalHabit(id, dateStr){
+    async function toggleCalHabit(id, dateStr){
       if(dateStr>todayStr()) return;
       const h=habits.find(x=>x.id===id);
       if(!h) return;
+      const snapshot=lsGet(KEY)||'[]';
       h.logs||={};
       h.logs[dateStr]=!h.logs[dateStr];
       if(!h.logs[dateStr]) delete h.logs[dateStr];
       save();
-      syncHabito(h).catch(()=>null);
       renderCalDayBody(dateStr);
       renderCalendario();
       renderSummary();
+      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderCalDayBody(dateStr); renderCalendario(); renderSummary(); }
     }
 
-    function setCalControlLog(id, dateStr, val){
+    async function setCalControlLog(id, dateStr, val){
       const h=habits.find(x=>x.id===id);
       if(!h) return;
+      const snapshot=lsGet(KEY)||'[]';
       h.logs||={};
       if(val) h.logs[dateStr]=val;
       else delete h.logs[dateStr];
       save();
-      syncHabito(h).catch(()=>null);
       renderCalDayBody(dateStr);
       renderCalendario();
       renderSummary();
+      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderCalDayBody(dateStr); renderCalendario(); renderSummary(); }
     }
 
     function closeCalDay(){ document.getElementById('cal-day-ov').classList.remove('open'); }
