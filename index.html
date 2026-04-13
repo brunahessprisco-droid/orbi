@@ -463,11 +463,22 @@ async function submitAuth(){
   if(AUTH_MODE === 'register' && !nome){ msg.textContent = 'Preencha o nome.'; return; }
   if(AUTH_MODE === 'register' && !inviteCode){ msg.textContent = 'Informe o código convite.'; return; }
   if(apiInp) localStorage.setItem(API_BASE_KEY, apiInp);
+  msg.textContent = 'Conectando ao servidor...';
   try{
     const url = AUTH_MODE === 'login' ? `${getApiBase()}/auth/login` : `${getApiBase()}/auth/register`;
     const payload = AUTH_MODE === 'login' ? { email, senha: pass } : { nome, email, senha: pass, inviteCode };
-    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const data = await r.json();
+    let r, data, lastErr;
+    const delays = [0, 5000, 12000];
+    for(let i = 0; i < delays.length; i++){
+      if(delays[i]) { msg.textContent = `Servidor acordando, aguarde... (${i}/${delays.length-1})`; await new Promise(res=>setTimeout(res,delays[i])); }
+      try{
+        r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        data = await r.json();
+        lastErr = null;
+        break;
+      }catch(e){ lastErr = e; }
+    }
+    if(lastErr) throw lastErr;
     if(!r.ok){
       const map = {
         INVALID_CREDENTIALS: 'Credenciais inválidas.',
