@@ -350,7 +350,7 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
     </div>
     <div class="auth-field">
       <label>API (avançado)</label>
-      <input id="auth-api" type="text" placeholder="http://localhost:3333/api">
+      <input id="auth-api" type="text" placeholder="https://orbi-api-b9ev.onrender.com/api">
     </div>
     <div class="auth-actions">
       <button class="btn-save" style="flex:1" onclick="doLogin()">Entrar</button>
@@ -695,7 +695,7 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
 </div>
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const API_BASE='http://localhost:3333/api';
+const API_BASE='https://orbi-api-b9ev.onrender.com/api';
 const SK_AUTH='fin_auth_token_v1',SK_API='fin_api_base_v1',SK_TH='app_theme';
 let authToken=localStorage.getItem(SK_AUTH)||'';
 let apiBase=localStorage.getItem(SK_API)||API_BASE;

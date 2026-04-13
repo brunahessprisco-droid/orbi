@@ -1803,7 +1803,7 @@ const SK_AUTH='fin_auth_token_v1';
 const SK_API_BASE='fin_api_base_v1';
 let authToken=localStorage.getItem(SK_AUTH)||'';
 let API_USER_ID=null;
-function getApiBase(){return(localStorage.getItem(SK_API_BASE)||'http://localhost:3333/api').replace(/\/+$/,'');}
+function getApiBase(){return(localStorage.getItem(SK_API_BASE)||'https://orbi-api-b9ev.onrender.com/api').replace(/\/+$/,'');}
 
 function canUseApi(){return!!(authToken&&API_USER_ID);}
 

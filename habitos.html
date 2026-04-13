@@ -665,7 +665,7 @@
     <div class="auth-sub">Entre com seu e-mail e senha para continuar</div>
     <div class="auth-field"><label>E-mail</label><input id="auth-email" type="email" placeholder="voce@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="auth-field"><label>Senha</label><input id="auth-pass" type="password" placeholder="Sua senha" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div class="auth-field"><label>API (avançado)</label><input id="auth-api" type="text" placeholder="http://localhost:3333/api"></div>
+    <div class="auth-field"><label>API (avançado)</label><input id="auth-api" type="text" placeholder="https://orbi-api-b9ev.onrender.com/api"></div>
     <div class="auth-actions"><button class="btn btn-primary" onclick="doLogin()">Entrar</button></div>
     <div class="auth-err" id="auth-msg"></div>
   </div>
@@ -944,10 +944,10 @@
     const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
     let authToken=localStorage.getItem(SK_AUTH)||'';
-    let apiBase=localStorage.getItem(SK_API)||'http://localhost:3333/api';
+    let apiBase=localStorage.getItem(SK_API)||'https://orbi-api-b9ev.onrender.com/api';
     let API_USER_ID=null;
 
-    function getApiBase(){return(apiBase||'http://localhost:3333/api').replace(/\/+$/,'');}
+    function getApiBase(){return(apiBase||'https://orbi-api-b9ev.onrender.com/api').replace(/\/+$/,'');}
     function canUseApi(){return!!(authToken&&API_USER_ID);}
 
     async function apiReq(path,opts={}){

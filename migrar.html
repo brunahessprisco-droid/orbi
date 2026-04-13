@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ORBI — Migração de Dados</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',sans-serif;background:#1A1A1B;color:#F2EDE4;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.card{background:#252324;border:1px solid rgba(242,237,228,0.08);border-radius:16px;padding:32px;width:100%;max-width:560px;}
+h1{font-size:20px;font-weight:700;margin-bottom:4px;}
+.sub{font-size:13px;color:#AAB7B7;margin-bottom:28px;}
+.section{margin-bottom:24px;}
+.section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#87A28B;margin-bottom:12px;}
+label{display:block;font-size:12px;color:#AAB7B7;margin-bottom:4px;margin-top:10px;}
+input{width:100%;background:#2F2D2E;border:1px solid rgba(242,237,228,0.12);border-radius:8px;padding:9px 12px;color:#F2EDE4;font-size:13px;font-family:inherit;outline:none;}
+input:focus{border-color:#87A28B;}
+.checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.check-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#AAB7B7;cursor:pointer;}
+.check-item input[type=checkbox]{width:auto;accent-color:#87A28B;}
+.btn{display:block;width:100%;padding:12px;background:#87A28B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:20px;transition:opacity .15s;}
+.btn:hover{opacity:.85;}
+.btn:disabled{opacity:.4;cursor:default;}
+#log{margin-top:20px;background:#1A1A1B;border:1px solid rgba(242,237,228,0.08);border-radius:10px;padding:14px;font-family:monospace;font-size:12px;max-height:320px;overflow-y:auto;display:none;}
+.log-ok{color:#3dd9a5;}
+.log-err{color:#ff6b8a;}
+.log-info{color:#AAB7B7;}
+.log-warn{color:#f59e0b;}
+.progress{margin-top:12px;display:none;}
+.progress-bar-wrap{background:#2F2D2E;border-radius:4px;height:6px;overflow:hidden;}
+.progress-bar{height:100%;background:#87A28B;border-radius:4px;transition:width .3s;}
+.progress-label{font-size:11px;color:#AAB7B7;margin-top:6px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>ORBI — Migração de Dados</h1>
+  <p class="sub">Lê todos os dados do backend local e envia para o Render</p>
+
+  <div class="section">
+    <div class="section-title">Origem — Local (localhost)</div>
+    <label>URL da API local</label>
+    <input id="src-url" value="https://orbi-api-b9ev.onrender.com/api" placeholder="https://orbi-api-b9ev.onrender.com/api">
+    <label>E-mail</label>
+    <input id="src-email" type="email" placeholder="seu@email.com">
+    <label>Senha</label>
+    <input id="src-pass" type="password" placeholder="••••••••">
+  </div>
+
+  <div class="section">
+    <div class="section-title">Destino — Render</div>
+    <label>URL da API Render</label>
+    <input id="dst-url" value="https://orbi-api-b9ev.onrender.com/api" placeholder="https://...onrender.com/api">
+    <label>E-mail</label>
+    <input id="dst-email" type="email" placeholder="seu@email.com">
+    <label>Senha</label>
+    <input id="dst-pass" type="password" placeholder="••••••••">
+  </div>
+
+  <div class="section">
+    <div class="section-title">O que migrar</div>
+    <div class="checks">
+      <label class="check-item"><input type="checkbox" id="chk-fin" checked> Finanças</label>
+      <label class="check-item"><input type="checkbox" id="chk-ex" checked> Exercícios</label>
+    </div>
+  </div>
+
+  <button class="btn" id="btn-migrar" onclick="migrar()">Iniciar Migração</button>
+
+  <div class="progress" id="progress">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="pbar" style="width:0%"></div></div>
+    <div class="progress-label" id="plabel">Iniciando...</div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+let logEl, pbar, plabel;
+function log(msg, type='info'){
+  const el=document.getElementById('log');
+  el.style.display='block';
+  el.innerHTML+=`<div class="log-${type}">${msg}</div>`;
+  el.scrollTop=el.scrollHeight;
+}
+function setProgress(pct, label){
+  document.getElementById('progress').style.display='block';
+  document.getElementById('pbar').style.width=pct+'%';
+  document.getElementById('plabel').textContent=label;
+}
+
+async function login(base, email, pass){
+  const r=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,senha:pass})});
+  if(!r.ok) throw new Error(`Login falhou (${r.status}): ${await r.text()}`);
+  const d=await r.json();
+  return {token:d.token, userId:d.user.id};
+}
+
+async function get(base, token, path){
+  const r=await fetch(base+path,{headers:{Authorization:'Bearer '+token}});
+  if(!r.ok) throw new Error(`GET ${path} falhou (${r.status})`);
+  return r.json();
+}
+
+async function post(base, token, path, body){
+  const r=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)});
+  if(!r.ok){
+    const txt=await r.text();
+    throw new Error(`POST ${path} falhou (${r.status}): ${txt}`);
+  }
+  return r.json();
+}
+
+async function migrarFinancas(src, dst){
+  log('── Finanças ──────────────────', 'info');
+
+  // Categorias
+  setProgress(5,'Buscando categorias...');
+  const cats=await get(src.url, src.token, `/categorias?usuario_id=${src.userId}`);
+  log(`  Categorias: ${cats.length} encontradas`, 'info');
+  let erros=0;
+  for(const c of cats){
+    try{
+      await post(dst.url, dst.token, '/categorias', {usuario_id:dst.userId, client_id:c.client_id||c.id, nome:c.nome, cor:c.cor||'#7b9cff'});
+    }catch(e){log(`    ✗ cat "${c.nome}": ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${cats.length-erros} categorias migradas (${erros} erros)`, erros?'warn':'ok');
+
+  // Contas
+  setProgress(15,'Buscando contas...');
+  const contas=await get(src.url, src.token, `/contas?usuario_id=${src.userId}`);
+  log(`  Contas: ${contas.length} encontradas`, 'info');
+  erros=0;
+  for(const c of contas){
+    try{
+      await post(dst.url, dst.token, '/contas', {
+        usuario_id:dst.userId, client_id:c.client_id||c.id,
+        nome:c.nome, banco:c.banco||null, tipo:c.tipo||null,
+        vencimento:c.vencimento||null, limite_total:c.limite_total?Number(c.limite_total):null,
+        cor:c.cor||null, ativo:c.ativo!==false,
+      });
+    }catch(e){log(`    ✗ conta "${c.nome}": ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${contas.length-erros} contas migradas (${erros} erros)`, erros?'warn':'ok');
+
+  // Contas fixas
+  setProgress(25,'Buscando contas fixas...');
+  const fixas=await get(src.url, src.token, `/contas-fixas?usuario_id=${src.userId}`);
+  log(`  Contas Fixas: ${fixas.length} encontradas`, 'info');
+  erros=0;
+  for(const f of fixas){
+    try{
+      await post(dst.url, dst.token, '/contas-fixas', {
+        usuario_id:dst.userId, client_id:f.client_id||f.id,
+        nome:f.nome, valor_padrao:Number(f.valor_padrao)||0,
+        dia_venc:f.dia_venc||null, categoria_nome:f.categoria_nome,
+        conta_nome:f.conta_nome, cor:f.cor||null,
+        encerrado_apos:f.encerrado_apos||null,
+      });
+    }catch(e){log(`    ✗ fixa "${f.nome}": ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${fixas.length-erros} contas fixas migradas (${erros} erros)`, erros?'warn':'ok');
+
+  // Contas fixas valores
+  setProgress(35,'Buscando valores de contas fixas...');
+  const fixaVals=await get(src.url, src.token, `/contas-fixas-valores?usuario_id=${src.userId}`);
+  log(`  Valores de Fixas: ${fixaVals.length} encontradas`, 'info');
+  erros=0;
+  for(const v of fixaVals){
+    try{
+      await post(dst.url, dst.token, '/contas-fixas-valores', {
+        usuario_id:dst.userId,
+        fixa_client_id:v.fixa_client_id,
+        fatura:v.fatura,
+        valor_fatura:Number(v.valor_fatura)||0,
+      });
+    }catch(e){log(`    ✗ fixa-val "${v.fatura}": ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${fixaVals.length-erros} valores migrados (${erros} erros)`, erros?'warn':'ok');
+
+  // Transações
+  setProgress(45,'Buscando transações...');
+  const txs=await get(src.url, src.token, `/transacoes?usuario_id=${src.userId}`);
+  log(`  Transações: ${txs.length} encontradas`, 'info');
+  erros=0;
+  let ok=0;
+  for(const t of txs){
+    try{
+      await post(dst.url, dst.token, '/transacoes', {
+        usuario_id:dst.userId, client_id:t.client_id||t.id,
+        tipo:t.tipo, descricao:t.descricao,
+        valor:Number(t.valor)||0,
+        data_lancamento:t.data_lancamento instanceof Date ? t.data_lancamento.toISOString().slice(0,10) : String(t.data_lancamento).slice(0,10),
+        fatura:t.fatura, categoria_nome:t.categoria_nome, conta_nome:t.conta_nome,
+        observacao:t.observacao||null,
+        grupo_parcela_id:t.grupo_parcela_id||null,
+        n_parcelas:t.n_parcelas||null, parcela_atual:t.parcela_atual||null,
+        valor_parcela:t.valor_parcela?Number(t.valor_parcela):null,
+        conta_fixa_id:t.conta_fixa_id||null,
+      });
+      ok++;
+    }catch(e){log(`    ✗ tx "${t.descricao}" (${String(t.data_lancamento).slice(0,10)}): ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${ok} transações migradas (${erros} erros)`, erros?'warn':'ok');
+
+  // Orçamentos
+  setProgress(65,'Buscando orçamentos...');
+  const orcamentos=await get(src.url, src.token, `/orcamentos-config?usuario_id=${src.userId}`);
+  log(`  Orçamentos: ${orcamentos.length} encontrados`, 'info');
+  erros=0;
+  for(const o of orcamentos){
+    try{
+      await post(dst.url, dst.token, '/orcamentos-config', {
+        usuario_id:dst.userId, categoria_nome:o.categoria_nome, limite_valor:Number(o.limite_valor)||0,
+      });
+    }catch(e){log(`    ✗ orcamento "${o.categoria_nome}": ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${orcamentos.length-erros} orçamentos migrados (${erros} erros)`, erros?'warn':'ok');
+
+  // Saving goal
+  setProgress(70,'Buscando meta de poupança...');
+  try{
+    const sg=await get(src.url, src.token, `/settings/saving-goal?usuario_id=${src.userId}`);
+    if(Number(sg.saving_goal)>0){
+      await post(dst.url, dst.token, '/settings/saving-goal', {usuario_id:dst.userId, saving_goal:Number(sg.saving_goal)});
+      log(`  ✓ Meta de poupança: R$ ${sg.saving_goal}`, 'ok');
+    } else { log(`  – Meta de poupança: zero, pulando`, 'info'); }
+  }catch(e){log(`  ✗ saving-goal: ${e.message}`,'err');}
+
+  // Poupança
+  setProgress(73,'Buscando poupança...');
+  try{
+    const p=await get(src.url, src.token, `/poupanca?usuario_id=${src.userId}`);
+    const hasPoupanca=Number(p.meta||0)>0||Object.keys(p.previsto||{}).length>0||Object.keys(p.realizado||{}).length>0;
+    if(hasPoupanca){
+      await post(dst.url, dst.token, '/poupanca', {usuario_id:dst.userId, meta:Number(p.meta||0), previsto:p.previsto||{}, realizado:p.realizado||{}});
+      log(`  ✓ Poupança migrada`, 'ok');
+    } else { log(`  – Poupança: vazia, pulando`, 'info'); }
+  }catch(e){log(`  ✗ poupanca: ${e.message}`,'err');}
+
+  // Projeção extras
+  setProgress(76,'Buscando projeções...');
+  try{
+    const projs=await get(src.url, src.token, `/projecao-extras?usuario_id=${src.userId}`);
+    log(`  Projeções extras: ${projs.length} encontradas`, 'info');
+    erros=0;
+    for(const p of projs){
+      try{
+        await post(dst.url, dst.token, '/projecao-extras', {
+          usuario_id:dst.userId, client_id:p.client_id||p.id,
+          nome:p.nome, valor:Number(p.valor)||0, ativo:p.ativo!==false,
+        });
+      }catch(e){log(`    ✗ proj "${p.nome}": ${e.message}`,'err');erros++;}
+    }
+    log(`  ✓ ${projs.length-erros} projeções migradas (${erros} erros)`, erros?'warn':'ok');
+  }catch(e){log(`  ✗ projecao-extras: ${e.message}`,'err');}
+}
+
+async function migrarExercicios(src, dst){
+  log('── Exercícios ────────────────', 'info');
+
+  // Locais
+  setProgress(80,'Buscando locais de treino...');
+  const locais=await get(src.url, src.token, `/locais-treino?usuario_id=${src.userId}`);
+  log(`  Locais: ${locais.length} encontrados`, 'info');
+  let erros=0;
+  for(const l of locais){
+    try{
+      await post(dst.url, dst.token, '/locais-treino', {usuario_id:dst.userId, client_id:l.client_id||l.id, nome:l.nome});
+    }catch(e){log(`    ✗ local "${l.nome}": ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${locais.length-erros} locais migrados (${erros} erros)`, erros?'warn':'ok');
+
+  // Tipos
+  setProgress(85,'Buscando tipos de exercício...');
+  const tipos=await get(src.url, src.token, `/tipos-exercicio?usuario_id=${src.userId}`);
+  log(`  Tipos: ${tipos.length} encontrados`, 'info');
+  erros=0;
+  for(const t of tipos){
+    try{
+      await post(dst.url, dst.token, '/tipos-exercicio', {usuario_id:dst.userId, client_id:t.client_id||t.id, nome:t.nome, cat:t.cat});
+    }catch(e){log(`    ✗ tipo "${t.nome}": ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${tipos.length-erros} tipos migrados (${erros} erros)`, erros?'warn':'ok');
+
+  // Treinos
+  setProgress(90,'Buscando treinos...');
+  const treinos=await get(src.url, src.token, `/treinos?usuario_id=${src.userId}`);
+  log(`  Treinos: ${treinos.length} encontrados`, 'info');
+  erros=0;
+  let ok=0;
+  for(const t of treinos){
+    try{
+      await post(dst.url, dst.token, '/treinos', {
+        usuario_id:dst.userId, client_id:t.client_id||t.id,
+        titulo:t.titulo, data:String(t.data).slice(0,10),
+        hora_inicio:t.hora_inicio||null, hora_fim:t.hora_fim||null,
+        duracao:t.duracao||null, tipo_cat:t.tipo_cat||'cardio',
+        tipo_ex:t.tipo_ex||null, calorias:t.calorias||null,
+        km:t.km?Number(t.km):null, local_nome:t.local_nome||null,
+        descricao:t.descricao||null, obs:t.obs||null,
+      });
+      ok++;
+    }catch(e){log(`    ✗ treino "${t.titulo}" (${String(t.data).slice(0,10)}): ${e.message}`,'err');erros++;}
+  }
+  log(`  ✓ ${ok} treinos migrados (${erros} erros)`, erros?'warn':'ok');
+}
+
+async function migrar(){
+  const btn=document.getElementById('btn-migrar');
+  btn.disabled=true;
+  document.getElementById('log').innerHTML='';
+  document.getElementById('log').style.display='none';
+
+  const srcUrl=(document.getElementById('src-url').value||'').replace(/\/+$/,'');
+  const srcEmail=document.getElementById('src-email').value.trim();
+  const srcPass=document.getElementById('src-pass').value;
+  const dstUrl=(document.getElementById('dst-url').value||'').replace(/\/+$/,'');
+  const dstEmail=document.getElementById('dst-email').value.trim();
+  const dstPass=document.getElementById('dst-pass').value;
+  const migFin=document.getElementById('chk-fin').checked;
+  const migEx=document.getElementById('chk-ex').checked;
+
+  if(!srcEmail||!srcPass||!dstEmail||!dstPass){
+    alert('Preencha todos os campos de e-mail e senha.');
+    btn.disabled=false;
+    return;
+  }
+
+  try{
+    setProgress(2,'Autenticando no local...');
+    log('Autenticando no backend local...', 'info');
+    const src=await login(srcUrl, srcEmail, srcPass);
+    src.url=srcUrl;
+    log(`✓ Local: usuário ${src.userId}`, 'ok');
+
+    setProgress(4,'Autenticando no Render...');
+    log('Autenticando no Render...', 'info');
+    const dst=await login(dstUrl, dstEmail, dstPass);
+    dst.url=dstUrl;
+    log(`✓ Render: usuário ${dst.userId}`, 'ok');
+
+    if(migFin) await migrarFinancas(src, dst);
+    if(migEx)  await migrarExercicios(src, dst);
+
+    setProgress(100,'Concluído!');
+    log('', 'info');
+    log('✓ Migração concluída! Você já pode usar o Render.', 'ok');
+  }catch(e){
+    log('ERRO FATAL: '+e.message, 'err');
+    setProgress(0,'Erro — verifique o log acima');
+  }
+  btn.disabled=false;
+}
+</script>
+</body>
+</html>

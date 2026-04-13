@@ -273,7 +273,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
 
     <div class="auth-field">
       <label>API (avançado)</label>
-      <input id="auth-api" type="text" placeholder="http://localhost:3333/api">
+      <input id="auth-api" type="text" placeholder="https://orbi-api-b9ev.onrender.com/api">
     </div>
 
     <div class="auth-actions">
@@ -431,7 +431,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
 <script>
 const API_BASE_KEY='fin_api_base_v1';
 const AUTH_KEY='fin_auth_token_v1';
-function getApiBase(){return localStorage.getItem(API_BASE_KEY)||'http://localhost:3333/api';}
+function getApiBase(){return localStorage.getItem(API_BASE_KEY)||'https://orbi-api-b9ev.onrender.com/api';}
 
 let AUTH_MODE = 'login';
 
@@ -513,7 +513,7 @@ function hIcon(icon){if(!icon)return'<i class="bi bi-stars"></i>';if(icon.starts
 
 async function fetchFinancas(){
   const token=localStorage.getItem(AUTH_KEY);
-  const base=localStorage.getItem(API_BASE_KEY)||'http://localhost:3333/api';
+  const base=localStorage.getItem(API_BASE_KEY)||'https://orbi-api-b9ev.onrender.com/api';
   if(!token)return;
   try{
     const r=await fetch(`${base}/transacoes?usuario_id=${getUserId()}`,{headers:{Authorization:'Bearer '+token}});
