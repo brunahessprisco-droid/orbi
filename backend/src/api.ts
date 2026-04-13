@@ -67,7 +67,7 @@ export const apiRouter = express.Router();
 
 apiRouter.get("/admin/users", async (req, res) => {
   const secret = req.query.secret as string;
-  if (!secret || secret !== (process.env.ADMIN_SECRET || "orbi-admin-2025")) {
+  if (!secret || !process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: "FORBIDDEN" });
   }
   const users = await prisma.user.findMany({
@@ -79,7 +79,7 @@ apiRouter.get("/admin/users", async (req, res) => {
 
 apiRouter.post("/admin/create-invite", async (req, res) => {
   const { adminSecret, code, intendedEmail, intendedName } = req.body as Record<string, string>;
-  if (!adminSecret || adminSecret !== (process.env.ADMIN_SECRET || "orbi-admin-2025")) {
+  if (!adminSecret || !process.env.ADMIN_SECRET || adminSecret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: "FORBIDDEN" });
   }
   const inviteCode = code || ("ORBI-" + Math.random().toString(36).slice(2, 8).toUpperCase());
@@ -233,7 +233,7 @@ apiRouter.get("/auth/me", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 apiRouter.post("/auth/logout", requireAuth, async (req: AuthedRequest, res) => {
-  await prisma.session.delete({ where: { token: req.sessionToken! } }).catch(() => null);
+  await prisma.session.delete({ where: { token: req.sessionToken! } });
   res.json({ ok: true });
 });
 

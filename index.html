@@ -521,7 +521,7 @@ async function submitAuth(){
   }
 }
 
-function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; localStorage.removeItem(AUTH_KEY); location.reload(); }
+function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
 function toggleTheme(){ const isDark=document.documentElement.getAttribute('data-theme')==='dark'; const next=isDark?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('app_theme',next); }
 function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.innerHTML=on?'<i class="bi bi-eye-slash-fill"></i>':'<i class="bi bi-eye-fill"></i>'; }
 function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
@@ -546,7 +546,7 @@ async function hubBootstrap(){
   const uid=localStorage.getItem('hub_user_id');
   const base=getApiBase();
   if(!token||!uid)return;
-  const h=url=>fetch(`${base}${url}`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.ok?r.json():[]).catch(()=>[]);
+  const h=url=>fetch(`${base}${url}`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.ok?r.json():null).catch(()=>null);
   try{
     const[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC]=await Promise.all([
       h(`/treinos?usuario_id=${uid}`),
@@ -567,12 +567,12 @@ async function hubBootstrap(){
     const weights=rWArr.map(r=>({id:r.client_id||r.id,_dbId:r.id,date:typeof r.date==='string'?r.date.slice(0,10):new Date(r.date).toISOString().slice(0,10),weight:r.weight!=null?Number(r.weight):null,fat:r.fat!=null?Number(r.fat):null,height:r.height!=null?Number(r.height):null}));
     const exams=(Array.isArray(rE)?rE:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',status:r.status||'',date:(r.date||'').slice(0,10)}));
     const consults=(Array.isArray(rC)?rC:[]).map(r=>({id:r.client_id,_dbId:r.id,date:(r.date||'').slice(0,10),time:r.time||'',specialty:r.especialidade||'',status:r.status||''}));
-    _lsSet('saude_treinos_v1',JSON.stringify(treinos));
-    _lsSet('casinha_tarefas',JSON.stringify(tarefas));
-    _lsSet('habitos_app_v5',JSON.stringify(habitos));
-    _lsSet('alimentacao_meals_v3_light',JSON.stringify(meals));
-    _lsSet('alimentacao_plan_v3_light',JSON.stringify(plan));
-    _lsSet('saude_app_v1',JSON.stringify({weights,exams,consults,doctors:[]}));
+    if(rTre!==null) _lsSet('saude_treinos_v1',JSON.stringify(treinos));
+    if(rTar!==null) _lsSet('casinha_tarefas',JSON.stringify(tarefas));
+    if(rHab!==null) _lsSet('habitos_app_v5',JSON.stringify(habitos));
+    if(rAli!==null) _lsSet('alimentacao_meals_v3_light',JSON.stringify(meals));
+    if(rCfg!==null) _lsSet('alimentacao_plan_v3_light',JSON.stringify(plan));
+    if(rW!==null&&rE!==null&&rC!==null) _lsSet('saude_app_v1',JSON.stringify({weights,exams,consults,doctors:[]}));
     rendTodaySummary(); rendCal();
   }catch(e){console.warn('Hub bootstrap:',e);}
   hubBootstrapGcal();
