@@ -775,7 +775,7 @@ async function logoutUser(){
 }
 
 // ── DADOS ────────────────────────────────────────────────────────────────────
-const SK_T='saude_treinos_v1',SK_L='saude_locais_v1',SK_TP='saude_tipos_v1';
+const SK_T='saude_treinos_v1',SK_L='saude_locais_v1',SK_TP='saude_tipos_v1',SK_DIRTY='saude_treinos_dirty_v1';
 // storage helpers – isolamento por usuário
 function _uid(){return localStorage.getItem('hub_user_id')||'anon';}
 function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
@@ -830,6 +830,9 @@ function saveLocal_(){
   lsSet(SK_L,JSON.stringify(locais));
   lsSet(SK_TP,JSON.stringify(tipos));
 }
+function getDirty(){return new Set(JSON.parse(lsGet(SK_DIRTY)||'[]'));}
+function markDirty(id){const s=getDirty();s.add(id);lsSet(SK_DIRTY,JSON.stringify([...s]));}
+function clearDirty(id){const s=getDirty();s.delete(id);lsSet(SK_DIRTY,JSON.stringify([...s]));}
 
 function setStatus(msg,err=false){
   const el=document.getElementById('sync-status');
@@ -892,6 +895,19 @@ async function bootstrapApi(){
       syncTreino(t).catch(()=>null);
     }
     if(naoSincronizados.length)console.log(`Migração exercícios: ${naoSincronizados.length} treinos enviados ao banco`);
+    // Restaurar edições locais pendentes (sync falhou antes)
+    const dirty=getDirty();
+    if(dirty.size>0){
+      const localById=Object.fromEntries(localCache.map(t=>[t.id,t]));
+      treinos=treinos.map(t=>{
+        if(dirty.has(t.id)&&localById[t.id]){
+          const local=localById[t.id];
+          syncTreino(local).then(()=>clearDirty(local.id)).catch(()=>null);
+          return local;
+        }
+        return t;
+      });
+    }
     saveLocal_();
     setStatus(null);
   }catch(e){
@@ -1764,7 +1780,15 @@ async function saveTreino(){
   if(editTreinoId)treinos=treinos.map(t=>t.id===editTreinoId?obj:t);
   else treinos.unshift(obj);
   saveLocal_();
-  await syncTreino(obj).catch(e=>console.error(e));
+  markDirty(obj.id);
+  try{
+    await syncTreino(obj);
+    clearDirty(obj.id);
+  }catch(e){
+    console.error(e);
+    setStatus('Alterações salvas localmente (sync pendente: '+e.message+')',true);
+    setTimeout(()=>setStatus(null),6000);
+  }
   renderAll();closeOv('ov-treino');
 }
 async function delTreino(id){
