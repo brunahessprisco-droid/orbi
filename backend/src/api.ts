@@ -1259,27 +1259,60 @@ apiRouter.delete("/google/disconnect", requireAuth, async (req: AuthedRequest, r
   return res.status(204).send();
 });
 
+apiRouter.get("/google/calendars", requireAuth, async (req: AuthedRequest, res) => {
+  const token = await googleRefreshIfNeeded(req.userId!).catch(e => { throw e; });
+  const gr = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50", {
+    headers: { Authorization: `Bearer ${token.accessToken}` },
+  });
+  if (!gr.ok) return res.status(400).json({ error: "GOOGLE_FETCH_ERROR", detail: await gr.text() });
+  const data = await gr.json() as { items?: Array<{ id: string; summary?: string; primary?: boolean; selected?: boolean; backgroundColor?: string }> };
+  const calendars = (data.items || []).map(c => ({ id: c.id, name: c.summary || c.id, primary: !!c.primary, color: c.backgroundColor || null }));
+  return res.json(calendars);
+});
+
 apiRouter.get("/google/events", requireAuth, async (req: AuthedRequest, res) => {
   const token = await googleRefreshIfNeeded(req.userId!).catch(e => { throw e; });
-  // Fetch events for the next/past 60 days window
   const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=250`;
-  const gr = await fetch(url, { headers: { Authorization: `Bearer ${token.accessToken}` } });
-  if (!gr.ok) return res.status(400).json({ error: "GOOGLE_FETCH_ERROR", detail: await gr.text() });
-  const data = await gr.json() as { items?: Array<{ id: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; hangoutLink?: string; htmlLink?: string; status?: string }> };
-  const events = (data.items || [])
-    .filter(e => e.status !== "cancelled")
-    .map(e => {
-      const startRaw = e.start?.dateTime || e.start?.date || "";
-      const endRaw   = e.end?.dateTime   || e.end?.date   || "";
-      const allDay   = !e.start?.dateTime;
-      const date     = startRaw.slice(0, 10);
-      const time     = allDay ? "" : startRaw.slice(11, 16);
-      const endTime  = allDay ? "" : endRaw.slice(11, 16);
-      return { id: e.id, title: e.summary || "Sem título", date, time, endTime, allDay, meetUrl: e.hangoutLink || null, htmlLink: e.htmlLink || null };
-    });
-  return res.json(events);
+
+  type GCalEvent = { id: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; hangoutLink?: string; htmlLink?: string; status?: string };
+
+  // Fetch calendar list first, then events from all selected calendars
+  const calListRes = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50", {
+    headers: { Authorization: `Bearer ${token.accessToken}` },
+  });
+  let calendarIds = ["primary"];
+  if (calListRes.ok) {
+    const calList = await calListRes.json() as { items?: Array<{ id: string; selected?: boolean; accessRole?: string }> };
+    calendarIds = (calList.items || [])
+      .filter(c => c.selected !== false && (c.accessRole === "owner" || c.accessRole === "writer" || c.accessRole === "reader"))
+      .map(c => c.id);
+    if (!calendarIds.length) calendarIds = ["primary"];
+  }
+
+  const allEvents: ReturnType<typeof mapEvent>[] = [];
+  function mapEvent(e: GCalEvent, calId: string) {
+    const startRaw = e.start?.dateTime || e.start?.date || "";
+    const endRaw   = e.end?.dateTime   || e.end?.date   || "";
+    const allDay   = !e.start?.dateTime;
+    const date     = startRaw.slice(0, 10);
+    const time     = allDay ? "" : startRaw.slice(11, 16);
+    const endTime  = allDay ? "" : endRaw.slice(11, 16);
+    return { id: `${calId}::${e.id}`, title: e.summary || "Sem título", date, time, endTime, allDay, meetUrl: e.hangoutLink || null, htmlLink: e.htmlLink || null };
+  }
+
+  await Promise.all(calendarIds.map(async calId => {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=250`;
+    const gr = await fetch(url, { headers: { Authorization: `Bearer ${token.accessToken}` } });
+    if (!gr.ok) return;
+    const data = await gr.json() as { items?: GCalEvent[] };
+    (data.items || []).filter(e => e.status !== "cancelled").forEach(e => allEvents.push(mapEvent(e, calId)));
+  }));
+
+  // Deduplicate by date+time+title in case same event appears in multiple calendars
+  const seen = new Set<string>();
+  const unique = allEvents.filter(e => { const k = `${e.date}|${e.time}|${e.title}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  return res.json(unique);
 });
 
 // ── STRAVA ───────────────────────────────────────────────────────────────────
