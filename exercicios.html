@@ -709,9 +709,9 @@ async function apiReq(path,opts={}){
   if(authToken)headers.Authorization='Bearer '+authToken;
   let res;
   try{res=await fetch(getApiBase()+path,{...opts,headers});}
-  catch(e){throw new Error(`Falha ao acessar API (${e.message||'erro de rede'})`);}
+  catch(e){const err=new Error(`Falha ao acessar API (${e.message||'erro de rede'})`);err.network=true;throw err;}
   if(!res.ok){
-    let msg='Erro na API';
+    let msg='Erro na API ('+res.status+')';
     try{const j=await res.json();msg=j.detail||j.error||msg;}catch(_){}
     throw new Error(msg);
   }
@@ -724,7 +724,7 @@ async function apiReqRetry(path,opts={},maxTries=4){
   for(let i=0;i<maxTries;i++){
     try{return await apiReq(path,opts);}
     catch(e){
-      if(i===maxTries-1)throw e;
+      if(!e.network||i===maxTries-1){setStatus('Erro: '+e.message,true);setTimeout(()=>setStatus(null),6000);throw e;}
       setStatus(`Servidor acordando, aguarde... (${i+1}/${maxTries-1})`,true);
       await new Promise(r=>setTimeout(r,delays[i]||15000));
     }
