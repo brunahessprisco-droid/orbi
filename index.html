@@ -38,6 +38,7 @@
   --cas-c:#E98A73;--cas-bg:rgba(233,138,115,0.12);--cas-border:rgba(233,138,115,0.25);
   --ali-c:#87A28B;--ali-bg:rgba(135,162,139,0.12);--ali-border:rgba(135,162,139,0.25);
   --sau-c:#3E4A59;--sau-bg:rgba(62,74,89,0.15);--sau-border:rgba(62,74,89,0.3);
+  --gcal-c:#4285f4;--gcal-bg:rgba(66,133,244,0.12);--gcal-border:rgba(66,133,244,0.25);
   --radius:16px;--radius-sm:10px;--mono:"DM Mono",monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -109,6 +110,7 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .cal-dot.sau{background:var(--sau-bg);color:var(--sau-c);}
 .cal-dot.hab{background:var(--hab-bg);color:var(--hab-c);}
 .cal-dot.ali{background:var(--ali-bg);color:var(--ali-c);}
+.cal-dot.gcal{background:var(--gcal-bg);color:var(--gcal-c);}
 .popup-section-title.sau{color:var(--sau-c);}
 .popup-section-title.hab{color:var(--hab-c);}
 .popup-section-title.ali{color:var(--ali-c);}
@@ -336,6 +338,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <button class="filter-btn" data-f="cas" onclick="setFilter('cas',this)"><img src="assets/Casinha.png" alt="Casa/Tarefas"></button>
         <button class="filter-btn" data-f="ali" onclick="setFilter('ali',this)"><img src="assets/Alimentação.png" alt="Alimentação"></button>
         <button class="filter-btn" data-f="sau" onclick="setFilter('sau',this)"><img src="assets/Saúde.png" alt="Saúde"></button>
+        <button class="filter-btn" data-f="gcal" onclick="setFilter('gcal',this)" id="filter-gcal" style="display:none">📅</button>
       </div>
     </div>
     <!-- Bottom: today card (2/6) + calendar (4/6) -->
@@ -423,6 +426,21 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <div class="profile-field"><label>Confirmar nova senha</label><input id="pf-senha-conf" type="password" placeholder="Repita a nova senha"></div>
         <button class="profile-btn" onclick="changePassword()">Alterar senha</button>
         <div class="profile-msg" id="pf-pass-msg"></div>
+      </div>
+      <hr class="profile-divider">
+      <div class="profile-section">
+        <div class="profile-section-title">Integrações</div>
+        <div id="gcal-connect-section" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:20px;">📅</span>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Google Calendar</div>
+              <div id="gcal-status-text" style="font-size:11px;color:var(--muted);">Não conectado</div>
+            </div>
+          </div>
+          <button id="gcal-connect-btn" class="profile-btn" style="margin:0;padding:6px 14px;font-size:12px;" onclick="connectGoogleCalendar()">Conectar</button>
+        </div>
+        <div class="profile-msg" id="pf-gcal-msg"></div>
       </div>
     </div>
   </div>
@@ -557,6 +575,78 @@ async function hubBootstrap(){
     _lsSet('saude_app_v1',JSON.stringify({weights,exams,consults,doctors:[]}));
     rendTodaySummary(); rendCal();
   }catch(e){console.warn('Hub bootstrap:',e);}
+  hubBootstrapGcal();
+}
+
+async function hubBootstrapGcal(){
+  const token=localStorage.getItem(AUTH_KEY);
+  if(!token)return;
+  try{
+    const r=await fetch(`${getApiBase()}/google/events`,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)return;
+    const events=await r.json();
+    if(Array.isArray(events)){
+      _lsSet('hub_gcal_events',JSON.stringify(events));
+      rendTodaySummary(); rendCal();
+    }
+  }catch(e){console.warn('GCal bootstrap:',e);}
+}
+
+const GOOGLE_CLIENT_ID_PUB='907511453265-19fjjgaa5eiqds1fbi16ug7lae31jt97.apps.googleusercontent.com';
+const GCAL_REDIRECT_URI='https://orbi-two-xi.vercel.app/index.html';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.readonly';
+
+function connectGoogleCalendar(){
+  const state=Math.random().toString(36).slice(2);
+  _lsSet('gcal_oauth_state',state);
+  const params=new URLSearchParams({
+    client_id:GOOGLE_CLIENT_ID_PUB,
+    redirect_uri:GCAL_REDIRECT_URI,
+    response_type:'code',
+    scope:GCAL_SCOPE,
+    access_type:'offline',
+    prompt:'consent',
+    state,
+  });
+  window.location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
+}
+
+async function disconnectGoogleCalendar(){
+  const token=localStorage.getItem(AUTH_KEY);
+  if(!token)return;
+  try{
+    await fetch(`${getApiBase()}/google/disconnect`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+    _lsSet('hub_gcal_events','[]');
+    updateGcalUI(false);
+    rendTodaySummary(); rendCal();
+    document.getElementById('pf-gcal-msg').textContent='Google Calendar desconectado.';
+  }catch(e){document.getElementById('pf-gcal-msg').textContent='Erro ao desconectar.';}
+}
+
+function updateGcalUI(connected){
+  const statusEl=document.getElementById('gcal-status-text');
+  const btn=document.getElementById('gcal-connect-btn');
+  const filterBtn=document.getElementById('filter-gcal');
+  if(connected){
+    if(statusEl)statusEl.textContent='Conectado';
+    if(btn){btn.textContent='Desconectar';btn.onclick=disconnectGoogleCalendar;btn.style.background='var(--red-bg)';btn.style.color='var(--red)';}
+    if(filterBtn)filterBtn.style.display='';
+  }else{
+    if(statusEl)statusEl.textContent='Não conectado';
+    if(btn){btn.textContent='Conectar';btn.onclick=connectGoogleCalendar;btn.style.background='';btn.style.color='';}
+    if(filterBtn)filterBtn.style.display='none';
+  }
+}
+
+async function checkGcalStatus(){
+  const token=localStorage.getItem(AUTH_KEY);
+  if(!token)return;
+  try{
+    const r=await fetch(`${getApiBase()}/google/status`,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)return;
+    const{connected}=await r.json();
+    updateGcalUI(connected);
+  }catch(e){}
 }
 
 async function fetchFinancas(){
@@ -584,6 +674,7 @@ async function fetchFinancas(){
 function getUserId(){ return localStorage.getItem('hub_user_id')||''; }
 function ds(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function sortT(arr,field){return [...arr].sort((a,b)=>(a[field]||'').localeCompare(b[field]||''));}
+function loadGoogleEvents(){ try{return JSON.parse(_lsGet('hub_gcal_events')||'[]');}catch{return [];} }
 function getDayData(dateStr){
   const allTxs=loadTxs();
   const txs=allTxs.filter(t=>t.data===dateStr&&t.tipo!=='receita');
@@ -610,7 +701,8 @@ function getDayData(dateStr){
   const habitosFeitos=todosHabitos.filter(h=>h.logs&&h.logs[dateStr]);
   const refeicoes=sortT(loadAlimentacao().filter(m=>m.date===dateStr),'time');
   const planSlots=getMealPlanForDate(dateStr);
-  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,planSlots};
+  const gcalEvents=sortT(loadGoogleEvents().filter(e=>e.date===dateStr),'time');
+  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,planSlots,gcalEvents};
 }
 
 let calFilter='todos';
@@ -651,6 +743,7 @@ function rendCal(){
     if((f==='todos'||f==='sau')&&(day.pesos.length||day.consultas.length||day.exames.length)){const parts=[];if(day.pesos.length)parts.push(day.pesos[0].weight?`<span class="sensitive">${day.pesos[0].weight}kg</span>`:'Peso');if(day.consultas.length)parts.push(`${day.consultas.length} consulta${day.consultas.length!==1?'s':''}`);dots.push(`<div class="cal-dot sau">${_ci('assets/Saúde.png')} ${parts.join(' · ')}</div>`);}
     if((f==='todos'||f==='hab')&&day.habitosFeitos.length){dots.push(`<div class="cal-dot hab">${_ci('assets/Hábitos.png')} ${day.habitosFeitos.length}/${day.todosHabitos.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
     if((f==='todos'||f==='ali')&&day.refeicoes.length){const kcal=day.refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);dots.push(`<div class="cal-dot ali">${_ci('assets/Alimentação.png')} ${day.refeicoes.length} ref${kcal?` · ${fmtNum(kcal)} kcal`:''}</div>`);}
+    if((f==='todos'||f==='gcal')&&day.gcalEvents.length){dots.push(`<div class="cal-dot gcal">📅 ${day.gcalEvents.length} evento${day.gcalEvents.length!==1?'s':''}</div>`);}
     const hasData=dots.length>0;
     const MAX=4; const visible=dots.slice(0,MAX); const extra=dots.length>MAX?`<div class="cal-more">+${dots.length-MAX} mais</div>`:'';
     return`<div class="cal-day${isToday?' today':''}${hasData?' has-data':''}" onclick="openDay('${day.dateStr}')"><div class="cal-day-num">${day.date.getDate()}</div><div class="cal-dots">${visible.join('')}${extra}</div></div>`;
@@ -658,8 +751,8 @@ function rendCal(){
 }
 
 function openDay(dateStr){
-  const{receitas,despesas,parcelados,treinos,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes}=getDayData(dateStr);
-  const hasAny=receitas.length||despesas.length||parcelados.length||treinos.length||tarefas.length||pesos.length||exames.length||consultas.length||habitosFeitos.length||refeicoes.length;
+  const{receitas,despesas,parcelados,treinos,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,gcalEvents}=getDayData(dateStr);
+  const hasAny=receitas.length||despesas.length||parcelados.length||treinos.length||tarefas.length||pesos.length||exames.length||consultas.length||habitosFeitos.length||refeicoes.length||gcalEvents.length;
   const[y,mo,d]=dateStr.split('-'); const dateObj=new Date(Number(y),Number(mo)-1,Number(d)); const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   document.getElementById('popup-title').textContent=DIAS[dateObj.getDay()]+', '+Number(d)+' de '+MESES[Number(mo)-1];
   document.getElementById('popup-date').textContent=dateStr.split('-').reverse().join('/');
@@ -673,6 +766,7 @@ function openDay(dateStr){
   if(pesos.length||consultas.length||exames.length){ const p=[];if(pesos.length&&pesos[0].weight)p.push(`<span class="sensitive">${pesos[0].weight}kg</span>`);if(consultas.length)p.push(`${consultas.length} consulta${consultas.length!==1?'s':''}`); chips.push(`<div class="popup-sum-chip sau">${_ci(_MI.sau)}${p.join(' · ')||'Saúde'}</div>`); }
   if(habitosFeitos.length) chips.push(`<div class="popup-sum-chip hab">${_ci(_MI.hab)}${habitosFeitos.length}/${todosHabitos.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
   if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); chips.push(`<div class="popup-sum-chip ali">${_ci(_MI.ali)}${refeicoes.length} refeição${refeicoes.length!==1?'ões':''} · ${fmtNum(kcal)} kcal</div>`); }
+  if(gcalEvents.length) chips.push(`<div class="popup-sum-chip" style="background:var(--gcal-bg);color:var(--gcal-c);border:1px solid var(--gcal-border);">📅 ${gcalEvents.length} evento${gcalEvents.length!==1?'s':''}</div>`);
   let html=`<div class="popup-summary">${chips.join('')}</div>`;
   if(receitas.length){ html+=`<div class="popup-section"><div class="popup-section-title fin">${_ci(_MI.fin,12)}Receitas</div>${receitas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val green">+ <span class="sensitive">${fmt(t.valor)}</span></div></div>`).join('')}</div>`; }
   if(despesas.length){ html+=`<div class="popup-section"><div class="popup-section-title" style="color:var(--red);">${_ci(_MI.fin,12)}Despesas</div>${despesas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val red">- <span class="sensitive">${fmt(t.valor)}</span></div></div>`).join('')}</div>`; }
@@ -696,6 +790,7 @@ function openDay(dateStr){
     html+=habPopHtml;
   }
   if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); html+=`<div class="popup-section"><div class="popup-section-title ali">${_ci(_MI.ali,12)}Alimentação · ${fmtNum(kcal)} kcal</div>${refeicoes.map(r=>`<div class="popup-item"><div class="popup-item-name">${r.name||'Refeição'}</div><div class="popup-item-val amber">${r.calories?fmtNum(r.calories)+' kcal':''}</div></div>`).join('')}</div>`; }
+  if(gcalEvents.length){ html+=`<div class="popup-section"><div class="popup-section-title" style="color:var(--gcal-c);">📅 Google Calendar</div>${gcalEvents.map(e=>{const timeStr=e.time?`${e.time}${e.endTime?' – '+e.endTime:''}`:e.allDay?'Dia inteiro':'';const meetLink=e.meetUrl?`<a href="${e.meetUrl}" target="_blank" rel="noopener" style="color:var(--gcal-c);font-size:10px;text-decoration:none;margin-left:6px;">🔗 Meet</a>`:'';return`<div class="popup-item"><div class="popup-item-name">${e.title}${meetLink}</div><div class="popup-item-val muted">${timeStr}</div></div>`;}).join('')}</div>`; }
   document.getElementById('popup-body').innerHTML=html; document.getElementById('ov-day').classList.add('open');
 }
 function closeOv(){document.getElementById('ov-day').classList.remove('open');}
@@ -783,7 +878,7 @@ function rendTodaySummary(){
   const todayStr=ds(new Date());
   const cardStr=ds(cardDate);
   const isToday=cardStr===todayStr;
-  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,planSlots}=getDayData(cardStr);
+  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,planSlots,gcalEvents}=getDayData(cardStr);
   const f=calFilter;
   const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   const el=document.getElementById('today-summary');
@@ -837,6 +932,12 @@ function rendTodaySummary(){
     despesas.forEach(t=>item(null,'var(--red)',t.descricao,t.categoria||'',`- <span class="sensitive">${fmt(t.valor)}</span>`,'red',{module:'financas.html'}));
     parcelados.forEach(t=>item(null,'var(--fin-c)',t.descricao,t.categoria||'',`- <span class="sensitive">${fmt(t.valorParcela)}</span>`,'amber',{module:'financas.html'}));
   }
+  if(f==='todos'||f==='gcal'){
+    gcalEvents.forEach(e=>{
+      const timeStr=e.time?`${e.time}${e.endTime?' – '+e.endTime:''}`:e.allDay?'dia inteiro':'';
+      item(e.time||null,'var(--gcal-c)',e.title,'',timeStr,'muted',{externalUrl:e.meetUrl||e.htmlLink||null});
+    });
+  }
 
   // Ordena: com hora primeiro (cronológico), sem hora depois
   const comHora=items.filter(i=>i.time).sort((a,b)=>a.time.localeCompare(b.time));
@@ -844,8 +945,8 @@ function rendTodaySummary(){
 
   const MODULE_ICONS={'exercicios.html':'assets/Exercício.png','casinha.html':'assets/Casinha.png','Alimentacao.html':'assets/Alimentação.png','Saude.html':'assets/Saúde.png','financas.html':'assets/Finanças.png','habitos.html':'assets/Hábitos.png'};
   function renderItem(i){
-    const cls='td-item'+(i.planned?' planned':'')+(i.done?' td-item-done':'')+(i.module?' td-item-link':'');
-    const clickAttr=i.module?`onclick="window.location='${i.module}'"` : '';
+    const cls='td-item'+(i.planned?' planned':'')+(i.done?' td-item-done':'')+((i.module||i.externalUrl)?' td-item-link':'');
+    const clickAttr=i.externalUrl?`onclick="window.open('${i.externalUrl}','_blank','noopener')"`:i.module?`onclick="window.location='${i.module}'"` : '';
     const badge=i.planned?`<span class="td-item-planned-badge">Planejado</span>`:'';
     const checkBtn=i.checkFn&&i.id?`<button class="td-check-btn" onclick="event.stopPropagation();${i.checkFn}('${i.id}')" title="Marcar como concluído"><i class="bi bi-check-lg"></i></button>`:'';
     const modIcon=MODULE_ICONS[i.module];
@@ -888,6 +989,7 @@ async function loadProfileData(){
     localStorage.setItem('hub_user_nome', user.nome||'');
     updateProfileUI();
   }catch(e){}
+  checkGcalStatus();
 }
 
 function updateProfileUI(){
@@ -982,6 +1084,33 @@ applyPrivacy();
 rendTodaySummary();
 rendCal();
 document.querySelector('#profile-overlay .profile-modal').addEventListener('input',()=>_profileDirty=true);
+
+// ── Handle Google OAuth callback ────────────────────────────────────────────
+(async function handleGcalCallback(){
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('code');
+  if(!code)return;
+  // Clean URL immediately
+  const clean=window.location.pathname;
+  window.history.replaceState({},'',clean);
+  const token=localStorage.getItem(AUTH_KEY);
+  if(!token)return;
+  try{
+    const r=await fetch(`${getApiBase()}/google/exchange-token`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({code}),
+    });
+    if(r.ok){
+      updateGcalUI(true);
+      hubBootstrapGcal();
+    }else{
+      const d=await r.json().catch(()=>({}));
+      console.warn('GCal exchange error:',d);
+    }
+  }catch(e){console.warn('GCal exchange error:',e);}
+})();
+
 if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { fetchFinancas(); hubBootstrap(); loadProfileData(); }
 </script>
 </body>

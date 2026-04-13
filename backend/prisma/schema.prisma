@@ -98,6 +98,7 @@ model User {
   saudeConsumos          SaudeConsumo[]
   stravaToken            StravaToken?
   stravaExcluded         StravaExcluded[]
+  googleToken            GoogleToken?
 }
 
 model Session {
@@ -622,6 +623,18 @@ model StravaExcluded {
 
   @@unique([userId, clientId])
   @@index([userId])
+}
+
+model GoogleToken {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model HealthWeight {

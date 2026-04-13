@@ -1182,6 +1182,106 @@ apiRouter.delete("/saude/consumos/:id", requireAuth, async (req: AuthedRequest, 
   res.status(204).end();
 });
 
+// ── GOOGLE CALENDAR ──────────────────────────────────────────────────────────
+
+const GOOGLE_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID     || "";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
+const GOOGLE_REDIRECT_URI  = process.env.GOOGLE_REDIRECT_URI  || "https://orbi-two-xi.vercel.app/index.html";
+
+async function googleRefreshIfNeeded(userId: string) {
+  let token = await prisma.googleToken.findUnique({ where: { userId } });
+  if (!token) throw Object.assign(new Error("NOT_CONNECTED"), { status: 400 });
+  const now = new Date();
+  if (token.expiresAt <= new Date(now.getTime() + 60_000)) {
+    if (!token.refreshToken) throw Object.assign(new Error("NO_REFRESH_TOKEN"), { status: 400 });
+    const r = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        refresh_token: token.refreshToken,
+        grant_type: "refresh_token",
+      }).toString(),
+    });
+    if (!r.ok) throw Object.assign(new Error("GOOGLE_REFRESH_ERROR"), { status: 400 });
+    const d = await r.json() as { access_token: string; expires_in: number; refresh_token?: string };
+    const expiresAt = new Date(Date.now() + d.expires_in * 1000);
+    token = await prisma.googleToken.update({
+      where: { userId },
+      data: {
+        accessToken: d.access_token,
+        expiresAt,
+        ...(d.refresh_token ? { refreshToken: d.refresh_token } : {}),
+      },
+    });
+  }
+  return token;
+}
+
+apiRouter.post("/google/exchange-token", requireAuth, async (req: AuthedRequest, res) => {
+  const { code } = req.body as { code?: string };
+  if (!code) return res.status(400).json({ error: "BAD_REQUEST" });
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      redirect_uri: GOOGLE_REDIRECT_URI,
+      grant_type: "authorization_code",
+    }).toString(),
+  });
+  if (!r.ok) return res.status(400).json({ error: "GOOGLE_ERROR", detail: await r.text() });
+  const d = await r.json() as { access_token: string; refresh_token?: string; expires_in: number; token_type: string };
+  const expiresAt = new Date(Date.now() + d.expires_in * 1000);
+  await prisma.googleToken.upsert({
+    where: { userId: req.userId! },
+    update: { accessToken: d.access_token, refreshToken: d.refresh_token ?? null, expiresAt },
+    create: { userId: req.userId!, accessToken: d.access_token, refreshToken: d.refresh_token ?? null, expiresAt },
+  });
+  return res.json({ ok: true });
+});
+
+apiRouter.get("/google/status", requireAuth, async (req: AuthedRequest, res) => {
+  const token = await prisma.googleToken.findUnique({ where: { userId: req.userId! } });
+  return res.json({ connected: !!token });
+});
+
+apiRouter.delete("/google/disconnect", requireAuth, async (req: AuthedRequest, res) => {
+  const token = await prisma.googleToken.findUnique({ where: { userId: req.userId! } });
+  if (token) {
+    // Revoke token (best-effort)
+    await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token.accessToken)}`, { method: "POST" }).catch(() => null);
+    await prisma.googleToken.deleteMany({ where: { userId: req.userId! } });
+  }
+  return res.status(204).send();
+});
+
+apiRouter.get("/google/events", requireAuth, async (req: AuthedRequest, res) => {
+  const token = await googleRefreshIfNeeded(req.userId!).catch(e => { throw e; });
+  // Fetch events for the next/past 60 days window
+  const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=250`;
+  const gr = await fetch(url, { headers: { Authorization: `Bearer ${token.accessToken}` } });
+  if (!gr.ok) return res.status(400).json({ error: "GOOGLE_FETCH_ERROR", detail: await gr.text() });
+  const data = await gr.json() as { items?: Array<{ id: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; hangoutLink?: string; htmlLink?: string; status?: string }> };
+  const events = (data.items || [])
+    .filter(e => e.status !== "cancelled")
+    .map(e => {
+      const startRaw = e.start?.dateTime || e.start?.date || "";
+      const endRaw   = e.end?.dateTime   || e.end?.date   || "";
+      const allDay   = !e.start?.dateTime;
+      const date     = startRaw.slice(0, 10);
+      const time     = allDay ? "" : startRaw.slice(11, 16);
+      const endTime  = allDay ? "" : endRaw.slice(11, 16);
+      return { id: e.id, title: e.summary || "Sem título", date, time, endTime, allDay, meetUrl: e.hangoutLink || null, htmlLink: e.htmlLink || null };
+    });
+  return res.json(events);
+});
+
 // ── STRAVA ───────────────────────────────────────────────────────────────────
 
 const STRAVA_CLIENT_ID     = process.env.STRAVA_CLIENT_ID     || "";
