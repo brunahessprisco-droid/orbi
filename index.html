@@ -796,10 +796,36 @@ function openDay(dateStr){
 }
 function closeOv(){document.getElementById('ov-day').classList.remove('open');}
 
+// ── HUB ACTIONS — confiabilidade crítica ────────────────────────────────────
+// Fila serializa todas as ações: sem race conditions entre cliques rápidos.
+// Snapshot é lido como string bruta do localStorage na hora da execução.
+// Rollback restaura a string exata — nenhuma mutação por referência possível.
+// _hubPost lança exceção em qualquer falha de rede ou status HTTP não-ok.
+let _hubActionQueue=Promise.resolve();
+function _hubRun(fn){
+  _hubActionQueue=_hubActionQueue.then(()=>fn().catch(e=>console.error('[Hub] erro não tratado na fila:',e)));
+}
+async function _hubPost(path,body){
+  const token=localStorage.getItem(AUTH_KEY);
+  const uid=localStorage.getItem('hub_user_id');
+  if(!token) throw new Error('[Hub] _hubPost: sem token de autenticação');
+  if(!uid)   throw new Error('[Hub] _hubPost: sem hub_user_id');
+  const r=await fetch(getApiBase()+path,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify(body),
+  });
+  if(!r.ok){
+    const detail=await r.text().catch(()=>'');
+    throw new Error(`[Hub] _hubPost: HTTP ${r.status} em ${path} — ${detail}`);
+  }
+}
+
+// hubSyncHabito mantido para uso por _clearControleModal e _saveControleModal
 async function hubSyncHabito(h){
   const token=localStorage.getItem(AUTH_KEY);
   const uid=localStorage.getItem('hub_user_id');
-  if(!token||!uid)return;
+  if(!token||!uid) throw new Error('[Hub] hubSyncHabito: sem autenticação');
   const r=await fetch(`${getApiBase()}/habitos`,{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
@@ -811,24 +837,48 @@ async function hubSyncHabito(h){
       logs:h.logs||{},
     }),
   });
-  if(!r.ok) throw new Error('sync_habito_failed');
+  if(!r.ok){
+    const detail=await r.text().catch(()=>'');
+    throw new Error(`[Hub] hubSyncHabito: HTTP ${r.status} — ${detail}`);
+  }
 }
 
 let _controleState={id:null,dateStr:null};
-async function hubToggleHabito(id,dateStr){
-  const arr=loadHabitos(); const h=arr.find(x=>x.id===id); if(!h)return;
-  if(h.tipo==='controle'){ _openControleModal(h,dateStr); return; }
-  if(!h.logs)h.logs={};
-  const wasSet=!!h.logs[dateStr];
-  if(wasSet)delete h.logs[dateStr]; else h.logs[dateStr]=true;
-  _lsSet('habitos_app_v5',JSON.stringify(arr));
-  rendTodaySummary(); rendCal();
-  try{ await hubSyncHabito(h); }catch(_){
-    // Revert localStorage se API falhou
-    if(wasSet)h.logs[dateStr]=true; else delete h.logs[dateStr];
-    _lsSet('habitos_app_v5',JSON.stringify(arr));
+function hubToggleHabito(id,dateStr){
+  // Verificação síncrona de tipo antes de entrar na fila
+  const check=loadHabitos().find(x=>x.id===id);
+  if(!check) return;
+  if(check.tipo==='controle'){ _openControleModal(check,dateStr); return; }
+  _hubRun(async()=>{
+    // 1. Snapshot completo como string bruta (imune a mutação por referência)
+    const snapshot=_lsGet('habitos_app_v5')||'[]';
+    // 2. Parse fresco para aplicar o update
+    const cur=JSON.parse(snapshot);
+    const hab=cur.find(x=>x.id===id);
+    if(!hab) return;
+    if(!hab.logs) hab.logs={};
+    const wasSet=!!hab.logs[dateStr];
+    // 3. Update otimista
+    if(wasSet) delete hab.logs[dateStr]; else hab.logs[dateStr]=true;
+    _lsSet('habitos_app_v5',JSON.stringify(cur));
     rendTodaySummary(); rendCal();
-  }
+    // 4. API com await obrigatório — lança em qualquer falha
+    try{
+      const uid=localStorage.getItem('hub_user_id');
+      await _hubPost('/habitos',{
+        usuario_id:uid,client_id:hab.id,nome:hab.name,icone:hab.icon||null,
+        categoria:hab.cat||null,frequencia:hab.freq||null,weekdays:hab.weekdays||[],
+        obs:hab.note||null,autoType:hab.autoType||null,autoKeyword:hab.autoKeyword||null,
+        tipo:hab.tipo||'check',unit:hab.unit||null,startDate:hab.startDate||null,
+        logs:hab.logs||{},
+      });
+    }catch(err){
+      // 5. Rollback: restaura string exata capturada antes de qualquer mudança
+      console.error('[Hub] hubToggleHabito — rollback:',err.message);
+      _lsSet('habitos_app_v5',snapshot);
+      rendTodaySummary(); rendCal();
+    }
+  });
 }
 function _openControleModal(h,dateStr){
   _controleState={id:h.id,dateStr};
@@ -869,41 +919,62 @@ async function _saveControleModal(){
     rendTodaySummary(); rendCal();
   }
 }
-async function hubCheckTreino(id){
-  const arr=loadTreinos(); const t=arr.find(x=>x.id===id); if(!t)return;
-  const prevPlan=t.planejado; const prevNao=t.naoFeito;
-  t.planejado=false; t.naoFeito=false;
-  _lsSet('saude_treinos_v1',JSON.stringify(arr));
-  rendTodaySummary(); rendCal();
-  const token=localStorage.getItem(AUTH_KEY); const uid=localStorage.getItem('hub_user_id');
-  if(token&&uid&&t.id){
+function hubCheckTreino(id){
+  _hubRun(async()=>{
+    // 1. Snapshot completo como string bruta
+    const snapshot=_lsGet('saude_treinos_v1')||'[]';
+    // 2. Parse fresco
+    const cur=JSON.parse(snapshot);
+    const t=cur.find(x=>x.id===id);
+    if(!t) return;
+    // 3. Update otimista
+    t.planejado=false; t.naoFeito=false;
+    _lsSet('saude_treinos_v1',JSON.stringify(cur));
+    rendTodaySummary(); rendCal();
+    // 4. API com await obrigatório — lança em qualquer falha
     try{
-      const r=await fetch(`${getApiBase()}/treinos`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({usuario_id:uid,client_id:t.id,titulo:t.titulo||'Treino',data:t.data,hora_inicio:t.hora_inicio||undefined,duracao:t.duracao||null,tipo_cat:t.tipo_cat||'cardio',local_nome:t.local||null,obs:t.obs||null})});
-      if(!r.ok) throw new Error();
-    }catch(_){
-      t.planejado=prevPlan; t.naoFeito=prevNao;
-      _lsSet('saude_treinos_v1',JSON.stringify(arr));
+      const uid=localStorage.getItem('hub_user_id');
+      await _hubPost('/treinos',{
+        usuario_id:uid,client_id:t.id,titulo:t.titulo||'Treino',data:t.data,
+        hora_inicio:t.hora_inicio||undefined,duracao:t.duracao||null,
+        tipo_cat:t.tipo_cat||'cardio',local_nome:t.local||null,obs:t.obs||null,
+      });
+    }catch(err){
+      // 5. Rollback: string exata anterior
+      console.error('[Hub] hubCheckTreino — rollback:',err.message);
+      _lsSet('saude_treinos_v1',snapshot);
       rendTodaySummary(); rendCal();
     }
-  }
+  });
 }
-async function hubCheckTarefa(id){
-  const arr=loadTarefas(); const t=arr.find(x=>x.id===id); if(!t)return;
-  const prevStatus=t.status; const prevConc=t.dataConclusao;
-  t.status='concluida'; t.dataConclusao=ds(new Date());
-  _lsSet('casinha_tarefas',JSON.stringify(arr));
-  rendTodaySummary(); rendCal();
-  const token=localStorage.getItem(AUTH_KEY); const uid=localStorage.getItem('hub_user_id');
-  if(token&&uid&&t.id){
+function hubCheckTarefa(id){
+  _hubRun(async()=>{
+    // 1. Snapshot completo como string bruta
+    const snapshot=_lsGet('casinha_tarefas')||'[]';
+    // 2. Parse fresco
+    const cur=JSON.parse(snapshot);
+    const t=cur.find(x=>x.id===id);
+    if(!t) return;
+    const conclusao=ds(new Date());
+    // 3. Update otimista
+    t.status='concluida'; t.dataConclusao=conclusao;
+    _lsSet('casinha_tarefas',JSON.stringify(cur));
+    rendTodaySummary(); rendCal();
+    // 4. API com await obrigatório — lança em qualquer falha
     try{
-      const r=await fetch(`${getApiBase()}/casinha/tarefas`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({usuario_id:uid,client_id:t.id,titulo:t.titulo||'Tarefa',status:'concluida',dataConclusao:ds(new Date()),prioridade:t.prioridade||'media',ambiente:t.ambiente||null,dataVenc:t.dataVenc||null,horario:t.horario||null})});
-      if(!r.ok) throw new Error();
-    }catch(_){
-      t.status=prevStatus; t.dataConclusao=prevConc;
-      _lsSet('casinha_tarefas',JSON.stringify(arr));
+      const uid=localStorage.getItem('hub_user_id');
+      await _hubPost('/casinha/tarefas',{
+        usuario_id:uid,client_id:t.id,titulo:t.titulo||'Tarefa',status:'concluida',
+        dataConclusao:conclusao,prioridade:t.prioridade||'media',
+        ambiente:t.ambiente||null,dataVenc:t.dataVenc||null,horario:t.horario||null,
+      });
+    }catch(err){
+      // 5. Rollback: string exata anterior
+      console.error('[Hub] hubCheckTarefa — rollback:',err.message);
+      _lsSet('casinha_tarefas',snapshot);
       rendTodaySummary(); rendCal();
     }
-  }
+  });
 }
 
 let cardDate=new Date();
