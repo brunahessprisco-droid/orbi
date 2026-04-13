@@ -719,6 +719,18 @@ async function apiReq(path,opts={}){
   return res.json();
 }
 
+async function apiReqRetry(path,opts={},maxTries=4){
+  const delays=[3000,8000,15000];
+  for(let i=0;i<maxTries;i++){
+    try{return await apiReq(path,opts);}
+    catch(e){
+      if(i===maxTries-1)throw e;
+      setStatus(`Servidor acordando, aguarde... (${i+1}/${maxTries-1})`,true);
+      await new Promise(r=>setTimeout(r,delays[i]||15000));
+    }
+  }
+}
+
 async function checkAuth(){
   if(!authToken)return false;
   try{
@@ -926,7 +938,7 @@ async function bootstrapApi(){
 
 async function syncTreino(t){
   if(!canUseApi())return;
-  await apiReq('/treinos',{method:'POST',body:JSON.stringify({
+  const r=await apiReqRetry('/treinos',{method:'POST',body:JSON.stringify({
     usuario_id:API_USER_ID, client_id:t.id,
     titulo:t.titulo, data:t.data, hora_inicio:t.hora_inicio||null,
     hora_fim:t.hora_fim||null, duracao:t.duracao||null,
@@ -934,28 +946,31 @@ async function syncTreino(t){
     calorias:t.calorias||null, km:t.km||null,
     local_nome:t.local||null, descricao:t.descricao||null, obs:treinoObsEncode(t),
   })});
+  if(r?._dbId||r?.id){t._dbId=r._dbId||r.id;saveLocal_();}
+  return r;
 }
 async function deleteTreinoApi(t){
   if(!t._dbId)return;
   addDeleted(t._dbId);
   if(!canUseApi())return;
-  try{await apiReq(`/treinos/${t._dbId}`,{method:'DELETE'});clearDeleted(t._dbId);}catch(e){console.error('DELETE treino falhou, será retentado:',e);}
+  try{await apiReqRetry(`/treinos/${t._dbId}`,{method:'DELETE'});clearDeleted(t._dbId);}
+  catch(e){console.error('DELETE treino falhou, será retentado na próxima abertura:',e);}
 }
 async function syncLocal(l){
   if(!canUseApi())return;
-  await apiReq('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
+  await apiReqRetry('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
 }
 async function deleteLocalApi(l){
   if(!canUseApi()||!l._dbId)return;
-  await apiReq(`/locais-treino/${l._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReqRetry(`/locais-treino/${l._dbId}`,{method:'DELETE'}).catch(()=>null);
 }
 async function syncTipo(t){
   if(!canUseApi())return;
-  await apiReq('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
+  await apiReqRetry('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
 }
 async function deleteTipoApi(t){
   if(!canUseApi()||!t._dbId)return;
-  await apiReq(`/tipos-exercicio/${t._dbId}`,{method:'DELETE'}).catch(()=>null);
+  await apiReqRetry(`/tipos-exercicio/${t._dbId}`,{method:'DELETE'}).catch(()=>null);
 }
 
 function fmtMonth(k){
@@ -1583,7 +1598,7 @@ async function delPlanejamento(id){
   const t=treinos.find(x=>x.id===id);
   treinos=treinos.filter(x=>x.id!==id);
   saveLocal_();
-  if(t&&t._dbId)await apiReq(`/treinos/${t._dbId}`,{method:'DELETE'}).catch(()=>null);
+  if(t)await deleteTreinoApi(t);
   renderAll();
 }
 
