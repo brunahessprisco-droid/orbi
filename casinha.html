@@ -1122,7 +1122,15 @@ async function completarTarefa(id){
     // Tarefa de rotina: ocorrências futuras já estão pré-geradas.
     // Só garante que o horizonte continua preenchido.
     const r=rotinas.find(x=>x.id===t.rotinaId);
-    if(r){const ns=preencherOcorrenciasRotina(r);if(ns.length){ns.forEach(n=>syncTarefa(n).catch(()=>null));saveR();syncRotina(r).catch(()=>null);}}
+    if(r){
+      const ns=preencherOcorrenciasRotina(r);
+      if(ns.length){
+        for(const n of ns){markDirty(SK_DIRTY_T,n.id);syncTarefa(n).catch(e=>console.warn('[Casinha] Sync ocorrência falhou:',n.id,e));}
+        saveR();
+        markDirty(SK_DIRTY_R,r.id);
+        syncRotina(r).catch(e=>console.warn('[Casinha] Sync rotina falhou:',r.id,e));
+      }
+    }
   } else if(t.recorrencia){
     // Tarefa avulsa com recorrência: gera a próxima
     const nd=calcNextDate(t.dataVenc||today(),t.recorrencia);
@@ -1130,7 +1138,8 @@ async function completarTarefa(id){
     tarefas.push(next);syncTarefa(next).catch(()=>null);
   }
   saveT();renderCurrent();
-  try{ await syncTarefa(t); }catch(_){
+  try{ await syncTarefa(t); }catch(e){
+    console.warn('[Casinha] Sync completar falhou:',t.id,e);
     tarefas=JSON.parse(snapshotT); rotinas=JSON.parse(snapshotR);
     saveT(); renderCurrent();
   }
@@ -1143,7 +1152,7 @@ async function adiarTarefa(id){
   d.setDate(d.getDate()+1);
   t.dataVenc=dateStr(d);t.status='adiada';
   saveT();renderCurrent();
-  try{ await syncTarefa(t); }catch(_){ tarefas=JSON.parse(snapshot); saveT(); renderCurrent(); }
+  try{ await syncTarefa(t); }catch(e){ console.warn('[Casinha] Sync adiar falhou:',t.id,e); tarefas=JSON.parse(snapshot); saveT(); renderCurrent(); }
 }
 
 function deletarTarefa(id){
@@ -1201,18 +1210,18 @@ function onDropCol(ev,ds){
   const oldDate=t.dataVenc;
   t.dataVenc=ds;
   autoStatus();
-  syncTarefa(t).catch(()=>null);
+  try{syncTarefa(t).then(()=>clearDirty(SK_DIRTY_T,t.id)).catch(e=>{console.warn('[Casinha] Drag-and-drop sync falhou:',t.id,e);markDirty(SK_DIRTY_T,t.id);});}catch(e){console.warn('[Casinha] Drag-and-drop sync falhou:',t.id,e);markDirty(SK_DIRTY_T,t.id);}
   // Se for tarefa de rotina, arrasta todas as futuras pendentes
   if(t.rotinaId&&t.recorrencia){
     const r=rotinas.find(x=>x.id===t.rotinaId);
     if(r){
       const futuras=tarefas.filter(x=>x.rotinaId===r.id&&x.id!==t.id&&x.status!=='concluida');
-      futuras.forEach(x=>deleteTarefaApi(x).catch(()=>null));
+      futuras.forEach(x=>{deleteTarefaApi(x).catch(()=>{console.warn('[Casinha] Delete futura failed:',x.id);});});
       tarefas=tarefas.filter(x=>!(x.rotinaId===r.id&&x.id!==t.id&&x.status!=='concluida'));
       r.proximaData=calcNextDate(ds,r.recorrencia);
       const ns=preencherOcorrenciasRotina(r);
-      ns.forEach(n=>syncTarefa(n).catch(()=>null));
-      saveR();syncRotina(r).catch(()=>null);
+      for(const n of ns){markDirty(SK_DIRTY_T,n.id);syncTarefa(n).catch(e=>console.warn('[Casinha] Sync ocorrência falhou:',n.id,e));}
+      saveR();markDirty(SK_DIRTY_R,r.id);syncRotina(r).catch(e=>console.warn('[Casinha] Sync rotina falhou:',r.id,e));
     }
   }
   saveT();renderCalendario();
@@ -1297,7 +1306,14 @@ async function toggleRotina(id){
   const snapshotT=lsGet(SK_T)||'[]';
   r.ativo=!r.ativo;
   if(r.ativo&&!r.proximaData)r.proximaData=today();
-  if(r.ativo){const ns=preencherOcorrenciasRotina(r);ns.forEach(t=>syncTarefa(t).catch(()=>null));saveT();}
+  if(r.ativo){
+    const ns=preencherOcorrenciasRotina(r);
+    for(const t of ns){
+      markDirty(SK_DIRTY_T,t.id);
+      syncTarefa(t).catch(e=>console.warn('[Casinha] Sync ocorrência falhou:',t.id,e));
+    }
+    saveT();
+  }
   saveR();renderRotinas();
   try{ await syncRotina(r); }catch(_){
     rotinas=JSON.parse(snapshotR); tarefas=JSON.parse(snapshotT);
@@ -1346,12 +1362,12 @@ function checkRotinas(){
     if(!r.ativo||!r.proximaData)continue;
     const novas=preencherOcorrenciasRotina(r);
     if(novas.length>0){
-      novas.forEach(t=>syncTarefa(t).catch(()=>null));
+      for(const t of novas){markDirty(SK_DIRTY_T,t.id);syncTarefa(t).catch(e=>console.warn('[Casinha] Sync ocorrência falhou:',t.id,e));}
       dirty=true;dirtyR=true;
     }
   }
   if(dirty)saveT();
-  if(dirtyR){saveR();rotinas.filter(r=>r._dbId).forEach(r=>syncRotina(r).catch(()=>null));}
+  if(dirtyR){saveR();for(const r of rotinas.filter(r=>r._dbId)){markDirty(SK_DIRTY_R,r.id);syncRotina(r).catch(e=>console.warn('[Casinha] Sync rotina falhou:',r.id,e));}}
 }
 
 function deletarRotina(id){

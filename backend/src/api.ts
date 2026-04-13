@@ -3,6 +3,7 @@ import express from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import NodeCache from "node-cache";
 
 type AuthedRequest = express.Request & { userId?: string; sessionToken?: string };
 
@@ -34,11 +35,28 @@ function assertUserMatchesQuery(req: AuthedRequest) {
   if (String(q) !== String(req.userId)) throw Object.assign(new Error("FORBIDDEN"), { status: 403 });
 }
 
+// In-memory session cache with 5-minute TTL
+const sessionCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+
 async function requireAuth(req: AuthedRequest, res: express.Response, next: express.NextFunction) {
   const token = readBearerToken(req);
   if (!token) return res.status(401).json({ error: "UNAUTHORIZED" });
+
+  // Check cache first
+  const cached = sessionCache.get<string>(token);
+  if (cached) {
+    req.userId = cached;
+    req.sessionToken = token;
+    return next();
+  }
+
+  // Cache miss — query DB
   const session = await prisma.session.findUnique({ where: { token } });
   if (!session) return res.status(401).json({ error: "UNAUTHORIZED" });
+
+  // Store in cache
+  sessionCache.set(token, session.userId);
+
   req.userId = session.userId;
   req.sessionToken = token;
   return next();
@@ -66,7 +84,7 @@ function toDecimal(value: unknown) {
 export const apiRouter = express.Router();
 
 apiRouter.get("/admin/users", async (req, res) => {
-  const secret = req.query.secret as string;
+  const secret = (req.header("x-admin-secret") as string) || (req.query.secret as string);
   if (!secret || !process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: "FORBIDDEN" });
   }
@@ -78,13 +96,14 @@ apiRouter.get("/admin/users", async (req, res) => {
 });
 
 apiRouter.post("/admin/create-invite", async (req, res) => {
-  const { adminSecret, code, intendedEmail, intendedName } = req.body as Record<string, string>;
-  if (!adminSecret || !process.env.ADMIN_SECRET || adminSecret !== process.env.ADMIN_SECRET) {
+  const body = req.body as Record<string, string>;
+  const secret = (req.header("x-admin-secret") as string) || body.adminSecret;
+  if (!secret || !process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: "FORBIDDEN" });
   }
-  const inviteCode = code || ("ORBI-" + Math.random().toString(36).slice(2, 8).toUpperCase());
+  const inviteCode = body.code || ("ORBI-" + Math.random().toString(36).slice(2, 8).toUpperCase());
   await prisma.inviteCode.create({
-    data: { id: crypto.randomUUID(), code: inviteCode, intendedEmail: intendedEmail || null, intendedName: intendedName || null, isActive: true },
+    data: { id: crypto.randomUUID(), code: inviteCode, intendedEmail: body.intendedEmail || null, intendedName: body.intendedName || null, isActive: true },
   });
   return res.json({ ok: true, code: inviteCode });
 });
@@ -238,6 +257,7 @@ apiRouter.get("/auth/me", requireAuth, async (req: AuthedRequest, res) => {
 
 apiRouter.post("/auth/logout", requireAuth, async (req: AuthedRequest, res) => {
   await prisma.session.delete({ where: { token: req.sessionToken! } });
+  sessionCache.del(req.sessionToken!);
   res.json({ ok: true });
 });
 
