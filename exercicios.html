@@ -775,7 +775,10 @@ async function logoutUser(){
 }
 
 // ── DADOS ────────────────────────────────────────────────────────────────────
-const SK_T='saude_treinos_v1',SK_L='saude_locais_v1',SK_TP='saude_tipos_v1',SK_DIRTY='saude_treinos_dirty_v1';
+const SK_T='saude_treinos_v1',SK_L='saude_locais_v1',SK_TP='saude_tipos_v1',SK_DIRTY='saude_treinos_dirty_v1',SK_DEL='saude_treinos_deleted_v1';
+function getDeleted(){return new Set(JSON.parse(lsGet(SK_DEL)||'[]'));}
+function addDeleted(dbId){if(!dbId)return;const s=getDeleted();s.add(dbId);lsSet(SK_DEL,JSON.stringify([...s]));}
+function clearDeleted(dbId){if(!dbId)return;const s=getDeleted();s.delete(dbId);lsSet(SK_DEL,JSON.stringify([...s]));}
 // storage helpers – isolamento por usuário
 function _uid(){return localStorage.getItem('hub_user_id')||'anon';}
 function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
@@ -885,11 +888,16 @@ async function bootstrapApi(){
     } else {
       locais=apiLocais.map(r=>({id:r.client_id,nome:r.nome}));
     }
-    treinos=apiTreinos.map(r=>treinoFromApi(r));
+    const deleted=getDeleted();
+    treinos=apiTreinos.map(r=>treinoFromApi(r)).filter(t=>!deleted.has(t._dbId));
+    // Retentar DELETEs pendentes
+    for(const dbId of deleted){
+      apiReq(`/treinos/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(dbId)).catch(()=>null);
+    }
     // Migração: sobe qualquer treino local que não está na API
     const localCache=JSON.parse(lsGet(SK_T)||'[]');
     const apiIds=new Set(treinos.map(t=>t.id));
-    const naoSincronizados=localCache.filter(t=>!apiIds.has(t.id));
+    const naoSincronizados=localCache.filter(t=>!apiIds.has(t.id)&&!deleted.has(t._dbId));
     for(const t of naoSincronizados){
       treinos.push(t);
       syncTreino(t).catch(()=>null);
@@ -928,8 +936,10 @@ async function syncTreino(t){
   })});
 }
 async function deleteTreinoApi(t){
-  if(!canUseApi()||!t._dbId)return;
-  await apiReq(`/treinos/${t._dbId}`,{method:'DELETE'}).catch(()=>null);
+  if(!t._dbId)return;
+  addDeleted(t._dbId);
+  if(!canUseApi())return;
+  try{await apiReq(`/treinos/${t._dbId}`,{method:'DELETE'});clearDeleted(t._dbId);}catch(e){console.error('DELETE treino falhou, será retentado:',e);}
 }
 async function syncLocal(l){
   if(!canUseApi())return;
