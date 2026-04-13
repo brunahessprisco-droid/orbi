@@ -1202,7 +1202,10 @@ let authMode='login';
 let txSyncTimer=null,catSyncTimer=null,contaSyncTimer=null,fixaSyncTimer=null,fixaValSyncTimer=null,budgetSyncTimer=null,savingSyncTimer=null,poupancaSyncTimer=null,projExtrasSyncTimer=null,syncInFlight=false;
 
 // Persist
-function save(){scheduleTxSync();}
+function save(){
+  if(API_USER_ID) try{localStorage.setItem('u_'+API_USER_ID+'_'+SK,JSON.stringify(txs));}catch(_){}
+  scheduleTxSync();
+}
 function saveC(){scheduleContaSync();}
 function saveCAT(){scheduleCatSync();}
 function saveFX(){scheduleFixaSync();}
@@ -1727,6 +1730,16 @@ async function bootstrapApi(){
     if(apiCats!==null) cats=apiCats.map(c=>({id:String(c.client_id||c.id),nome:c.nome,cor:c.cor||'#7b9cff'}));
     if(apiTxs!==null){
       txs=apiTxs.map(txFromApi);
+      // Resgata transações criadas localmente antes do debounce disparar (tab fechada rapidamente)
+      try{
+        const localRaw=localStorage.getItem('u_'+API_USER_ID+'_'+SK);
+        if(localRaw){
+          const localTxs=JSON.parse(localRaw);
+          const apiClientIds=new Set(apiTxs.map(t=>String(t.client_id)));
+          const pendentes=localTxs.filter(t=>t.id&&!apiClientIds.has(String(t.id)));
+          if(pendentes.length){txs=[...txs,...pendentes];scheduleTxSync();}
+        }
+      }catch(_){}
       // Cache para o hub
       try{{const _fuid=localStorage.getItem('hub_user_id')||'anon';localStorage.setItem('u_'+_fuid+'_hub_fin_cache',JSON.stringify(txs.map(t=>({data:t.data,valor:t.valor,valorParcela:t.valorParcela,descricao:t.descricao,categoria:t.categoria,tipo:t.tipo}))));}localStorage.setItem('hub_user_id',API_USER_ID);}catch(e){}
     }

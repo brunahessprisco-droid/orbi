@@ -55,7 +55,7 @@ Se qualquer POST no passo 2 falha silenciosamente (`.catch(()=>null)`), aquela t
 
 ---
 
-### [ ] 20. Finanças: fechar aba antes de 200ms apaga transação recém-criada
+### [x] 20. Finanças: fechar aba antes de 200ms apaga transação recém-criada ✓ FIXED
 **Módulo:** `financas.html`
 
 `save()` chama `scheduleTxSync()`, que agenda a sincronização com debounce de 200ms. A variável `txs` (JS em memória) é atualizada imediatamente, mas **não é gravada em localStorage** — apenas o `hub_fin_cache` (cache de leitura do hub) é atualizado, e somente após o sync da API completar.
