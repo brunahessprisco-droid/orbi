@@ -737,11 +737,12 @@
           apiReqRetry(`/saude/consultas?usuario_id=${API_USER_ID}`),
         ]);
         // HealthWeight usa modelo diferente — mapeamos via extraJson
+        const _ds=window.saudeApp?.getDeletedState?.()||{};
         const deleted = {
-          weights:new Set((deletedState&&deletedState.weights)||[]),
-          doctors:new Set((deletedState&&deletedState.doctors)||[]),
-          exams:new Set((deletedState&&deletedState.exams)||[]),
-          consults:new Set((deletedState&&deletedState.consults)||[])
+          weights:new Set((_ds.weights)||[]),
+          doctors:new Set((_ds.doctors)||[]),
+          exams:new Set((_ds.exams)||[]),
+          consults:new Set((_ds.consults)||[])
         };
         const apiWeights=(rW.data||rW).map(r=>({
           id:r.client_id||r.extraJson?.id||r.id,_dbId:r.id,
@@ -798,6 +799,7 @@
 
       const KEY_REM='saude_remedios_v1';
       const KEY_CONSUMO='saude_consumos_v1';
+      const REM_CAT_LABEL={hipertensao:'Hipertensão',diabetes:'Diabetes',colesterol:'Colesterol',ansiedade:'Ansiedade / Humor',tireoide:'Tireoide',vitamina:'Vitamina / Suplemento',outro:'Outro'};
 
       const defaultData={
         settings:{theme:document.documentElement.getAttribute('data-theme')||'dark'},
@@ -863,6 +865,7 @@
       window.saudeApp={
         getState:()=>state,
         setState:(partial)=>{ Object.assign(state,partial); saveState(); },
+        getDeletedState:()=>deletedState,
         renderAll:()=>renderAll(),
       };
       function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
@@ -1053,8 +1056,6 @@
       function loadConsumos(){ try{return JSON.parse(lsGet(KEY_CONSUMO)||'[]');}catch{return [];} }
       function saveRemedios(){ try{ lsSet(KEY_REM,JSON.stringify(remedios)); }catch(e){ console.error('saveRemedios:',e); } }
       function saveConsumos(){ lsSet(KEY_CONSUMO,JSON.stringify(consumos)); }
-
-      const REM_CAT_LABEL={hipertensao:'Hipertensão',diabetes:'Diabetes',colesterol:'Colesterol',ansiedade:'Ansiedade / Humor',tireoide:'Tireoide',vitamina:'Vitamina / Suplemento',outro:'Outro'};
 
       function remedioStockStatus(r){
         const stock=Number(r.stock||0);
