@@ -712,7 +712,7 @@ async function apiReq(path,opts={}){
   catch(e){const err=new Error(`Falha ao acessar API (${e.message||'erro de rede'})`);err.network=true;throw err;}
   if(!res.ok){
     let msg='Erro na API ('+res.status+')';
-    try{const j=await res.json();msg=j.detail||j.error||msg;}catch(_){}
+    try{const j=await res.json();msg=j.detail||j.error||msg;if(j.details)msg+=' '+JSON.stringify(j.details);}catch(_){}
     throw new Error(msg);
   }
   if(res.status===204)return null;
