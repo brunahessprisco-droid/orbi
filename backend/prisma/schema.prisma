@@ -94,6 +94,8 @@ model User {
   alimentacaoRefeicoes   AlimentacaoRefeicao[]
   alimentacaoConfig      AlimentacaoConfig?
   alimentacaoWater       AlimentacaoWater[]
+  saudeRemedios          SaudeRemedio[]
+  saudeConsumos          SaudeConsumo[]
   stravaToken            StravaToken?
   stravaExcluded         StravaExcluded[]
 }
@@ -538,6 +540,43 @@ model AlimentacaoWater {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
+}
+
+model SaudeRemedio {
+  id        String   @id @default(uuid())
+  userId    String
+  clientId  String
+  name      String
+  cat       String?
+  dose      String?
+  stock     Float?
+  qty       Float?
+  days      Int?
+  lastBuy   String?
+  note      String?
+  habitId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+}
+
+model SaudeConsumo {
+  id        String   @id @default(uuid())
+  userId    String
+  clientId  String
+  date      String
+  time      String?
+  name      String
+  dose      String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
 }
 
 model InviteCode {

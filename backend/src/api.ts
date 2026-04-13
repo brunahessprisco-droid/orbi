@@ -1110,6 +1110,68 @@ apiRouter.delete("/alimentacao/water/date/:date", requireAuth, async (req: Authe
   res.status(204).end();
 });
 
+// ── REMÉDIOS ─────────────────────────────────────────────────────────────────
+apiRouter.get("/saude/remedios", requireAuth, async (req: AuthedRequest, res) => {
+  const rows = await prisma.saudeRemedio.findMany({ where: { userId: req.userId! }, orderBy: { name: "asc" } });
+  res.json(rows);
+});
+apiRouter.post("/saude/remedios", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    client_id: z.string().min(1),
+    name: z.string().min(1),
+    cat: z.string().nullable().optional(),
+    dose: z.string().nullable().optional(),
+    stock: z.coerce.number().nullable().optional(),
+    qty: z.coerce.number().nullable().optional(),
+    days: z.coerce.number().int().nullable().optional(),
+    lastBuy: z.string().nullable().optional(),
+    note: z.string().nullable().optional(),
+    habitId: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  const row = await prisma.saudeRemedio.upsert({
+    where: { userId_clientId: { userId: req.userId!, clientId: input.client_id } },
+    update: { name: input.name, cat: input.cat ?? null, dose: input.dose ?? null, stock: input.stock ?? null, qty: input.qty ?? null, days: input.days ?? null, lastBuy: input.lastBuy ?? null, note: input.note ?? null, habitId: input.habitId ?? null },
+    create: { userId: req.userId!, clientId: input.client_id, name: input.name, cat: input.cat ?? null, dose: input.dose ?? null, stock: input.stock ?? null, qty: input.qty ?? null, days: input.days ?? null, lastBuy: input.lastBuy ?? null, note: input.note ?? null, habitId: input.habitId ?? null },
+  });
+  res.status(201).json(row);
+});
+apiRouter.delete("/saude/remedios/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).end();
+  await prisma.saudeRemedio.deleteMany({ where: { clientId: id, userId: req.userId! } });
+  res.status(204).end();
+});
+
+// ── CONSUMOS ──────────────────────────────────────────────────────────────────
+apiRouter.get("/saude/consumos", requireAuth, async (req: AuthedRequest, res) => {
+  const rows = await prisma.saudeConsumo.findMany({ where: { userId: req.userId! }, orderBy: [{ date: "desc" }, { time: "desc" }] });
+  res.json(rows);
+});
+apiRouter.post("/saude/consumos", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    client_id: z.string().min(1),
+    date: z.string().min(10),
+    time: z.string().nullable().optional(),
+    name: z.string().min(1),
+    dose: z.string().nullable().optional(),
+    reason: z.string().nullable().optional(),
+  });
+  const input = schema.parse(req.body);
+  const row = await prisma.saudeConsumo.upsert({
+    where: { userId_clientId: { userId: req.userId!, clientId: input.client_id } },
+    update: { date: input.date, time: input.time ?? null, name: input.name, dose: input.dose ?? null, reason: input.reason ?? null },
+    create: { userId: req.userId!, clientId: input.client_id, date: input.date, time: input.time ?? null, name: input.name, dose: input.dose ?? null, reason: input.reason ?? null },
+  });
+  res.status(201).json(row);
+});
+apiRouter.delete("/saude/consumos/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).end();
+  await prisma.saudeConsumo.deleteMany({ where: { clientId: id, userId: req.userId! } });
+  res.status(204).end();
+});
+
 // ── STRAVA ───────────────────────────────────────────────────────────────────
 
 const STRAVA_CLIENT_ID     = process.env.STRAVA_CLIENT_ID     || "";

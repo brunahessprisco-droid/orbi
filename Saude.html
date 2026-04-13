@@ -724,17 +724,42 @@
       if(!canUseApi()||!c._dbId)return;
       await apiReqRetry(`/saude/consultas/${c._dbId}`,{method:'DELETE'}).catch(()=>null);
     }
+    async function syncRemedio(r){
+      if(!canUseApi())return;
+      return apiReqRetry('/saude/remedios',{method:'POST',body:JSON.stringify({
+        client_id:r.id,name:r.name,cat:r.cat||null,dose:r.dose||null,
+        stock:r.stock??null,qty:r.qty??null,days:r.days??null,
+        lastBuy:r.lastBuy||null,note:r.note||null,habitId:r.habitId||null,
+      })}).catch(()=>null);
+    }
+    async function deleteRemedioApi(r){
+      if(!canUseApi())return;
+      await apiReqRetry(`/saude/remedios/${r.id}`,{method:'DELETE'}).catch(()=>null);
+    }
+    async function syncConsumo(c){
+      if(!canUseApi())return;
+      return apiReqRetry('/saude/consumos',{method:'POST',body:JSON.stringify({
+        client_id:c.id,date:c.date,time:c.time||null,
+        name:c.name,dose:c.dose||null,reason:c.reason||null,
+      })}).catch(()=>null);
+    }
+    async function deleteConsumoApi(c){
+      if(!canUseApi())return;
+      await apiReqRetry(`/saude/consumos/${c.id}`,{method:'DELETE'}).catch(()=>null);
+    }
 
     async function saudeBootstrap(){
       if(!canUseApi())return;
       // Bootstrap é chamado depois que state já está carregado do localStorage
       // Puxamos dados da API e mesclamos com o estado local
       try{
-        const[rW,rM,rE,rC]=await Promise.all([
+        const[rW,rM,rE,rC,rRem,rCon]=await Promise.all([
           apiReqRetry('/health/weights'),
           apiReqRetry(`/saude/medicos?usuario_id=${API_USER_ID}`),
           apiReqRetry(`/saude/exames?usuario_id=${API_USER_ID}`),
           apiReqRetry(`/saude/consultas?usuario_id=${API_USER_ID}`),
+          apiReqRetry('/saude/remedios'),
+          apiReqRetry('/saude/consumos'),
         ]);
         // HealthWeight usa modelo diferente — mapeamos via extraJson
         const _ds=window.saudeApp?.getDeletedState?.()||{};
@@ -788,6 +813,21 @@
         for(const m of nwM)syncMedico(m).catch(()=>null);
         for(const e of nwE)syncExame(e).catch(()=>null);
         for(const c of nwC)syncConsulta(c).catch(()=>null);
+
+        // Remédios e consumos
+        const apiRemedios=(rRem||[]).map(r=>({id:r.clientId,name:r.name,cat:r.cat||'',dose:r.dose||'',stock:r.stock??null,qty:r.qty??null,days:r.days??null,lastBuy:r.lastBuy||'',note:r.note||'',habitId:r.habitId||undefined}));
+        const apiConsumos=(rCon||[]).map(c=>({id:c.clientId,date:c.date,time:c.time||'',name:c.name,dose:c.dose||'',reason:c.reason||''}));
+        const apiRemIds=new Set(apiRemedios.map(r=>r.id));
+        const apiConIds=new Set(apiConsumos.map(c=>c.id));
+        const localRem=app.getRemedios();
+        const localCon=app.getConsumos();
+        const nwRem=localRem.filter(r=>!apiRemIds.has(r.id));
+        const nwCon=localCon.filter(c=>!apiConIds.has(c.id));
+        app.setRemedios([...apiRemedios,...nwRem]);
+        app.setConsumos([...apiConsumos,...nwCon]);
+        for(const r of nwRem)syncRemedio(r).catch(()=>null);
+        for(const c of nwCon)syncConsumo(c).catch(()=>null);
+
         app.renderAll();
       }catch(e){console.error('Bootstrap saúde:',e);}
     }
@@ -866,6 +906,10 @@
         getState:()=>state,
         setState:(partial)=>{ Object.assign(state,partial); saveState(); },
         getDeletedState:()=>deletedState,
+        getRemedios:()=>remedios,
+        setRemedios:(list)=>{ remedios=list; saveRemedios(); renderRemedios(); },
+        getConsumos:()=>consumos,
+        setConsumos:(list)=>{ consumos=list; saveConsumos(); renderConsumos(); },
         renderAll:()=>renderAll(),
       };
       function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
@@ -1096,7 +1140,7 @@
           lsSet(KEY_HAB_HABITS,JSON.stringify(habitos));
           // store link back on the remédio
           const idx=remedios.findIndex(x=>x.id===r.id);
-          if(idx>=0){ remedios[idx].habitId=hid; saveRemedios(); }
+          if(idx>=0){ remedios[idx].habitId=hid; saveRemedios(); syncRemedio(remedios[idx]).catch(()=>null); }
         }catch(e){ console.error('createHabitoForRemedio',e); }
       }
 
@@ -1215,6 +1259,7 @@
         if(idx>=0) remedios[idx]=item; else remedios.push(item);
         editing.remedio=null;
         saveRemedios();
+        syncRemedio(item).catch(()=>null);
         closeOverlay('ov-remedio');
         renderRemedios();
         // create linked habit if checkbox was checked
@@ -1248,6 +1293,7 @@
         if(idx>=0) consumos[idx]=item; else consumos.push(item);
         editing.consumo=null;
         saveConsumos();
+        syncConsumo(item).catch(()=>null);
         closeOverlay('ov-consumo');
         renderConsumos();
       }
@@ -1708,20 +1754,24 @@
         editRemedio:(id)=>openRemedioModal(id),
         deleteRemedio:(id)=>{
           if(!confirm('Excluir este remédio?')) return;
+          const r=remedios.find(x=>x.id===id);
           remedios=remedios.filter(x=>x.id!==id);
           saveRemedios(); renderRemedios();
+          if(r) deleteRemedioApi(r).catch(()=>null);
         },
         remedioCompra:(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r) return;
           const addQty=Number(r.qty||30);
           r.stock=(Number(r.stock||0))+addQty;
           r.lastBuy=todayStr();
-          saveRemedios(); renderRemedios();
+          saveRemedios(); syncRemedio(r).catch(()=>null); renderRemedios();
         },
         deleteConsumo:(id)=>{
           if(!confirm('Excluir este registro?')) return;
+          const c=consumos.find(x=>x.id===id);
           consumos=consumos.filter(x=>x.id!==id);
           saveConsumos(); renderConsumos();
+          if(c) deleteConsumoApi(c).catch(()=>null);
         },
         vincularHabito:(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r) return;
@@ -1732,7 +1782,7 @@
           const r=remedios.find(x=>x.id===id); if(!r||!r.habitId) return;
           if(!confirm('Desvincular este remédio do hábito?\n\nO hábito não será excluído do módulo Hábitos.')) return;
           r.habitId=undefined;
-          saveRemedios(); renderRemedios();
+          saveRemedios(); syncRemedio(r).catch(()=>null); renderRemedios();
         }
       });
       function remove(collection,id,msg){
