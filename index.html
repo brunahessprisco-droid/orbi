@@ -309,8 +309,8 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <div class="sis-name">Exercícios</div>
       </div>
       <div class="sis-card" onclick="window.location.href='casinha.html'">
-        <img src="assets/Casinha.png" class="sis-icon-img" alt="Casinha">
-        <div class="sis-name">Casinha</div>
+        <img src="assets/Casinha.png" class="sis-icon-img" alt="Casa/Tarefas">
+        <div class="sis-name">Casa/Tarefas</div>
       </div>
       <div class="sis-card" onclick="window.location.href='Alimentacao.html'">
         <img src="assets/Alimentação.png" class="sis-icon-img" alt="Alimentação">
@@ -329,7 +329,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
         <button class="filter-btn" data-f="hab" onclick="setFilter('hab',this)"><img src="assets/Hábitos.png" alt="Hábitos"></button>
         <button class="filter-btn" data-f="fin" onclick="setFilter('fin',this)"><img src="assets/Finanças.png" alt="Finanças"></button>
         <button class="filter-btn" data-f="ex" onclick="setFilter('ex',this)"><img src="assets/Exercício.png" alt="Exercícios"></button>
-        <button class="filter-btn" data-f="cas" onclick="setFilter('cas',this)"><img src="assets/Casinha.png" alt="Casinha"></button>
+        <button class="filter-btn" data-f="cas" onclick="setFilter('cas',this)"><img src="assets/Casinha.png" alt="Casa/Tarefas"></button>
         <button class="filter-btn" data-f="ali" onclick="setFilter('ali',this)"><img src="assets/Alimentação.png" alt="Alimentação"></button>
         <button class="filter-btn" data-f="sau" onclick="setFilter('sau',this)"><img src="assets/Saúde.png" alt="Saúde"></button>
       </div>
@@ -623,7 +623,7 @@ function openDay(dateStr){
   if(despesas.length){ html+=`<div class="popup-section"><div class="popup-section-title" style="color:var(--red);">🔴 Despesas</div>${despesas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val red">- <span class="sensitive">${fmt(t.valor)}</span></div></div>`).join('')}</div>`; }
   if(parcelados.length){ html+=`<div class="popup-section"><div class="popup-section-title ali">📦 Parcelados</div>${parcelados.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.descricao}${t.categoria?` <span style="color:var(--hint);font-size:10px;">· ${t.categoria}</span>`:''}</div><div class="popup-item-val amber">- <span class="sensitive">${fmt(t.valorParcela)}</span></div></div>`).join('')}</div>`; }
   if(treinos.length){ html+=`<div class="popup-section"><div class="popup-section-title ex">💪 Exercícios</div>${treinos.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.titulo||t.nome||'Treino'}${t.local?` <span style="color:var(--hint);font-size:10px;">· ${t.local}</span>`:''}</div><div class="popup-item-val purple">${t.duracao?t.duracao+'min':t.tipo_cat||''}</div></div>`).join('')}</div>`; }
-  if(tarefas.length){ html+=`<div class="popup-section"><div class="popup-section-title cas">🏠 Casinha</div>${tarefas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.titulo||'Tarefa'}${t.ambiente?` <span style="color:var(--hint);font-size:10px;">· ${t.ambiente}</span>`:''}</div><div class="popup-item-val pink">✓ concluída</div></div>`).join('')}</div>`; }
+  if(tarefas.length){ html+=`<div class="popup-section"><div class="popup-section-title cas">🏠 Casa/Tarefas</div>${tarefas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.titulo||'Tarefa'}${t.ambiente?` <span style="color:var(--hint);font-size:10px;">· ${t.ambiente}</span>`:''}</div><div class="popup-item-val pink">✓ concluída</div></div>`).join('')}</div>`; }
   if(pesos.length||exames.length||consultas.length){ html+=`<div class="popup-section"><div class="popup-section-title sau">❤️ Saúde</div>${pesos.map(w=>`<div class="popup-item"><div class="popup-item-name">Peso registrado</div><div class="popup-item-val" style="color:var(--sau-c);"><span class="sensitive">${w.weight?w.weight+'kg':'—'}${w.fat?` · ${w.fat}% gordura`:''}</span></div></div>`).join('')}${exames.map(e=>`<div class="popup-item"><div class="popup-item-name">${e.name||'Exame'}</div><div class="popup-item-val muted">${e.status||'exame'}</div></div>`).join('')}${consultas.map(c=>`<div class="popup-item"><div class="popup-item-name">${c.doctor||c.specialty||'Consulta'}</div><div class="popup-item-val muted">${c.status||'consulta'}</div></div>`).join('')}</div>`; }
   if(habitosFeitos.length){
     const POP_GROUPS=[

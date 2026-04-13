@@ -811,7 +811,7 @@
           <select class="sel" id="f-auto-type" onchange="toggleAutoFields()">
             <option value="">Nenhuma</option>
             <option value="treino_realizado">Exercícios: treino realizado</option>
-            <option value="tarefa_concluida">Casinha: tarefa concluída</option>
+            <option value="tarefa_concluida">Casa/Tarefas: tarefa concluída</option>
           </select>
         </div>
       </div>
@@ -1407,7 +1407,7 @@
       }
 
       const todayItems=autoToday.map(h=>`<span class="auto-banner-chip">${escapeHtml(h.icon||'✨')} ${escapeHtml(h.name)}</span>`).join('');
-      const srcLabel={treino_realizado:'Exercícios',tarefa_concluida:'Casinha'};
+      const srcLabel={treino_realizado:'Exercícios',tarefa_concluida:'Casa/Tarefas'};
 
       banner.style.display='block';
       banner.innerHTML=`<div class="auto-banner">
