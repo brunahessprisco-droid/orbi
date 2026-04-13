@@ -81,6 +81,9 @@
     .badge.lanche{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border)}
     .badge.jantar{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-border)}
     .badge.ceia{background:var(--surface3);color:var(--muted);border-color:var(--border)}
+    .badge.pre_treino{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
+    .badge.pos_treino{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+    .badge.outra{background:var(--surface3);color:var(--muted);border-color:var(--border)}
     .table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}
     .table th,.table td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;font-size:13px;vertical-align:middle}
     .table th{font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:.4px;font-weight:500}
@@ -222,6 +225,9 @@
             <option value="lanche">Lanche</option>
             <option value="jantar">Jantar</option>
             <option value="ceia">Ceia</option>
+            <option value="pre_treino">Pré treino</option>
+            <option value="pos_treino">Pós treino</option>
+            <option value="outra">Outra</option>
           </select>
         </div>
         <div class="section-title">Cadastrar refeição / editar / excluir</div>
@@ -301,7 +307,7 @@
       <div class="modal-head"><div class="modal-title" id="meal-modal-title">Nova refeição</div><button class="btn-icon" id="close-meal-modal" type="button">×</button></div>
       <div class="form-row">
         <div class="field"><label>Nome</label><input class="input" id="m-name" placeholder="Ex: Almoço"></div>
-        <div class="field"><label>Tipo</label><select class="sel" id="m-type"><option value="cafe">Café da manhã</option><option value="almoco">Almoço</option><option value="lanche">Lanche</option><option value="jantar">Jantar</option><option value="ceia">Ceia</option></select></div>
+        <div class="field"><label>Tipo</label><select class="sel" id="m-type"><option value="cafe">Café da manhã</option><option value="almoco">Almoço</option><option value="lanche">Lanche</option><option value="jantar">Jantar</option><option value="ceia">Ceia</option><option value="pre_treino">Pré treino</option><option value="pos_treino">Pós treino</option><option value="outra">Outra</option></select></div>
       </div>
       <div class="form-row">
         <div class="field"><label>Data</label><input class="input" id="m-date" type="date"></div>
@@ -401,7 +407,7 @@
       const lsRem=k=>localStorage.removeItem('u_'+_uid()+'_'+k);
       const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
       const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-      const TYPE_LABEL={cafe:'Café da manhã',almoco:'Almoço',lanche:'Lanche',jantar:'Jantar',ceia:'Ceia'};
+      const TYPE_LABEL={cafe:'Café da manhã',almoco:'Almoço',lanche:'Lanche',jantar:'Jantar',ceia:'Ceia',pre_treino:'Pré treino',pos_treino:'Pós treino',outra:'Outra'};
 
       let meals=JSON.parse(lsGet(KEY_MEALS)||'[]');
       let _rawGoals=JSON.parse(lsGet(KEY_GOALS)||'null')||{calories:2000,water:2500};
@@ -414,7 +420,7 @@
       if(!goals.caloriesMin && !goals.caloriesMax) goals={caloriesMin:1800,caloriesMax:2200,water:goals.water||2500};
       let plan=JSON.parse(lsGet(KEY_PLAN)||'{}');
       let deletedMealIds=JSON.parse(lsGet(KEY_DELETED)||'[]');
-      let waterLogs=JSON.parse(localStorage.getItem(KEY_WATER)||'[]');
+      let waterLogs=JSON.parse(lsGet(KEY_WATER)||'[]');
       let refMonth=new Date();
       let refWeek=new Date();
       let editingMealId=null;
@@ -429,7 +435,8 @@
       const qsa = (sel) => [...document.querySelectorAll(sel)];
 
       function uid(){return crypto.randomUUID();}
-      function todayStr(){return new Date().toISOString().slice(0,10);}
+      function localIso(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+      function todayStr(){return localIso(new Date());}
       function nowTime(){const d=new Date();return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
       function saveMeals(){lsSet(KEY_MEALS,JSON.stringify(meals));}
       function saveGoalsStore(){lsSet(KEY_GOALS,JSON.stringify(goals));}
@@ -490,7 +497,7 @@
       function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
       function fmtNum(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:0});}
       function weekStart(d){const x=new Date(d);const day=x.getDay();x.setHours(0,0,0,0);x.setDate(x.getDate()-day);return x;}
-      function weekKey(d){return weekStart(d).toISOString().slice(0,10);}
+      function weekKey(d){return localIso(weekStart(d));}
       function typeClass(t){return TYPE_LABEL[t]?t:'ceia';}
       function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
       function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -603,7 +610,7 @@
       function renderWeekChart(){
         const labels=[],calVals=[],waterVals=[];
         for(let i=6;i>=0;i--){
-          const d=new Date(); d.setDate(d.getDate()-i); const s=d.toISOString().slice(0,10);
+          const d=new Date(); d.setDate(d.getDate()-i); const s=localIso(d);
           labels.push(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`);
           calVals.push(meals.filter(m=>m.date===s).reduce((a,m)=>a+Number(m.calories||0),0));
           waterVals.push(waterLogs.filter(w=>w.date===s).reduce((a,w)=>a+Number(w.ml||0),0));
@@ -668,10 +675,10 @@
         if(!plan[key]) plan[key]=[];
         const ws=weekStart(refWeek);
         const today=todayStr();
-        $('week-label').textContent=`Semana de ${fmtDate(ws.toISOString().slice(0,10))}`;
+        $('week-label').textContent=`Semana de ${fmtDate(localIso(ws))}`;
         const html=[];
         for(let i=0;i<7;i++){
-          const d=new Date(ws); d.setDate(ws.getDate()+i); const ds=d.toISOString().slice(0,10);
+          const d=new Date(ws); d.setDate(ws.getDate()+i); const ds=localIso(d);
           let row=plan[key].find(x=>x.date===ds);
           if(!row){ row={date:ds,slots:{cafe:'',almoco:'',lanche:'',jantar:'',ceia:''}}; plan[key].push(row); }
           const isToday=ds===today;
@@ -696,7 +703,7 @@
       function goToWeekOfToday(){ refWeek=new Date(); renderPlanning(); }
 
       // Wizard: copiar planejamento para hoje passo a passo
-      const WIZARD_TIMES={cafe:'08:00',almoco:'12:30',lanche:'16:00',jantar:'20:00',ceia:'22:00'};
+      const WIZARD_TIMES={cafe:'08:00',almoco:'12:30',lanche:'16:00',jantar:'20:00',ceia:'22:00',pre_treino:'07:00',pos_treino:'09:00',outra:'12:00'};
       function openWizard(){
         const key=weekKey(refWeek);
         const row=(plan[key]||[]).find(x=>x.date===todayStr());
@@ -778,7 +785,7 @@
         const first=new Date(y,m,1), start=new Date(first); start.setDate(1-first.getDay());
         const cells=[];
         for(let i=0;i<42;i++){
-          const d=new Date(start); d.setDate(start.getDate()+i); const ds=d.toISOString().slice(0,10);
+          const d=new Date(start); d.setDate(start.getDate()+i); const ds=localIso(d);
           const inMonth=d.getMonth()===m; const isToday=ds===todayStr();
           const dayMeals=meals.filter(me=>me.date===ds).sort((a,b)=>a.time.localeCompare(b.time));
           const dayWater=waterLogs.filter(w=>w.date===ds).reduce((a,w)=>a+Number(w.ml||0),0);
