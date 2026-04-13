@@ -1082,6 +1082,34 @@ apiRouter.post("/alimentacao/config", requireAuth, async (req: AuthedRequest, re
   res.status(201).json(row);
 });
 
+// ── ÁGUA ─────────────────────────────────────────────────────────────────────
+apiRouter.get("/alimentacao/water", requireAuth, async (req: AuthedRequest, res) => {
+  const date = req.query.date as string | undefined;
+  const where: any = { userId: req.userId! };
+  if (date) where.date = date;
+  const rows = await prisma.alimentacaoWater.findMany({ where, orderBy: { createdAt: "asc" } });
+  res.json(rows);
+});
+apiRouter.post("/alimentacao/water", requireAuth, async (req: AuthedRequest, res) => {
+  const schema = z.object({ usuario_id: z.string().min(1), date: z.string().min(10), ml: z.coerce.number().int().positive() });
+  const input = schema.parse(req.body);
+  if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
+  const row = await prisma.alimentacaoWater.create({ data: { userId: req.userId!, date: input.date, ml: input.ml } });
+  res.status(201).json(row);
+});
+apiRouter.delete("/alimentacao/water/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = readRouteParam(req, "id");
+  if (!id) return res.status(400).end();
+  await prisma.alimentacaoWater.deleteMany({ where: { id, userId: req.userId! } });
+  res.status(204).end();
+});
+apiRouter.delete("/alimentacao/water/date/:date", requireAuth, async (req: AuthedRequest, res) => {
+  const date = readRouteParam(req, "date");
+  if (!date) return res.status(400).end();
+  await prisma.alimentacaoWater.deleteMany({ where: { date, userId: req.userId! } });
+  res.status(204).end();
+});
+
 // ── STRAVA ───────────────────────────────────────────────────────────────────
 
 const STRAVA_CLIENT_ID     = process.env.STRAVA_CLIENT_ID     || "";

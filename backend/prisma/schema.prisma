@@ -93,6 +93,7 @@ model User {
   habitos                Habito[]
   alimentacaoRefeicoes   AlimentacaoRefeicao[]
   alimentacaoConfig      AlimentacaoConfig?
+  alimentacaoWater       AlimentacaoWater[]
   stravaToken            StravaToken?
   stravaExcluded         StravaExcluded[]
 }
@@ -525,6 +526,18 @@ model AlimentacaoConfig {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AlimentacaoWater {
+  id         String   @id @default(uuid())
+  userId     String
+  date       String
+  ml         Int
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
 model InviteCode {

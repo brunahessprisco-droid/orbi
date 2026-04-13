@@ -613,10 +613,20 @@
       const headers={'Content-Type':'application/json',...(opts.headers||{})};
       if(authToken)headers.Authorization='Bearer '+authToken;
       let res;
-      try{res=await fetch(getApiBase()+path,{...opts,headers});}catch(e){throw new Error('Falha de rede');}
+      try{res=await fetch(getApiBase()+path,{...opts,headers});}catch(e){const err=new Error('Falha de rede');err.network=true;throw err;}
       if(!res.ok){let msg='Erro';try{const j=await res.json();msg=j.error||msg;}catch(_){}throw new Error(msg);}
       if(res.status===204)return null;
       return res.json();
+    }
+    async function apiReqRetry(path,opts={},maxTries=4){
+      const delays=[3000,8000,15000];
+      for(let i=0;i<maxTries;i++){
+        try{return await apiReq(path,opts);}
+        catch(e){
+          if(!e.network||i===maxTries-1)throw e;
+          await new Promise(r=>setTimeout(r,delays[i]||15000));
+        }
+      }
     }
     async function checkAuthSaude(){
       if(!authToken)return false;
@@ -718,10 +728,10 @@
       // Puxamos dados da API e mesclamos com o estado local
       try{
         const[rW,rM,rE,rC]=await Promise.all([
-          apiReq('/health/weights'),
-          apiReq(`/saude/medicos?usuario_id=${API_USER_ID}`),
-          apiReq(`/saude/exames?usuario_id=${API_USER_ID}`),
-          apiReq(`/saude/consultas?usuario_id=${API_USER_ID}`),
+          apiReqRetry('/health/weights'),
+          apiReqRetry(`/saude/medicos?usuario_id=${API_USER_ID}`),
+          apiReqRetry(`/saude/exames?usuario_id=${API_USER_ID}`),
+          apiReqRetry(`/saude/consultas?usuario_id=${API_USER_ID}`),
         ]);
         // HealthWeight usa modelo diferente — mapeamos via extraJson
         const deleted = {
