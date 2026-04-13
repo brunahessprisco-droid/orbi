@@ -51,7 +51,7 @@ Each module is a standalone HTML file with inline `<script>` — no bundler, no 
 | `Alimentacao.html` | Nutrition |
 | `Saude.html` | Health (weight, exams, appointments, meds) |
 
-The hub (`index.html`) reads data from **localStorage** populated by `hubBootstrap()`, which fetches from all modules' APIs on load. Data is stored per-user with `_lsSet(key, val)` / `_lsGet(key)` helpers that namespace by `hub_user_id`.
+The hub (`index.html`) uses localStorage as a **read cache** only. On load, `hubBootstrap()` fetches from all module APIs and writes to localStorage. The hub calendar and today card read from this cache for fast rendering. Hub actions (toggle habit, complete task, complete workout) write directly to the API and update the cache in sync. Data is namespaced per-user via `_lsSet(key, val)` / `_lsGet(key)` helpers that prefix with `u_${hub_user_id}_`.
 
 ### Key localStorage keys (hub)
 - `hub_fin_cache` — transactions
