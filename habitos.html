@@ -614,6 +614,42 @@
   .cal-habit-row-check{font-size:15px;flex-shrink:0;color:var(--blue);}
   .cal-habit-row.undone .cal-habit-row-check{color:var(--border2,rgba(255,255,255,.2));}
   .cal-none{color:var(--hint);text-align:center;padding:24px 0;font-size:13px;}
+
+  /* ── Icon Picker ────────────────────────── */
+  .icon-picker-wrap{position:relative;}
+  .icon-picker-btn{
+    display:flex;align-items:center;gap:8px;width:100%;
+    padding:9px 12px;background:var(--surface2);border:1px solid var(--border);
+    border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;
+    cursor:pointer;text-align:left;transition:border-color .15s;
+  }
+  .icon-picker-btn:hover{border-color:var(--border2);}
+  .icon-preview-el{font-size:18px;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;width:22px;}
+  .icon-picker-panel{
+    display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;
+    background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
+    box-shadow:0 12px 40px var(--shadow);z-index:200;
+    padding:10px;max-height:300px;overflow-y:auto;min-width:280px;
+  }
+  .icon-picker-panel.open{display:block;}
+  .icon-search{
+    width:100%;background:var(--surface2);border:1px solid var(--border);
+    border-radius:8px;padding:7px 10px;color:var(--text);font:inherit;font-size:12px;
+    outline:none;margin-bottom:10px;
+  }
+  .icon-search:focus{border-color:var(--border2);}
+  .icon-cat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:8px 0 5px;}
+  .icon-cat-label:first-child{margin-top:0;}
+  .icon-grid{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;}
+  .icon-item{
+    width:32px;height:32px;border-radius:8px;border:1px solid transparent;
+    background:var(--surface2);display:flex;align-items:center;justify-content:center;
+    font-size:16px;cursor:pointer;transition:.12s;color:var(--text);
+  }
+  .icon-item:hover{border-color:var(--border2);background:var(--surface3);}
+  .icon-item.selected{border-color:var(--purple);background:var(--purple-bg);color:var(--purple);}
+  .icon-item.hidden{display:none;}
+  .hab-emoji{font-size:1em;}
   </style>
 </head>
 <body>
@@ -776,7 +812,18 @@
         </div>
         <div class="field">
           <label>Ícone</label>
-          <input class="input" id="f-icon" placeholder="💧">
+          <div class="icon-picker-wrap">
+            <button class="icon-picker-btn" type="button" onclick="toggleIconPicker(event)" id="icon-picker-btn">
+              <span class="icon-preview-el" id="icon-preview-el"><i class="bi bi-stars"></i></span>
+              <span id="icon-picker-label" style="flex:1;font-size:12px;color:var(--muted);">Escolher ícone</span>
+              <i class="bi bi-chevron-down" style="font-size:10px;color:var(--hint);"></i>
+            </button>
+            <input type="hidden" id="f-icon" value="">
+            <div class="icon-picker-panel" id="icon-picker-panel">
+              <input class="icon-search" id="icon-search" placeholder="Buscar…" oninput="filterIcons(this.value)">
+              <div id="icon-grid-container"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1090,7 +1137,7 @@
         if(!h) return;
         document.getElementById('modal-title').textContent='Editar hábito';
         document.getElementById('f-name').value=h.name||'';
-        document.getElementById('f-icon').value=h.icon||'';
+        _setIconVal(h.icon||'');
         document.getElementById('f-cat').value=h.cat||'outro';
         document.getElementById('f-freq').value=h.freq||'diario';
         document.getElementById('f-tipo').value=h.tipo||'check';
@@ -1127,10 +1174,113 @@
       _habitDirty=false;
     }
 
+    // ── hIcon helper (retrocompat: emoji continua funcionando) ──
+    function hIcon(icon){
+      if(!icon) return '<i class="bi bi-stars"></i>';
+      if(icon.startsWith('bi-')) return `<i class="bi ${icon}"></i>`;
+      return `<span class="hab-emoji">${escapeHtml(icon)}</span>`;
+    }
+
+    // ── Icon Picker ─────────────────────────────────────────────
+    const ICON_CATS=[
+      {label:'Corpo & Saúde', icons:[
+        'bi-heart','bi-heart-pulse','bi-droplet','bi-lungs','bi-thermometer-half',
+        'bi-bandaid','bi-capsule','bi-eye','bi-ear','bi-cup-straw',
+        'bi-person-arms-up','bi-activity','bi-clipboard2-pulse'
+      ]},
+      {label:'Exercício', icons:[
+        'bi-dumbbell','bi-bicycle','bi-person-walking','bi-stopwatch',
+        'bi-lightning','bi-fire','bi-trophy','bi-flag','bi-arrow-repeat','bi-speedometer2'
+      ]},
+      {label:'Mente & Bem-estar', icons:[
+        'bi-brain','bi-peace','bi-moon-stars','bi-sun','bi-stars',
+        'bi-headphones','bi-music-note','bi-flower1','bi-leaf','bi-cloud',
+        'bi-emoji-smile','bi-balloon'
+      ]},
+      {label:'Produtividade', icons:[
+        'bi-book','bi-journal','bi-pencil','bi-lightbulb','bi-alarm',
+        'bi-clock','bi-laptop','bi-code-slash','bi-briefcase',
+        'bi-calendar-check','bi-list-check','bi-kanban'
+      ]},
+      {label:'Casa & Rotina', icons:[
+        'bi-house','bi-cup-hot','bi-broom','bi-basket','bi-tools',
+        'bi-tree','bi-water','bi-droplet-fill','bi-shop','bi-archive'
+      ]},
+      {label:'Extras', icons:[
+        'bi-star','bi-gem','bi-rocket','bi-compass','bi-globe',
+        'bi-gift','bi-lightning-charge','bi-shield-check','bi-award',
+        'bi-pin','bi-camera','bi-controller'
+      ]}
+    ];
+
+    function _setIconVal(val){
+      document.getElementById('f-icon').value=val||'';
+      const prev=document.getElementById('icon-preview-el');
+      const lbl=document.getElementById('icon-picker-label');
+      if(prev) prev.innerHTML=hIcon(val||'bi-stars');
+      if(lbl) lbl.textContent=val ? val.replace('bi-','') : 'Escolher ícone';
+      document.querySelectorAll('.icon-item').forEach(el=>{
+        el.classList.toggle('selected', el.dataset.icon===val);
+      });
+    }
+
+    function _buildIconGrid(){
+      const container=document.getElementById('icon-grid-container');
+      if(!container||container.children.length) return;
+      container.innerHTML=ICON_CATS.map(cat=>`
+        <div class="icon-cat-label">${cat.label}</div>
+        <div class="icon-grid">${cat.icons.map(ic=>
+          `<button class="icon-item" type="button" data-icon="${ic}" title="${ic.slice(3)}" onclick="selectIcon('${ic}')"><i class="bi ${ic}"></i></button>`
+        ).join('')}</div>
+      `).join('');
+    }
+
+    function toggleIconPicker(e){
+      e.stopPropagation();
+      _buildIconGrid();
+      const panel=document.getElementById('icon-picker-panel');
+      const nowOpen=!panel.classList.contains('open');
+      panel.classList.toggle('open',nowOpen);
+      if(nowOpen){
+        document.getElementById('icon-search').value='';
+        filterIcons('');
+        document.getElementById('icon-search').focus();
+        setTimeout(()=>document.addEventListener('click',_closePickerOutside,{once:true}),0);
+      }
+    }
+
+    function _closePickerOutside(e){
+      const panel=document.getElementById('icon-picker-panel');
+      if(panel&&!panel.contains(e.target)){panel.classList.remove('open');}
+      else if(panel&&panel.classList.contains('open')){
+        document.addEventListener('click',_closePickerOutside,{once:true});
+      }
+    }
+
+    function selectIcon(ic){
+      _setIconVal(ic);
+      document.getElementById('icon-picker-panel').classList.remove('open');
+      _habitDirty=true;
+    }
+
+    function filterIcons(q){
+      q=q.toLowerCase().replace(/^bi-/,'');
+      document.querySelectorAll('.icon-item').forEach(el=>{
+        el.classList.toggle('hidden',!!q&&!el.dataset.icon.slice(3).includes(q));
+      });
+      document.querySelectorAll('.icon-cat-label').forEach(lbl=>{
+        const grid=lbl.nextElementSibling;
+        if(!grid) return;
+        const visible=[...grid.querySelectorAll('.icon-item')].some(el=>!el.classList.contains('hidden'));
+        lbl.style.display=visible?'':'none';
+        grid.style.display=visible?'':'none';
+      });
+    }
+
     function resetForm(){
       editingId=null;
       document.getElementById('f-name').value='';
-      document.getElementById('f-icon').value='';
+      _setIconVal('');
       document.getElementById('f-cat').value='saude';
       document.getElementById('f-freq').value='diario';
       document.getElementById('f-tipo').value='check';
@@ -1172,7 +1322,7 @@
 
     function saveHabit(){
       const name=document.getElementById('f-name').value.trim();
-      const icon=document.getElementById('f-icon').value.trim()||'✨';
+      const icon=document.getElementById('f-icon').value.trim()||'bi-stars';
       const cat=document.getElementById('f-cat').value;
       const freq=document.getElementById('f-freq').value;
       const weekdays=getSelectedWeekdays();
@@ -1408,7 +1558,7 @@
         return;
       }
 
-      const todayItems=autoToday.map(h=>`<span class="auto-banner-chip">${escapeHtml(h.icon||'✨')} ${escapeHtml(h.name)}</span>`).join('');
+      const todayItems=autoToday.map(h=>`<span class="auto-banner-chip">${hIcon(h.icon)} ${escapeHtml(h.name)}</span>`).join('');
       const srcLabel={treino_realizado:'Exercícios',tarefa_concluida:'Casa/Tarefas'};
 
       banner.style.display='block';
@@ -1506,7 +1656,7 @@
             ondrop="habitDrop(event,'${h.id}')"
             ondragend="habitDragEnd()">
             <div class="drag-handle">⠿</div>
-            <div class="hicon">${escapeHtml(h.icon||'✨')}</div>
+            <div class="hicon">${hIcon(h.icon)}</div>
             <div class="hmeta">
               <div class="htitle">${escapeHtml(h.name)}</div>
               <div class="hsub">🔥 ${s.current} · 🏆 ${s.best}${autoLabel}</div>
@@ -1565,10 +1715,11 @@
         .map(h=>({h,s:streak(h)}))
         .sort((a,b)=>b.s.best-a.s.best || b.s.current-a.s.current || a.h.name.localeCompare(b.h.name));
 
-      document.getElementById('rank-list').innerHTML = ranked.length ? ranked.slice(0,8).map((x,i)=>`
+      const rankEl=document.getElementById('rank-list');
+      if(rankEl) rankEl.innerHTML = ranked.length ? ranked.slice(0,8).map((x,i)=>`
         <div class="rank-row">
           <div class="rank-num">${i+1}</div>
-          <div class="rank-name">${escapeHtml(x.h.icon||'✨')} ${escapeHtml(x.h.name)}</div>
+          <div class="rank-name">${hIcon(x.h.icon)} ${escapeHtml(x.h.name)}</div>
           <div class="rank-val">🔥 ${x.s.current} · 🏆 ${x.s.best}</div>
         </div>
       `).join('') : `<div class="empty">Sem hábitos ainda.</div>`;
@@ -1580,7 +1731,8 @@
         `${habits.filter(h=>h.autoType).length} hábitos com automação`,
       ];
 
-      document.getElementById('quick-list').innerHTML = quick.map((t,i)=>`
+      const quickEl=document.getElementById('quick-list');
+      if(quickEl) quickEl.innerHTML = quick.map((t,i)=>`
         <div class="rank-row">
           <div class="rank-num">${i+1}</div>
           <div class="rank-name">${t}</div>
@@ -1611,7 +1763,7 @@
           <div class="item-card">
             <div class="item-top">
               <div>
-                <div class="item-name">${escapeHtml(h.icon||'✨')} ${escapeHtml(h.name)}</div>
+                <div class="item-name">${hIcon(h.icon)} ${escapeHtml(h.name)}</div>
                 <div class="item-sub">${weekdayText}${h.note ? ' · ' + escapeHtml(h.note) : ''}</div>
               </div>
               <div class="item-actions">
@@ -1640,7 +1792,7 @@
           <div class="archived-title">📦 Arquivados <span style="font-weight:400;color:var(--hint);font-size:10px;">${archivedList.length} hábito${archivedList.length!==1?'s':''}</span></div>
           ${archivedList.map(h=>`
             <div class="archived-item">
-              <span style="font-size:18px;">${escapeHtml(h.icon||'✨')}</span>
+              <span style="font-size:18px;">${hIcon(h.icon)}</span>
               <span class="archived-item-name">${escapeHtml(h.name)}</span>
               <span style="font-size:11px;color:var(--muted);">${catLabel(h.cat)}</span>
               <button class="btn btn-icon" title="Restaurar" onclick="unarchiveHabit('${h.id}')" style="margin-left:auto;">↩️</button>
@@ -2008,7 +2160,7 @@
         if(r.isControle){
           return`<div class="stat-card">
             <div class="stat-card-head">
-              <div class="stat-card-icon">${escapeHtml(r.h.icon||'✨')}</div>
+              <div class="stat-card-icon">${hIcon(r.h.icon)}</div>
               <div>
                 <div class="stat-card-name">${escapeHtml(r.h.name)}</div>
                 <div class="stat-card-cat">${catLabel(r.h.cat)} · Controle${r.h.unit?' · '+escapeHtml(r.h.unit):''}</div>
@@ -2091,7 +2243,7 @@
         const allDone=planned.length>0&&doneCount===planned.length;
         const icons=planned.map(h=>{
           const done=!!(h.logs&&h.logs[dateStr]);
-          return`<div class="cal-habit-dot ${done?'done':'undone'}" title="${escapeHtml(h.name)}">${escapeHtml(h.icon||'✨')}</div>`;
+          return`<div class="cal-habit-dot ${done?'done':'undone'}" title="${escapeHtml(h.name)}">${hIcon(h.icon)}</div>`;
         }).join('');
         const progress=planned.length
           ? `<div class="cal-day-progress${allDone?' all-done':''}">${doneCount}/${planned.length}</div>`
@@ -2130,7 +2282,7 @@
         const done=!!logVal;
         if(h.tipo==='controle'){
           return`<div class="cal-habit-row ${done?'done':'undone'}${isFuture?' future-day':''}">
-            <div class="cal-habit-row-icon">${escapeHtml(h.icon||'✨')}</div>
+            <div class="cal-habit-row-icon">${hIcon(h.icon)}</div>
             <div class="cal-habit-row-name">${escapeHtml(h.name)}${h.unit?`<span style="font-size:10px;color:var(--muted);margin-left:6px;">${escapeHtml(h.unit)}</span>`:''}</div>
             <input class="sq-val ${done?'has-val':''}" value="${escapeHtml(String(logVal||''))}" maxlength="4"
               style="width:48px;height:28px;font-size:13px;"

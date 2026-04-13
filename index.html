@@ -509,6 +509,7 @@ function loadMealPlan(){ try{return JSON.parse(_lsGet('alimentacao_plan_v3_light
 function getMealPlanForDate(dateStr){ const p=loadMealPlan(); for(const week of Object.values(p)){ if(Array.isArray(week)){const row=week.find(x=>x.date===dateStr); if(row)return row.slots||null;} } return null; }
 function fmt(v){return 'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtNum(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:0});}
+function hIcon(icon){if(!icon)return'<i class="bi bi-stars"></i>';if(icon.startsWith('bi-'))return`<i class="bi ${icon}"></i>`;const d=document.createElement('span');d.textContent=icon;return d.outerHTML;}
 
 async function fetchFinancas(){
   const token=localStorage.getItem(AUTH_KEY);
@@ -641,7 +642,7 @@ function openDay(dateStr){
     POP_GROUPS.forEach(g=>{
       const gh=habitosFeitos.filter(g.filter);
       if(!gh.length) return;
-      habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>`<div class="popup-item"><div class="popup-item-name">${h.icon||''} ${h.name||'Hábito'}</div><div class="popup-item-val blue">✓ feito</div></div>`).join('')}`;
+      habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}</div><div class="popup-item-val blue">✓ feito</div></div>`).join('')}`;
     });
     habPopHtml+='</div>';
     html+=habPopHtml;
@@ -682,7 +683,7 @@ function hubToggleHabito(id,dateStr){
 }
 function _openControleModal(h,dateStr){
   _controleState={id:h.id,dateStr};
-  document.getElementById('hc-title').textContent=h.icon?h.icon+' '+h.name:h.name||'Registrar valor';
+  document.getElementById('hc-title').innerHTML=(h.icon?hIcon(h.icon)+' ':'')+((h.name||'Registrar valor').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])));
   document.getElementById('hc-unit').textContent=h.unit||'';
   const cur=(h.logs&&h.logs[dateStr])||'';
   const inp=document.getElementById('hc-input');
@@ -748,7 +749,7 @@ function rendTodaySummary(){
     habHtml='<div class="td-habits">'+HAB_GROUPS.map(g=>{
       const gh=todosHabitos.filter(g.filter);
       if(!gh.length) return '';
-      return `<div class="td-hab-group"><div class="td-hab-group-label">${g.label}</div><div class="td-hab-icons">${gh.map(h=>{const done=!!(h.logs&&h.logs[cardStr]);return`<div class="td-habit-icon ${done?'done':'undone'}" title="${h.name||'Hábito'}" onclick="hubToggleHabito('${h.id}','${cardStr}')">${h.icon||'🔁'}</div>`;}).join('')}</div></div>`;
+      return `<div class="td-hab-group"><div class="td-hab-group-label">${g.label}</div><div class="td-hab-icons">${gh.map(h=>{const done=!!(h.logs&&h.logs[cardStr]);return`<div class="td-habit-icon ${done?'done':'undone'}" title="${h.name||'Hábito'}" onclick="hubToggleHabito('${h.id}','${cardStr}')">${hIcon(h.icon)}</div>`;}).join('')}</div></div>`;
     }).join('')+'</div>';
   }
 
