@@ -645,13 +645,34 @@ function openDay(dateStr){
 }
 function closeOv(){document.getElementById('ov-day').classList.remove('open');}
 
+async function hubSyncHabito(h){
+  const token=localStorage.getItem(AUTH_KEY);
+  const uid=localStorage.getItem('hub_user_id');
+  if(!token||!uid)return;
+  try{
+    await fetch(`${getApiBase()}/habitos`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({
+        usuario_id:uid,client_id:h.id,nome:h.name,icone:h.icon||null,
+        categoria:h.cat||null,frequencia:h.freq||null,weekdays:h.weekdays||[],
+        obs:h.note||null,autoType:h.autoType||null,autoKeyword:h.autoKeyword||null,
+        tipo:h.tipo||'check',unit:h.unit||null,startDate:h.startDate||null,
+        logs:h.logs||{},
+      }),
+    });
+  }catch(_){}
+}
+
 let _controleState={id:null,dateStr:null};
 function hubToggleHabito(id,dateStr){
   const arr=loadHabitos(); const h=arr.find(x=>x.id===id); if(!h)return;
   if(h.tipo==='controle'){ _openControleModal(h,dateStr); return; }
   if(!h.logs)h.logs={};
   if(h.logs[dateStr])delete h.logs[dateStr]; else h.logs[dateStr]=true;
-  _lsSet('habitos_app_v5',JSON.stringify(arr)); rendTodaySummary(); rendCal();
+  _lsSet('habitos_app_v5',JSON.stringify(arr));
+  hubSyncHabito(h);
+  rendTodaySummary(); rendCal();
 }
 function _openControleModal(h,dateStr){
   _controleState={id:h.id,dateStr};
@@ -668,7 +689,9 @@ function _clearControleModal(){
   const{id,dateStr}=_controleState; if(!id)return;
   const arr=loadHabitos(); const h=arr.find(x=>x.id===id); if(!h)return;
   if(h.logs)delete h.logs[dateStr];
-  _lsSet('habitos_app_v5',JSON.stringify(arr)); _closeControleModal(); rendTodaySummary(); rendCal();
+  _lsSet('habitos_app_v5',JSON.stringify(arr));
+  hubSyncHabito(h);
+  _closeControleModal(); rendTodaySummary(); rendCal();
 }
 function _saveControleModal(){
   const{id,dateStr}=_controleState; if(!id)return;
@@ -676,7 +699,9 @@ function _saveControleModal(){
   const arr=loadHabitos(); const h=arr.find(x=>x.id===id); if(!h)return;
   if(!h.logs)h.logs={};
   if(val)h.logs[dateStr]=val; else delete h.logs[dateStr];
-  _lsSet('habitos_app_v5',JSON.stringify(arr)); _closeControleModal(); rendTodaySummary(); rendCal();
+  _lsSet('habitos_app_v5',JSON.stringify(arr));
+  hubSyncHabito(h);
+  _closeControleModal(); rendTodaySummary(); rendCal();
 }
 function hubCheckTreino(id){
   const arr=loadTreinos(); const t=arr.find(x=>x.id===id); if(!t)return;
