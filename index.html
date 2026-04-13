@@ -623,8 +623,10 @@ async function hubBootstrap(){
     localStorage.setItem('u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1', String(Date.now()));
     updateHubSyncIndicator();
   }catch(e){console.warn('Hub bootstrap:',e);
+    // Mesmo com erro, renderiza com cache local para não travar a UI
+    rendTodaySummary(); rendCal();
     const label=document.getElementById('hub-sync-label');
-    if(label){label.textContent='Erro na sincronização';label.style.color='var(--red)';}
+    if(label){label.textContent='Erro na sincronização — mostrando dados em cache';label.style.color='var(--amber)';}
   }
   hubBootstrapGcal();
 }
