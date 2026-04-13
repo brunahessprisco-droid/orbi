@@ -935,12 +935,23 @@
     const KEY='habitos_app_v5';
     const KEY_ARCHIVED='habitos_archived_v1';
     const KEY_DISMISSED='habitos_auto_dismissed_v1';
+    const KEY_DIRTY='habitos_dirty_v1';
+    const KEY_DELETED='habitos_deleted_v1';
     const SK_AUTH='fin_auth_token_v1',SK_API='fin_api_base_v1';
     // storage helpers – isolamento por usuário
     function _uid(){return localStorage.getItem('hub_user_id')||'anon';}
     function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
     function lsSet(k,v){localStorage.setItem('u_'+_uid()+'_'+k,v);}
     function lsRem(k){localStorage.removeItem('u_'+_uid()+'_'+k);}
+    // Dirty/deleted queue helpers
+    function _habGetSet(k){try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}}
+    function _habSetSet(k,s){lsSet(k,JSON.stringify([...s]));}
+    function markHabDirty(id){const s=_habGetSet(KEY_DIRTY);s.add(id);_habSetSet(KEY_DIRTY,s);}
+    function clearHabDirty(id){const s=_habGetSet(KEY_DIRTY);s.delete(id);_habSetSet(KEY_DIRTY,s);}
+    function getHabDirty(){return _habGetSet(KEY_DIRTY);}
+    function markHabDeleted(dbId){if(!dbId)return;const s=_habGetSet(KEY_DELETED);s.add(dbId);_habSetSet(KEY_DELETED,s);}
+    function clearHabDeleted(dbId){if(!dbId)return;const s=_habGetSet(KEY_DELETED);s.delete(dbId);_habSetSet(KEY_DELETED,s);}
+    function getHabDeleted(){return _habGetSet(KEY_DELETED);}
     const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
     let authToken=localStorage.getItem(SK_AUTH)||'';
@@ -1014,17 +1025,25 @@
         tipo:h.tipo||'check',unit:h.unit||null,startDate:h.startDate||null,
         logs:h.logs||{},
       })});
+      clearHabDirty(h.id);
     }
 
     async function deleteHabitoApi(h){
       if(!canUseApi()||!h._dbId)return;
-      await apiReq(`/habitos/${h._dbId}`,{method:'DELETE'});
+      markHabDeleted(h._dbId);
+      try{await apiReq(`/habitos/${h._dbId}`,{method:'DELETE'});clearHabDeleted(h._dbId);}
+      catch(e){console.error('DELETE hábito falhou:',e);}
     }
 
     async function bootstrapApi(){
       if(!canUseApi())return;
       try{
         const rows=await apiReq(`/habitos?usuario_id=${API_USER_ID}`);
+        // Process deleted queue first
+        const delSet=getHabDeleted();
+        for(const dbId of delSet){
+          try{await apiReq(`/habitos/${dbId}`,{method:'DELETE'});clearHabDeleted(dbId);}catch(_){}
+        }
         const apiHabitos=rows.map(r=>({
           id:r.client_id,_dbId:r.id,name:r.nome,icon:r.icone||'✨',
           cat:r.categoria||'outro',freq:r.frequencia||'diario',
@@ -1032,7 +1051,7 @@
           autoType:r.autoType||'',autoKeyword:r.autoKeyword||'',
           tipo:r.tipo||'check',unit:r.unit||'',startDate:r.startDate||'',
           logs:r.logs||{},
-        }));
+        })).filter(h=>!delSet.has(h._dbId));
         const localHabits=JSON.parse(lsGet(KEY)||'[]');
         // Backfill tipo/unit/startDate from localStorage for habits that have null in the API
         // (happens for habits created before these columns were added to the schema)
@@ -1064,6 +1083,15 @@
         for(const h of naoSinc)await syncHabito(h).catch(()=>null);
         // Resync habits that had tipo/unit/startDate backfilled from localStorage → grava no banco
         for(const h of toResync)await syncHabito(h).catch(()=>null);
+        // Process dirty queue - push local changes that haven't been confirmed
+        const dirtySet=getHabDirty();
+        if(dirtySet.size>0){
+          const localById2=Object.fromEntries(localHabits.map(h=>[h.id,h]));
+          for(const id of dirtySet){
+            const h=habits.find(x=>x.id===id)||localById2[id];
+            if(h)await syncHabito(h).catch(()=>null);
+          }
+        }
         if(habits.length===0){
           habits=[
             {id:uid(),name:'Beber água',icon:'💧',cat:'saude',freq:'diario',weekdays:[],note:'',autoType:'',autoKeyword:'',logs:{}},
@@ -1394,11 +1422,11 @@
         const h=habits.find(x=>x.id===editingId);
         if(!h) return;
         Object.assign(h,payload);
-        save();syncHabito(h).catch(()=>null);
+        save();markHabDirty(h.id);syncHabito(h).catch(()=>null);
       }else{
         const h={id:uid(),...payload,logs:{}};
         habits.push(h);
-        save();syncHabito(h).catch(()=>null);
+        save();markHabDirty(h.id);syncHabito(h).catch(()=>null);
       }
 
       save();
@@ -1414,6 +1442,7 @@
       const h=habits.find(x=>x.id===id);
       if(!h) return;
       if(!confirm(`Excluir o hábito "${h.name}"?`)) return;
+      if(h._dbId) markHabDeleted(h._dbId);
       habits=habits.filter(x=>x.id!==id);
       save();
       // Reset filters so deleted habit doesn't appear due to stale filter state

@@ -1158,6 +1158,26 @@ html.privacy .fin-cal-tx-val{filter:blur(8px);user-select:none;pointer-events:no
 <script>
 const SK='financas_v6_clean',SK_C='fin_cartoes_v6_clean',SK_CAT='fin_cats_v6_clean',SK_FX='fin_fixas_v6_clean',SK_FXV='fin_fixas_vals_v6_clean',SK_THEME='app_theme';
 const SK_BGT='fin_budgets_v6_clean',SK_SAVING='fin_saving_goal_v6_clean',SK_RPROJ='fin_receitas_proj_v6_clean',SK_POUPP='fin_poupanca_v6_clean';
+
+// ===== DIRTY / DELETED QUEUES =====
+const SK_DIRTY_TX='fin_dirty_v1',SK_DEL_TX='fin_deleted_v1';
+const SK_DIRTY_CAT='fin_cat_dirty_v1',SK_DEL_CAT='fin_cat_deleted_v1';
+const SK_DIRTY_C='fin_conta_dirty_v1',SK_DEL_C='fin_conta_deleted_v1';
+const SK_DIRTY_FX='fin_fixa_dirty_v1',SK_DEL_FX='fin_fixa_deleted_v1';
+const SK_DIRTY_FXV='fin_fixaval_dirty_v1',SK_DEL_FXV='fin_fixaval_deleted_v1';
+const SK_DIRTY_PR='fin_proj_dirty_v1',SK_DEL_PR='fin_proj_deleted_v1';
+function _finDirtyKey(entity){return 'u_'+(API_USER_ID||'anon')+'_'+entity;}
+function _finGetSet(key){try{return new Set(JSON.parse(localStorage.getItem(_finDirtyKey(key))||'[]'));}catch{return new Set();}}
+function _finSetSet(key,s){localStorage.setItem(_finDirtyKey(key),JSON.stringify([...s]));}
+function markDirty(entity,id){_finSetSet(entity,new Set([..._finGetSet(entity),id]));}
+function clearDirty(entity,id){const s=_finGetSet(entity);s.delete(id);_finSetSet(entity,s);}
+function getDirty(entity){return _finGetSet(entity);}
+function markDeleted(entity,id){_finSetSet(entity,new Set([..._finGetSet(entity),id]));}
+function clearDeleted(entity,id){const s=_finGetSet(entity);s.delete(id);_finSetSet(entity,s);}
+function getDeleted(entity){return _finGetSet(entity);}
+function hasPendingSync(){
+  return [SK_DIRTY_TX,SK_DEL_TX,SK_DIRTY_CAT,SK_DEL_CAT,SK_DIRTY_C,SK_DEL_C,SK_DIRTY_FX,SK_DEL_FX,SK_DIRTY_FXV,SK_DEL_FXV,SK_DIRTY_PR,SK_DEL_PR].some(k=>{try{const v=localStorage.getItem(_finDirtyKey(k));return v&&v!=='[]'&&v!=='{}';}catch{return false;}});
+}
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MESES_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const CARD_COLORS=['#2dd4a0','#7b9cff','#f06292','#fbbf24','#f97316','#a855f7','#06b6d4','#ec4899','#6366f1','#10b981','#84cc16','#ef4444'];
@@ -1213,6 +1233,14 @@ function saveFXV(){scheduleFixaValSync();}
 function saveBGT(){scheduleBudgetSync();}
 function saveSV(){scheduleSavingSync();}
 function savePP(){schedulePoupancaSync();}
+
+// Wrapper saves that also mark dirty
+function saveTxDirty(id){markDirty(SK_DIRTY_TX,id);save();}
+function saveCatDirty(id){markDirty(SK_DIRTY_CAT,id);saveCAT();}
+function saveCDirty(id){markDirty(SK_DIRTY_C,id);saveC();}
+function saveFXDirty(id){markDirty(SK_DIRTY_FX,id);saveFX();}
+function saveFXVDirty(id){markDirty(SK_DIRTY_FXV,id);saveFXV();}
+function savePRDirty(id){markDirty(SK_DIRTY_PR,id);scheduleProjExtrasSync();}
 
 function canUseApi(){return !!(authToken&&API_USER_ID);}
 let apiBase=localStorage.getItem(SK_API_BASE)||API_BASE;
@@ -1495,69 +1523,133 @@ async function syncCategoriasToApi(){
   if(!canUseApi())return;
   const existentes=await apiReq(`/categorias?usuario_id=${API_USER_ID}`);
   const localIds=new Set(cats.map(c=>String(c.id)));
-  await Promise.all(existentes
-    .filter(c=>c.client_id&&!localIds.has(String(c.client_id)))
-    .map(c=>apiReq(`/categorias/${c.id}`,{method:'DELETE'})));
+  // Process deleted queue — só deleta remoto o que está na fila
+  const delSet=getDeleted(SK_DEL_CAT);
+  const apiByCid={};
+  existentes.forEach(c=>{apiByCid[String(c.client_id)]=c;});
+  for(const dbId of delSet){
+    const apiC=apiByCid[dbId];
+    if(apiC){try{await apiReq(`/categorias/${apiC.id}`,{method:'DELETE'});}catch(_){}}
+    clearDeleted(SK_DEL_CAT,dbId);
+  }
+  // Importar categorias que existem na API mas não local (vieram de outro device)
+  for(const[cid,apiC]of Object.entries(apiByCid)){
+    if(!localIds.has(cid)){
+      cats.push({id:cid,_dbId:apiC.id,nome:apiC.nome||'Outros',cor:apiC.cor||'#7b9cff'});
+    }
+  }
+  // Upsert local → API (só se tiver mudanças)
   for(const c of cats){
     if(!c.nome)continue;
-    await apiReq('/categorias',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:String(c.id),nome:c.nome,cor:c.cor||'#7b9cff'})});
+    try{await apiReq('/categorias',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:String(c.id),nome:c.nome,cor:c.cor||'#7b9cff'})});clearDirty(SK_DIRTY_CAT,c.id);}catch(_){}
   }
+  saveCAT();updCatFilter();
 }
 async function syncTxsToApi(){
   if(!canUseApi())return;
   const existentes=await apiReq(`/transacoes?usuario_id=${API_USER_ID}`);
   const localIds=new Set(txs.map(t=>String(t.id)));
-  await Promise.all(existentes
-    .filter(t=>t.client_id&&!localIds.has(String(t.client_id)))
-    .map(t=>apiReq(`/transacoes/${t.id}`,{method:'DELETE'})));
-  await Promise.all(txs.map(t=>apiReq('/transacoes',{method:'POST',body:JSON.stringify(txToApi(t))}).catch(()=>null)));
+  // Process deleted queue — só deleta remoto o que está na fila
+  const delSet=getDeleted(SK_DEL_TX);
+  const apiByCid={};
+  existentes.forEach(t=>{apiByCid[String(t.client_id)]=t;});
+  for(const dbId of delSet){
+    const apiT=apiByCid[dbId];
+    if(apiT){try{await apiReq(`/transacoes/${apiT.id}`,{method:'DELETE'});}catch(_){}}
+    clearDeleted(SK_DEL_TX,dbId);
+  }
+  // Importar transações que existem na API mas não local (vieram de outro device)
+  for(const[cid,apiT]of Object.entries(apiByCid)){
+    if(!localIds.has(cid)){
+      txs.push(txFromApi(apiT));
+    }
+  }
+  // Upsert local → API
+  await Promise.allSettled(txs.map(async(t)=>{
+    try{await apiReq('/transacoes',{method:'POST',body:JSON.stringify(txToApi(t))});clearDirty(SK_DIRTY_TX,t.id);}catch(_){}
+  }));
+  try{localStorage.setItem('u_'+API_USER_ID+'_'+SK,JSON.stringify(txs));}catch(_){}
 }
 async function syncContasToApi(){
   if(!canUseApi())return;
   const existentes=await apiReq(`/contas?usuario_id=${API_USER_ID}`);
   const localIds=new Set(cartoes.map(c=>String(c.id)));
-  await Promise.all(existentes
-    .filter(c=>c.client_id&&!localIds.has(String(c.client_id)))
-    .map(c=>apiReq(`/contas/${c.id}`,{method:'DELETE'})));
-  for(const c of cartoes){
-    await apiReq('/contas',{method:'POST',body:JSON.stringify(contaToApi(c))});
+  // Process deleted queue
+  const delSet=getDeleted(SK_DEL_C);
+  const apiByCid={};
+  existentes.forEach(c=>{apiByCid[String(c.client_id)]=c;});
+  for(const dbId of delSet){
+    const apiC=apiByCid[dbId];
+    if(apiC){try{await apiReq(`/contas/${apiC.id}`,{method:'DELETE'});}catch(_){}}
+    clearDeleted(SK_DEL_C,dbId);
   }
+  // Importar contas que existem na API mas não local
+  for(const[cid,apiC]of Object.entries(apiByCid)){
+    if(!localIds.has(cid)){
+      cartoes.push(contaFromApi(apiC));
+    }
+  }
+  // Upsert local → API
+  for(const c of cartoes){
+    try{await apiReq('/contas',{method:'POST',body:JSON.stringify(contaToApi(c))});clearDirty(SK_DIRTY_C,c.id);}catch(_){}
+  }
+  saveC();updContaFilter();
 }
 async function syncFixasToApi(){
   if(!canUseApi())return;
   const existentes=await apiReq(`/contas-fixas?usuario_id=${API_USER_ID}`);
   const localIds=new Set(fixas.map(f=>String(f.id)));
-  await Promise.all(existentes
-    .filter(f=>f.client_id&&!localIds.has(String(f.client_id)))
-    .map(f=>apiReq(`/contas-fixas/${f.id}`,{method:'DELETE'})));
-  for(const f of fixas){
-    await apiReq('/contas-fixas',{method:'POST',body:JSON.stringify(fixaToApi(f))});
+  // Process deleted queue
+  const delSet=getDeleted(SK_DEL_FX);
+  const apiByCid={};
+  existentes.forEach(f=>{apiByCid[String(f.client_id)]=f;});
+  for(const dbId of delSet){
+    const apiF=apiByCid[dbId];
+    if(apiF){try{await apiReq(`/contas-fixas/${apiF.id}`,{method:'DELETE'});}catch(_){}}
+    clearDeleted(SK_DEL_FX,dbId);
   }
+  // Importar contas fixas que existem na API mas não local
+  for(const[cid,apiF]of Object.entries(apiByCid)){
+    if(!localIds.has(cid)){
+      fixas.push(fixaFromApi(apiF));
+    }
+  }
+  // Upsert local → API
+  for(const f of fixas){
+    try{await apiReq('/contas-fixas',{method:'POST',body:JSON.stringify(fixaToApi(f))});clearDirty(SK_DIRTY_FX,f.id);}catch(_){}
+  }
+  saveFX();
 }
 async function syncFixaValsToApi(){
   if(!canUseApi())return;
   const existentes=await apiReq(`/contas-fixas-valores?usuario_id=${API_USER_ID}`);
   const localRows=fixaValRowsFromLocal();
   const localSet=new Set(localRows.map(r=>`${r.fixa_client_id}|${r.fatura}`));
-  await Promise.all(existentes
-    .filter(r=>!localSet.has(`${r.fixa_client_id}|${r.fatura}`))
-    .map(r=>apiReq(`/contas-fixas-valores/${r.id}`,{method:'DELETE'})));
+  // Só deleta remoto se a combinação NÃO existe mais local
+  // (importar remotas que não estão local — não faz sentido para fixaVals,
+  //  pois são valores mensais derivados de fixas locais)
+  // Upsert local → API
   for(const r of localRows){
-    await apiReq('/contas-fixas-valores',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,...r})});
+    try{await apiReq('/contas-fixas-valores',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,...r})});}catch(_){}
   }
 }
 async function syncBudgetsToApi(){
   if(!canUseApi())return;
   const existentes=await apiReq(`/orcamentos-config?usuario_id=${API_USER_ID}`);
   const localNames=new Set(Object.keys(budgets||{}));
-  await Promise.all(existentes
-    .filter(r=>!localNames.has(r.categoria_nome))
-    .map(r=>apiReq(`/orcamentos-config?usuario_id=${API_USER_ID}&categoria_nome=${encodeURIComponent(r.categoria_nome)}`,{method:'DELETE'})));
+  // Importar budgets que existem na API mas não local (vieram de outro device)
+  for(const r of existentes){
+    if(!localNames.has(r.categoria_nome)){
+      budgets[r.categoria_nome]={limite:Number(r.limite_valor)||0};
+    }
+  }
+  // Upsert local → API
   for(const nome of Object.keys(budgets||{})){
     const lim=Number((budgets[nome]||{}).limite||0);
     if(lim<=0)continue;
-    await apiReq('/orcamentos-config',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,categoria_nome:nome,limite_valor:lim})});
+    try{await apiReq('/orcamentos-config',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,categoria_nome:nome,limite_valor:lim})});}catch(_){}
   }
+  saveBGT();
 }
 async function syncSavingGoalToApi(){
   if(!canUseApi())return;
@@ -1576,13 +1668,27 @@ async function syncProjExtrasToApi(){
   if(!canUseApi())return;
   const existentes=await apiReq(`/projecao-extras?usuario_id=${API_USER_ID}`);
   const localIds=new Set((receitasProj||[]).map(r=>String(r.id)));
-  await Promise.all(existentes
-    .filter(r=>r.client_id&&!localIds.has(String(r.client_id)))
-    .map(r=>apiReq(`/projecao-extras/${r.id}`,{method:'DELETE'})));
+  // Process deleted queue
+  const delSet=getDeleted(SK_DEL_PR);
+  const apiByCid={};
+  existentes.forEach(r=>{apiByCid[String(r.client_id)]=r;});
+  for(const dbId of delSet){
+    const apiR=apiByCid[dbId];
+    if(apiR){try{await apiReq(`/projecao-extras/${apiR.id}`,{method:'DELETE'});}catch(_){}}
+    clearDeleted(SK_DEL_PR,dbId);
+  }
+  // Importar projeções extras que existem na API mas não local
+  for(const[cid,apiR]of Object.entries(apiByCid)){
+    if(!localIds.has(cid)){
+      receitasProj.push(projExtraFromApi(apiR));
+    }
+  }
+  // Upsert local → API
   for(const r of (receitasProj||[])){
     if(!r.nome||!String(r.nome).trim())continue;
-    await apiReq('/projecao-extras',{method:'POST',body:JSON.stringify(projExtraToApi(r))});
+    try{await apiReq('/projecao-extras',{method:'POST',body:JSON.stringify(projExtraToApi(r))});clearDirty(SK_DIRTY_PR,r.id);}catch(_){}
   }
+  savePR();
 }
 function scheduleCatSync(){
   clearTimeout(catSyncTimer);
@@ -2765,17 +2871,25 @@ function saveTx(){
         if(t.groupId!==orig.groupId)return t;
         return {...t,descricao:base.descricao,valor:base.valor,valorParcela:base.valor,categoria:base.categoria,conta:base.conta,obs:base.obs,projecao:base.projecao};
       });
+      txs.filter(t=>t.groupId===orig.groupId).forEach(t=>saveTxDirty(t.id));
     } else {
       // scope==='this': usa o campo de valor individual da parcela se preenchido
       const parcEditRaw=document.getElementById('f-parc-edit-val').value;
       const parcEditVal=parcEditRaw?parseValor(parcEditRaw):base.valor;
       txs=txs.map(t=>t.id===editTxId?{...t,...base,valor:parcEditVal,valorParcela:parcEditVal,fatura:document.getElementById('f-fat').value}:t);
+      saveTxDirty(editTxId);
     }
   } else if(curType==='parcela'){
     const n=parseInt(document.getElementById('f-nparc').value)||2,ff=document.getElementById('f-fat-parc').value,pVal=valor/n,gid='g'+Date.now();
-    for(let i=0;i<n;i++)txs.unshift({...base,id:Date.now().toString()+i,tipo:'parcela',valorParcela:pVal,nParcelas:n,parcelaAtual:i+1,fatura:addM(ff,i),groupId:gid});
+    for(let i=0;i<n;i++){
+      const newId=Date.now().toString()+i;
+      txs.unshift({...base,id:newId,tipo:'parcela',valorParcela:pVal,nParcelas:n,parcelaAtual:i+1,fatura:addM(ff,i),groupId:gid});
+      saveTxDirty(newId);
+    }
   } else {
-    txs.unshift({...base,id:Date.now().toString(),tipo:curType,fatura:document.getElementById('f-fat').value});
+    const newId=Date.now().toString();
+    txs.unshift({...base,id:newId,tipo:curType,fatura:document.getElementById('f-fat').value});
+    saveTxDirty(newId);
   }
   save();updCatFilter();renderAll();closeOv('ov-tx');
 }
@@ -2794,11 +2908,14 @@ function confirmDelPrompt(mode){
 }
 function delTx(id,skipConfirm){
   if(!skipConfirm&&!confirm('Excluir esta parcela?'))return;
+  const tx=txs.find(t=>t.id===id);
+  if(tx&&tx._dbId) markDeleted(SK_DEL_TX,tx._dbId);
   txs=txs.filter(t=>t.id!==id);
   save();updCatFilter();renderAll();
 }
 function delTxGroup(groupId,nParc,skipConfirm){
   if(!skipConfirm&&!confirm(`Excluir todas as ${nParc} parcelas desta compra?`))return;
+  txs.filter(t=>t.groupId===groupId&&t._dbId).forEach(t=>markDeleted(SK_DEL_TX,t._dbId));
   txs=txs.filter(t=>t.groupId!==groupId);
   save();updCatFilter();renderAll();
 }
@@ -2806,19 +2923,19 @@ function delTxGroup(groupId,nParc,skipConfirm){
 // CARTÃO MODAL
 function openCartaoModal(){editCartaoId=null;document.getElementById('cartao-title').textContent='Novo cartão';['c-nome','c-banco','c-venc','c-limite'].forEach(id=>document.getElementById(id).value='');document.getElementById('c-tipo').value='credito';buildCP('cp-cartao',CARD_COLORS[0],'cartao');document.getElementById('ov-cartao').classList.add('open');}
 function editCartao(id){const c=cartoes.find(x=>x.id===id);if(!c)return;editCartaoId=id;document.getElementById('cartao-title').textContent='Editar cartão';document.getElementById('c-nome').value=c.nome;document.getElementById('c-banco').value=c.banco;document.getElementById('c-tipo').value=c.tipo;document.getElementById('c-venc').value=c.vencimento||'';document.getElementById('c-limite').value=c.limite||'';buildCP('cp-cartao',c.cor||CARD_COLORS[0],'cartao');document.getElementById('ov-cartao').classList.add('open');}
-function saveCartao(){const nome=document.getElementById('c-nome').value.trim(),banco=document.getElementById('c-banco').value.trim();if(!nome||!banco){alert('Preencha nome e banco.');return;}const obj={id:editCartaoId||Date.now().toString(),nome,banco,tipo:document.getElementById('c-tipo').value,vencimento:parseInt(document.getElementById('c-venc').value)||0,limite:parseFloat(document.getElementById('c-limite').value)||0,cor:colorSel.cartao};if(editCartaoId){const oldNome=(cartoes.find(c=>c.id===editCartaoId)||{}).nome;cartoes=cartoes.map(c=>c.id===editCartaoId?obj:c);if(oldNome&&oldNome!==nome)txs=txs.map(t=>t.conta===oldNome?{...t,conta:nome}:t);}else cartoes.push(obj);saveC();updContaFilter();renderAll();closeOv('ov-cartao');}
-function delCartao(id){if(!confirm('Excluir cartão?'))return;cartoes=cartoes.filter(c=>c.id!==id);saveC();updContaFilter();renderAll();}
+function saveCartao(){const nome=document.getElementById('c-nome').value.trim(),banco=document.getElementById('c-banco').value.trim();if(!nome||!banco){alert('Preencha nome e banco.');return;}const obj={id:editCartaoId||Date.now().toString(),nome,banco,tipo:document.getElementById('c-tipo').value,vencimento:parseInt(document.getElementById('c-venc').value)||0,limite:parseFloat(document.getElementById('c-limite').value)||0,cor:colorSel.cartao};if(editCartaoId){const oldNome=(cartoes.find(c=>c.id===editCartaoId)||{}).nome;cartoes=cartoes.map(c=>c.id===editCartaoId?obj:c);if(oldNome&&oldNome!==nome)txs=txs.map(t=>t.conta===oldNome?{...t,conta:nome}:t);saveCDirty(editCartaoId);}else{cartoes.push(obj);saveCDirty(obj.id);}updContaFilter();renderAll();closeOv('ov-cartao');}
+function delCartao(id){if(!confirm('Excluir cartão?'))return;const c=cartoes.find(x=>x.id===id);if(c&&c._dbId)markDeleted(SK_DEL_C,c._dbId);cartoes=cartoes.filter(c=>c.id!==id);saveC();updContaFilter();renderAll();}
 
 // CATEGORIA MODAL
 function openCatModal(){editCatId=null;document.getElementById('cat-modal-title').textContent='Nova categoria';document.getElementById('cat-nome').value='';buildCP('cp-cat',CARD_COLORS[1],'cat');document.getElementById('ov-cat').classList.add('open');}
 function editCat(id){const c=cats.find(x=>x.id===id);if(!c)return;editCatId=id;document.getElementById('cat-modal-title').textContent='Editar categoria';document.getElementById('cat-nome').value=c.nome;buildCP('cp-cat',c.cor,'cat');document.getElementById('ov-cat').classList.add('open');}
-function saveCat(){const nome=document.getElementById('cat-nome').value.trim();if(!nome){alert('Preencha o nome.');return;}const obj={id:editCatId||Date.now().toString(),nome,cor:colorSel.cat};if(editCatId){const oldNome=(cats.find(c=>c.id===editCatId)||{}).nome;cats=cats.map(c=>c.id===editCatId?obj:c);if(oldNome&&oldNome!==nome)txs=txs.map(t=>t.categoria===oldNome?{...t,categoria:nome}:t);}else cats.push(obj);saveCAT();updCatFilter();renderAll();closeOv('ov-cat');}
-function delCat(id){if(!confirm('Excluir categoria? Os lançamentos não serão afetados.'))return;cats=cats.filter(c=>c.id!==id);saveCAT();updCatFilter();renderAll();}
+function saveCat(){const nome=document.getElementById('cat-nome').value.trim();if(!nome){alert('Preencha o nome.');return;}const obj={id:editCatId||Date.now().toString(),nome,cor:colorSel.cat};if(editCatId){const oldNome=(cats.find(c=>c.id===editCatId)||{}).nome;cats=cats.map(c=>c.id===editCatId?obj:c);if(oldNome&&oldNome!==nome)txs=txs.map(t=>t.categoria===oldNome?{...t,categoria:nome}:t);saveCatDirty(editCatId);}else{cats.push(obj);saveCatDirty(obj.id);}updCatFilter();renderAll();closeOv('ov-cat');}
+function delCat(id){if(!confirm('Excluir categoria? Os lançamentos não serão afetados.'))return;const c=cats.find(x=>x.id===id);if(c&&c._dbId)markDeleted(SK_DEL_CAT,c._dbId);cats=cats.filter(c=>c.id!==id);saveCAT();updCatFilter();renderAll();}
 
 // CONTA FIXA MODAL
 function openFixaModal(){editFixaId=null;document.getElementById('fixa-modal-title').textContent='Nova conta fixa';['fx-nome','fx-valor','fx-dia'].forEach(id=>document.getElementById(id).value='');document.getElementById('fx-cat').innerHTML=getCatOpts('');document.getElementById('ov-fixa').classList.add('open');}
 function editFixa(id){const f=fixas.find(x=>x.id===id);if(!f)return;editFixaId=id;document.getElementById('fixa-modal-title').textContent='Editar conta fixa';document.getElementById('fx-nome').value=f.nome;document.getElementById('fx-valor').value=f.valor;document.getElementById('fx-dia').value=f.dia||'';document.getElementById('fx-cat').innerHTML=getCatOpts(f.categoria);document.getElementById('ov-fixa').classList.add('open');}
-function saveFixa(){const nome=document.getElementById('fx-nome').value.trim(),valor=parseFloat(document.getElementById('fx-valor').value);if(!nome||!valor){alert('Preencha nome e valor.');return;}const obj={id:editFixaId||Date.now().toString(),nome,valor,dia:parseInt(document.getElementById('fx-dia').value)||null,categoria:document.getElementById('fx-cat').value,encerradoApos:null};if(editFixaId)fixas=fixas.map(f=>f.id===editFixaId?{...f,...obj,id:f.id}:f);else fixas.push(obj);saveFX();renderAll();closeOv('ov-fixa');}
+function saveFixa(){const nome=document.getElementById('fx-nome').value.trim(),valor=parseFloat(document.getElementById('fx-valor').value);if(!nome||!valor){alert('Preencha nome e valor.');return;}const obj={id:editFixaId||Date.now().toString(),nome,valor,dia:parseInt(document.getElementById('fx-dia').value)||null,categoria:document.getElementById('fx-cat').value,encerradoApos:null};if(editFixaId){fixas=fixas.map(f=>f.id===editFixaId?{...f,...obj,id:f.id}:f);saveFXDirty(editFixaId);}else{fixas.push(obj);saveFXDirty(obj.id);}renderAll();closeOv('ov-fixa');}
 function encerrarFixa(id){if(!confirm('Encerrar esta conta fixa a partir de agora? Os lançamentos passados são mantidos.'))return;const k=curK();fixas=fixas.map(f=>f.id===id?{...f,encerradoApos:addM(k,-1)}:f);saveFX();renderAll();}
 
 // FIXA VAL MODAL
@@ -3147,16 +3264,19 @@ function rendDespesasList(){
 }
 
 function addDespesaProj(){
-  receitasProj.push({id:Date.now().toString(),nome:'',valor:0,ativo:true});
-  saveRP();rendDespesasList();rendProjecaoChart();
+  const id=Date.now().toString();
+  receitasProj.push({id,nome:'',valor:0,ativo:true});
+  savePRDirty(id);rendDespesasList();rendProjecaoChart();
 }
 function delDespesaProj(i){
+  const item=receitasProj[i];
+  if(item&&item._dbId)markDeleted(SK_DEL_PR,item._dbId);
   receitasProj.splice(i,1);saveRP();rendDespesasList();rendProjecaoChart();
 }
 function updDespesaProj(i,field,val){
   if(field==='valor')receitasProj[i][field]=parseFloat(val)||0;
   else receitasProj[i][field]=val;
-  saveRP();
+  savePRDirty(receitasProj[i].id);
   const total=receitasProj.filter(r=>r.ativo).reduce((a,r)=>a+(parseFloat(r.valor)||0),0);
   const el=document.getElementById('proj-receita-total');
   if(el)el.textContent=fmt(total);

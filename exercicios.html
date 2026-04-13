@@ -788,9 +788,18 @@ async function logoutUser(){
 
 // ── DADOS ────────────────────────────────────────────────────────────────────
 const SK_T='saude_treinos_v1',SK_L='saude_locais_v1',SK_TP='saude_tipos_v1',SK_DIRTY='saude_treinos_dirty_v1',SK_DEL='saude_treinos_deleted_v1';
+const SK_DIRTY_L='saude_locais_dirty_v1',SK_DEL_L='saude_locais_deleted_v1';
+const SK_DIRTY_TP='saude_tipos_dirty_v1',SK_DEL_TP='saude_tipos_deleted_v1';
 function getDeleted(){return new Set(JSON.parse(lsGet(SK_DEL)||'[]'));}
 function addDeleted(dbId){if(!dbId)return;const s=getDeleted();s.add(dbId);lsSet(SK_DEL,JSON.stringify([...s]));}
 function clearDeleted(dbId){if(!dbId)return;const s=getDeleted();s.delete(dbId);lsSet(SK_DEL,JSON.stringify([...s]));}
+// Generic dirty/deleted helpers for any entity type
+function _getSet(k){try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}}
+function _setSet(k,s){lsSet(k,JSON.stringify([...s]));}
+function markDirtyEntity(k,id){const s=_getSet(k);s.add(id);_setSet(k,s);}
+function clearDirtyEntity(k,id){const s=_getSet(k);s.delete(id);_setSet(k,s);}
+function markDeletedEntity(k,dbId){if(!dbId)return;const s=_getSet(k);s.add(dbId);_setSet(k,s);}
+function clearDeletedEntity(k,dbId){if(!dbId)return;const s=_getSet(k);s.delete(dbId);_setSet(k,s);}
 // storage helpers – isolamento por usuário
 function _uid(){return localStorage.getItem('hub_user_id')||'anon';}
 function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
@@ -904,7 +913,7 @@ async function bootstrapApi(){
     treinos=apiTreinos.map(r=>treinoFromApi(r)).filter(t=>!deleted.has(t._dbId));
     // Retentar DELETEs pendentes
     for(const dbId of deleted){
-      apiReq(`/treinos/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(dbId)).catch(()=>null);
+      apiReq(`/treinos/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(dbId)).catch((e)=>{ console.warn('[Sync] Falha retry delete treino:', dbId, e); });
     }
     // Migração: sobe qualquer treino local que não está na API
     const localCache=JSON.parse(lsGet(SK_T)||'[]');
@@ -959,18 +968,24 @@ async function deleteTreinoApi(t){
 async function syncLocal(l){
   if(!canUseApi())return;
   await apiReqRetry('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
+  clearDirtyEntity(SK_DIRTY_L,l.id);
 }
 async function deleteLocalApi(l){
   if(!canUseApi()||!l._dbId)return;
-  await apiReqRetry(`/locais-treino/${l._dbId}`,{method:'DELETE'});
+  markDeletedEntity(SK_DEL_L,l._dbId);
+  try{await apiReqRetry(`/locais-treino/${l._dbId}`,{method:'DELETE'});clearDeletedEntity(SK_DEL_L,l._dbId);}
+  catch(e){console.error('DELETE local falhou:',e);}
 }
 async function syncTipo(t){
   if(!canUseApi())return;
   await apiReqRetry('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
+  clearDirtyEntity(SK_DIRTY_TP,t.id);
 }
 async function deleteTipoApi(t){
   if(!canUseApi()||!t._dbId)return;
-  await apiReqRetry(`/tipos-exercicio/${t._dbId}`,{method:'DELETE'});
+  markDeletedEntity(SK_DEL_TP,t._dbId);
+  try{await apiReqRetry(`/tipos-exercicio/${t._dbId}`,{method:'DELETE'});clearDeletedEntity(SK_DEL_TP,t._dbId);}
+  catch(e){console.error('DELETE tipo falhou:',e);}
 }
 
 function fmtMonth(k){
@@ -1334,7 +1349,7 @@ function onDropWeekCol(ev,ds){
   const t=treinos.find(x=>x.id===_dragTreinoId);_dragTreinoId=null;
   if(!t||t.data===ds)return;
   t.data=ds;
-  saveLocal_();syncTreino(t).catch(()=>null);
+  saveLocal_();syncTreino(t).catch((e)=>{ console.warn('[Action] Sync falhou:', 'treino', t.id, e); });
   renderAll();
 }
 
@@ -1844,12 +1859,14 @@ async function saveLocal(){
   if(editLocalId)locais=locais.map(l=>l.id===editLocalId?obj:l);
   else locais.push(obj);
   saveLocal_();
+  markDirtyEntity(SK_DIRTY_L,obj.id);
   await syncLocal(obj).catch(e=>console.error(e));
   renderAll();closeOv('ov-local');
 }
 async function delLocal(id){
   if(!confirm('Excluir local?'))return;
   const l=locais.find(x=>x.id===id);
+  if(l&&l._dbId)markDeletedEntity(SK_DEL_L,l._dbId);
   locais=locais.filter(x=>x.id!==id);
   saveLocal_();
   try{if(l)await deleteLocalApi(l);}catch(e){locais.push(l);saveLocal_();renderAll();alert('Erro ao excluir. O item foi restaurado.');return;}
@@ -1871,12 +1888,14 @@ async function saveTipo(){
   if(editTipoId)tipos=tipos.map(t=>t.id===editTipoId?obj:t);
   else tipos.push(obj);
   saveLocal_();
+  markDirtyEntity(SK_DIRTY_TP,obj.id);
   await syncTipo(obj).catch(e=>console.error(e));
   renderAll();closeOv('ov-tipo');
 }
 async function delTipo(id){
   if(!confirm('Excluir tipo?'))return;
   const t=tipos.find(x=>x.id===id);
+  if(t&&t._dbId)markDeletedEntity(SK_DEL_TP,t._dbId);
   tipos=tipos.filter(x=>x.id!==id);
   saveLocal_();
   try{if(t)await deleteTipoApi(t);}catch(e){tipos.push(t);saveLocal_();renderAll();alert('Erro ao excluir. O item foi restaurado.');return;}

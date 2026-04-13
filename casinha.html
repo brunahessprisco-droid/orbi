@@ -590,6 +590,23 @@ function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if
 function lsSet(k,v){localStorage.setItem('u_'+_uid()+'_'+k,v);}
 function lsRem(k){localStorage.removeItem('u_'+_uid()+'_'+k);}
 
+// ===== DIRTY / DELETED QUEUES =====
+const SK_DIRTY_T='casinha_tarefas_dirty_v1',SK_DEL_T='casinha_tarefas_deleted_v1';
+const SK_DIRTY_R='casinha_rotinas_dirty_v1',SK_DEL_R='casinha_rotinas_deleted_v1';
+const SK_DIRTY_A='casinha_amb_dirty_v1',SK_DEL_A='casinha_amb_deleted_v1';
+const SK_DIRTY_P='casinha_pess_dirty_v1',SK_DEL_P='casinha_pess_deleted_v1';
+function _casGetSet(k){try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}}
+function _casSetSet(k,s){lsSet(k,JSON.stringify([...s]));}
+function markDirty(entity,id){_casSetSet(entity,new Set([..._casGetSet(entity),id]));}
+function clearDirty(entity,id){const s=_casGetSet(entity);s.delete(id);_casSetSet(entity,s);}
+function getDirty(entity){return _casGetSet(entity);}
+function markDeleted(entity,id){_casSetSet(entity,new Set([..._casGetSet(entity),id]));}
+function clearDeleted(entity,id){const s=_casGetSet(entity);s.delete(id);_casSetSet(entity,s);}
+function getDeleted(entity){return _casGetSet(entity);}
+function hasPendingSync(){
+  return [SK_DIRTY_T,SK_DEL_T,SK_DIRTY_R,SK_DEL_R,SK_DIRTY_A,SK_DEL_A,SK_DIRTY_P,SK_DEL_P].some(k=>{try{const v=lsGet(k);return v&&v!=='[]'&&v!=='{}';}catch{return false;}});
+}
+
 // ===== STATE =====
 let tarefas=[],pessoas=[],ambientes=[],rotinas=[];
 let curPage='dashboard',tarefasView=lsGet('casinha_tarefas_view')||'lista',calView='semana',calRef=new Date();
@@ -1132,6 +1149,7 @@ async function adiarTarefa(id){
 function deletarTarefa(id){
   if(!confirm('Excluir esta tarefa?'))return false;
   const t=tarefas.find(x=>x.id===id);
+  if(t&&t._dbId)markDeleted(SK_DEL_T,t._dbId);
   tarefas=tarefas.filter(x=>x.id!==id);
   saveT();renderCurrent();
   if(t)deleteTarefaApi(t).catch(()=>{tarefas.push(t);saveT();renderCurrent();alert('Erro ao excluir. O item foi restaurado.');});
@@ -1339,6 +1357,7 @@ function checkRotinas(){
 function deletarRotina(id){
   if(!confirm('Excluir esta rotina?'))return;
   const r=rotinas.find(x=>x.id===id);
+  if(r&&r._dbId)markDeleted(SK_DEL_R,r._dbId);
   rotinas=rotinas.filter(x=>x.id!==id);saveR();renderRotinas();
   if(r)deleteRotinaApi(r).catch(()=>{rotinas.push(r);saveR();renderRotinas();alert('Erro ao excluir. O item foi restaurado.');});
 }
@@ -1578,6 +1597,7 @@ async function saveTarefa(){
     t.obs=document.getElementById('f-obs').value.trim();
     if(t.status==='concluida'&&!t.dataConclusao)t.dataConclusao=today();
     if(t.status!=='concluida')t.dataConclusao=null;
+    markDirty(SK_DIRTY_T,t.id);
     if(t.rotinaId&&oldDataVenc&&dataVenc&&oldDataVenc!==dataVenc){
       const r=rotinas.find(x=>x.id===t.rotinaId);
       if(r){
@@ -1586,8 +1606,8 @@ async function saveTarefa(){
         tarefas=tarefas.filter(x=>!(x.rotinaId===r.id&&x.id!==t.id&&x.status!=='concluida'));
         r.proximaData=calcNextDate(dataVenc,r.recorrencia);
         const ns=preencherOcorrenciasRotina(r);
-        ns.forEach(n=>syncTarefa(n).catch(()=>null));
-        saveR();syncRotina(r).catch(()=>null);
+        ns.forEach(n=>{markDirty(SK_DIRTY_T,n.id);syncTarefa(n).catch(()=>null);});
+        saveR();markDirty(SK_DIRTY_R,r.id);syncRotina(r).catch(()=>null);
       }
     }
     syncTarget=t;
@@ -1603,6 +1623,7 @@ async function saveTarefa(){
       recorrencia,obs:document.getElementById('f-obs').value.trim(),
       dataConclusao:null,rotinaId:null,createdAt:new Date().toISOString()};
     tarefas.push(nova);
+    markDirty(SK_DIRTY_T,nova.id);
     syncTarget=nova;
   }
   autoStatus();
@@ -1683,6 +1704,7 @@ async function saveRotina(){
     r.responsavel=document.getElementById('r-resp').value;r.prioridade=r.prioridade||'media';
     r.recorrencia=recorrencia;r.horario=document.getElementById('r-hora').value||null;
     r.tempoEst=parseInt(document.getElementById('r-test').value)||null;r.proximaData=proximaData;
+    markDirty(SK_DIRTY_R,r.id);
     syncTarget=r;
   } else {
     const r={id:uid(),nome,icone:document.getElementById('r-icone').value,
@@ -1691,8 +1713,9 @@ async function saveRotina(){
       recorrencia,horario:document.getElementById('r-hora').value||null,
       tempoEst:parseInt(document.getElementById('r-test').value)||null,proximaData,ativo:true};
     rotinas.push(r);
+    markDirty(SK_DIRTY_R,r.id);
     const ns=preencherOcorrenciasRotina(r);
-    ns.forEach(t=>syncTarefa(t).catch(()=>null));
+    ns.forEach(t=>{markDirty(SK_DIRTY_T,t.id);syncTarefa(t).catch(()=>null);});
     syncTarget=r;
   }
   saveR();closeModal();renderCurrent();
@@ -1754,6 +1777,7 @@ async function saveAmbiente(){
 function deletarAmbiente(id){
   if(!confirm('Excluir este ambiente?'))return;
   const a=ambientes.find(x=>x.id===id);
+  if(a&&a._dbId)markDeleted(SK_DEL_A,a._dbId);
   ambientes=ambientes.filter(x=>x.id!==id);saveA();closeModal();renderCurrent();
   if(a)deleteAmbienteApi(a).catch(()=>{ambientes.push(a);saveA();renderCurrent();alert('Erro ao excluir. O item foi restaurado.');});
 }
@@ -1802,6 +1826,7 @@ async function savePessoa(){
 function deletarPessoa(id){
   if(!confirm('Excluir esta pessoa?'))return;
   const p=pessoas.find(x=>x.id===id);
+  if(p&&p._dbId)markDeleted(SK_DEL_P,p._dbId);
   pessoas=pessoas.filter(x=>x.id!==id);saveP();closeModal();renderCurrent();
   if(p)deletePessoaApi(p).catch(()=>{pessoas.push(p);saveP();renderCurrent();alert('Erro ao excluir. O item foi restaurado.');});
 }
@@ -2006,19 +2031,21 @@ async function syncAmbiente(a){
   if(!canUseApi())return;
   const r=await apiReq('/casinha/ambientes',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:a.id,nome:a.nome,cor:a.cor,icone:a.icone})});
   if(r&&!a._dbId)a._dbId=r.id;
+  clearDirty(SK_DIRTY_A,a.id);
 }
 async function deleteAmbienteApi(a){
   if(!canUseApi()||!a._dbId)return;
-  await apiReq(`/casinha/ambientes/${a._dbId}`,{method:'DELETE'});
+  try{await apiReq(`/casinha/ambientes/${a._dbId}`,{method:'DELETE'});clearDeleted(SK_DEL_A,a._dbId);}catch(e){console.error('DELETE ambiente falhou:',e);}
 }
 async function syncPessoa(p){
   if(!canUseApi())return;
   const r=await apiReq('/casinha/pessoas',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:p.id,nome:p.nome,cor:p.cor})});
   if(r&&!p._dbId)p._dbId=r.id;
+  clearDirty(SK_DIRTY_P,p.id);
 }
 async function deletePessoaApi(p){
   if(!canUseApi()||!p._dbId)return;
-  await apiReq(`/casinha/pessoas/${p._dbId}`,{method:'DELETE'});
+  try{await apiReq(`/casinha/pessoas/${p._dbId}`,{method:'DELETE'});clearDeleted(SK_DEL_P,p._dbId);}catch(e){console.error('DELETE pessoa falhou:',e);}
 }
 async function syncTarefa(t){
   if(!canUseApi())return;
@@ -2031,10 +2058,11 @@ async function syncTarefa(t){
     dataConclusao:t.dataConclusao||null,rotinaId:t.rotinaId||null,
   })});
   if(r&&!t._dbId)t._dbId=r.id;
+  clearDirty(SK_DIRTY_T,t.id);
 }
 async function deleteTarefaApi(t){
   if(!canUseApi()||!t._dbId)return;
-  await apiReq(`/casinha/tarefas/${t._dbId}`,{method:'DELETE'});
+  try{await apiReq(`/casinha/tarefas/${t._dbId}`,{method:'DELETE'});clearDeleted(SK_DEL_T,t._dbId);}catch(e){console.error('DELETE tarefa falhou:',e);}
 }
 async function syncRotina(r){
   if(!canUseApi())return;
@@ -2046,10 +2074,11 @@ async function syncRotina(r){
     proximaData:r.proximaData||null,ativo:r.ativo,
   })});
   if(res&&!r._dbId)r._dbId=res.id;
+  clearDirty(SK_DIRTY_R,r.id);
 }
 async function deleteRotinaApi(r){
   if(!canUseApi()||!r._dbId)return;
-  await apiReq(`/casinha/rotinas/${r._dbId}`,{method:'DELETE'});
+  try{await apiReq(`/casinha/rotinas/${r._dbId}`,{method:'DELETE'});clearDeleted(SK_DEL_R,r._dbId);}catch(e){console.error('DELETE rotina falhou:',e);}
 }
 
 // ===== INIT =====

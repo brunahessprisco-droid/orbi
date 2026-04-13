@@ -409,12 +409,24 @@
       const KEY_GOALS='alimentacao_goals_v3_light';
       const KEY_PLAN='alimentacao_plan_v3_light';
       const KEY_DELETED='alimentacao_deleted_ids_v1';
+      const KEY_DIRTY='alimentacao_dirty_v1';
       const KEY_WATER='alimentacao_water_v1';
+      const KEY_WATER_DIRTY='alimentacao_water_dirty_v1';
+      const KEY_CONFIG_DIRTY='alimentacao_config_dirty_v1';
       // storage helpers – isolamento por usuário
       const _uid=()=>localStorage.getItem('hub_user_id')||'anon';
       const lsGet=k=>{const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;};
       const lsSet=(k,v)=>localStorage.setItem('u_'+_uid()+'_'+k,v);
       const lsRem=k=>localStorage.removeItem('u_'+_uid()+'_'+k);
+      // Dirty/deleted queue helpers
+      const _algGetSet=k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}};
+      const _algSetSet=(k,s)=>lsSet(k,JSON.stringify([...s]));
+      const markMealDirty=id=>_algSetSet(KEY_DIRTY,new Set([..._algGetSet(KEY_DIRTY),id]));
+      const clearMealDirty=id=>{const s=_algGetSet(KEY_DIRTY);s.delete(id);_algSetSet(KEY_DIRTY,s);};
+      const getMealDirty=()=>_algGetSet(KEY_DIRTY);
+      const markWaterDirty=id=>{const s=_algGetSet(KEY_WATER_DIRTY);s.add(id);_algSetSet(KEY_WATER_DIRTY,s);};
+      const clearWaterDirty=id=>{const s=_algGetSet(KEY_WATER_DIRTY);s.delete(id);_algSetSet(KEY_WATER_DIRTY,s);};
+      const markConfigDirty=()=>_algSetSet(KEY_CONFIG_DIRTY,new Set(['config']));
       const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
       const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
       const TYPE_LABEL={cafe:'Café da manhã',almoco:'Almoço',lanche:'Lanche',jantar:'Jantar',ceia:'Ceia',pre_treino:'Pré treino',pos_treino:'Pós treino',outra:'Outra'};
@@ -442,7 +454,7 @@
       function todayStr(){return localIso(new Date());}
       function nowTime(){const d=new Date();return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
       function saveMeals(){lsSet(KEY_MEALS,JSON.stringify(meals));}
-      function saveGoalsStore(){lsSet(KEY_GOALS,JSON.stringify(goals));}
+      function saveGoalsStore(){lsSet(KEY_GOALS,JSON.stringify(goals));markConfigDirty();}
       function savePlan(){lsSet(KEY_PLAN,JSON.stringify(plan));}
       function saveDeletedMeals(){lsSet(KEY_DELETED,JSON.stringify([...new Set(deletedMealIds)]));}
 
@@ -452,10 +464,12 @@
           usuario_id:API_USER_ID,client_id:m.id,nome:m.name,tipo:m.type||null,
           date:m.date,time:m.time||null,calories:m.calories||null,obs:m.note||null,
         })});
+        clearMealDirty(m.id);
       }
       async function deleteRefeicaoApi(m){
         if(!canUseApi()||!m._dbId)return;
-        await apiReq(`/alimentacao/refeicoes/${m._dbId}`,{method:'DELETE'});
+        try{await apiReq(`/alimentacao/refeicoes/${m._dbId}`,{method:'DELETE'});deletedMealIds=deletedMealIds.filter(id=>id!==m.id);saveDeletedMeals();}
+        catch(e){console.error('DELETE refeição falhou:',e);}
       }
       async function syncConfig(){
         if(!canUseApi())return;
@@ -578,6 +592,7 @@
         if(i>=0) meals[i]=data; else meals.unshift(data);
         deletedMealIds=deletedMealIds.filter(id=>id!==data.id);
         saveDeletedMeals();
+        markMealDirty(data.id);
         saveMeals();
         closeMealModal();
         renderAll();
@@ -798,6 +813,7 @@
         if(!ml||ml<1){ alert('Informe a quantidade em ml.'); return; }
         const log={id:uid(),date:todayStr(),ml,time:nowTime()};
         waterLogs.push(log);
+        markWaterDirty(log.id);
         lsSet(KEY_WATER,JSON.stringify(waterLogs));
         syncWaterLog(log);
         closeWaterModal();
@@ -806,6 +822,7 @@
       function quickAddWater(ml){
         const log={id:uid(),date:todayStr(),ml,time:nowTime()};
         waterLogs.push(log);
+        markWaterDirty(log.id);
         lsSet(KEY_WATER,JSON.stringify(waterLogs));
         syncWaterLog(log);
         renderDashboard();
