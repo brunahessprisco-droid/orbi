@@ -1507,9 +1507,7 @@ async function syncTxsToApi(){
   await Promise.all(existentes
     .filter(t=>t.client_id&&!localIds.has(String(t.client_id)))
     .map(t=>apiReq(`/transacoes/${t.id}`,{method:'DELETE'})));
-  for(const t of txs){
-    await apiReq('/transacoes',{method:'POST',body:JSON.stringify(txToApi(t))});
-  }
+  await Promise.all(txs.map(t=>apiReq('/transacoes',{method:'POST',body:JSON.stringify(txToApi(t))}).catch(()=>null)));
 }
 async function syncContasToApi(){
   if(!canUseApi())return;
@@ -1603,7 +1601,7 @@ function scheduleTxSync(){
       await syncTxsToApi();
     }catch(e){console.warn('Falha ao sincronizar transacoes:',e.message);}
     finally{syncInFlight=false;}
-  },600);
+  },200);
 }
 function scheduleContaSync(){
   clearTimeout(contaSyncTimer);
@@ -1699,9 +1697,7 @@ async function bootstrapApi(){
 
     // Seed inicial no banco (somente quando vazio)
     if(apiCats.length===0){
-      cats=[...DEF_CATS];
-      await syncCategoriasToApi();
-      apiCats=await apiReq(`/categorias?usuario_id=${API_USER_ID}`);
+      cats=[];
     }
     if(apiContas.length===0){
       cartoes=[];
@@ -3375,7 +3371,7 @@ function rendAnalises(){
   // Data
   txs=[];
   cartoes=[];
-  cats=[...DEF_CATS];
+  cats=[];
   fixas=[];
   fixaVals={};
 

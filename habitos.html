@@ -279,6 +279,7 @@
       border:1px solid var(--border);
       background:var(--surface2);
       cursor:pointer;transition:.12s;
+      justify-self:center;
     }
     .sq:hover{transform:translateY(-1px);border-color:var(--border2)}
     .sq.done{
@@ -294,7 +295,8 @@
 
     /* Controle habit value cell */
     .sq-val{
-      width:36px;height:22px;border-radius:6px;
+      width:28px;height:22px;border-radius:6px;
+      justify-self:center;
       border:1px solid var(--border);
       background:var(--surface2);
       color:var(--text);font-size:9px;font-family:var(--mono);
@@ -1194,6 +1196,10 @@
 
       save();
       closeHabitModal();
+      // Reset filters so the new/edited habit is always visible
+      document.getElementById('habit-search').value='';
+      document.getElementById('habit-filter-cat').value='';
+      document.getElementById('habit-filter-auto').value='';
       renderAll();
     }
 
@@ -1204,6 +1210,10 @@
       deleteHabitoApi(h).catch(()=>null);
       habits=habits.filter(x=>x.id!==id);
       save();
+      // Reset filters so deleted habit doesn't appear due to stale filter state
+      document.getElementById('habit-search').value='';
+      document.getElementById('habit-filter-cat').value='';
+      document.getElementById('habit-filter-auto').value='';
       renderAll();
     }
 
