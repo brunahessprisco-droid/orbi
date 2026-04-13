@@ -677,7 +677,7 @@
     // sync helpers
     async function syncWeight(w){
       if(!canUseApi())return;
-      await apiReq('/health/weights',{method:'POST',body:JSON.stringify({
+      await apiReqRetry('/health/weights',{method:'POST',body:JSON.stringify({
         client_id:w.id,
         date:w.date,weight:w.weight,height:w.height,fat:w.fat,note:w.note||null,
         extraJson:{muscle:w.muscle,goal:w.goal,waist:w.waist,hip:w.hip,chest:w.chest},
@@ -685,7 +685,7 @@
     }
     async function syncMedico(d){
       if(!canUseApi())return;
-      return apiReq('/saude/medicos',{method:'POST',body:JSON.stringify({
+      return apiReqRetry('/saude/medicos',{method:'POST',body:JSON.stringify({
         usuario_id:API_USER_ID,client_id:d.id,nome:d.name,especialidade:d.specialty||null,
         frequencyDays:d.frequencyDays||null,phone:d.phone||null,whats:d.whats||null,
         email:d.email||null,clinica:d.clinic||null,endereco:d.address||null,obs:d.note||null,
@@ -693,11 +693,11 @@
     }
     async function deleteMedicoApi(d){
       if(!canUseApi()||!d._dbId)return;
-      await apiReq(`/saude/medicos/${d._dbId}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/medicos/${d._dbId}`,{method:'DELETE'}).catch(()=>null);
     }
     async function syncExame(e){
       if(!canUseApi())return;
-      return apiReq('/saude/exames',{method:'POST',body:JSON.stringify({
+      return apiReqRetry('/saude/exames',{method:'POST',body:JSON.stringify({
         usuario_id:API_USER_ID,client_id:e.id,nome:e.name,categoria:e.category||null,
         status:e.status||null,resultado:e.resultado||null,laboratorio:e.lab||null,medicoId:e.doctorId||null,
         date:e.date,nextDate:e.nextDate||null,obs:e.note||null,
@@ -706,11 +706,11 @@
     }
     async function deleteExameApi(e){
       if(!canUseApi()||!e._dbId)return;
-      await apiReq(`/saude/exames/${e._dbId}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/exames/${e._dbId}`,{method:'DELETE'}).catch(()=>null);
     }
     async function syncConsulta(c){
       if(!canUseApi())return;
-      return apiReq('/saude/consultas',{method:'POST',body:JSON.stringify({
+      return apiReqRetry('/saude/consultas',{method:'POST',body:JSON.stringify({
         usuario_id:API_USER_ID,client_id:c.id,date:c.date,time:c.time||null,
         medicoId:c.doctorId||null,especialidade:c.specialty||null,motivo:c.reason||null,
         status:c.status||null,returnDays:c.returnDays||null,nextDate:c.nextDate||null,
@@ -719,7 +719,7 @@
     }
     async function deleteConsultaApi(c){
       if(!canUseApi()||!c._dbId)return;
-      await apiReq(`/saude/consultas/${c._dbId}`,{method:'DELETE'}).catch(()=>null);
+      await apiReqRetry(`/saude/consultas/${c._dbId}`,{method:'DELETE'}).catch(()=>null);
     }
 
     async function saudeBootstrap(){

@@ -1,4 +1,4 @@
-CREATE TABLE "AlimentacaoWater" (
+CREATE TABLE IF NOT EXISTS "AlimentacaoWater" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "date" TEXT NOT NULL,
@@ -8,6 +8,7 @@ CREATE TABLE "AlimentacaoWater" (
     CONSTRAINT "AlimentacaoWater_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "AlimentacaoWater_userId_date_idx" ON "AlimentacaoWater"("userId", "date");
+CREATE INDEX IF NOT EXISTS "AlimentacaoWater_userId_date_idx" ON "AlimentacaoWater"("userId", "date");
 
+ALTER TABLE "AlimentacaoWater" DROP CONSTRAINT IF EXISTS "AlimentacaoWater_userId_fkey";
 ALTER TABLE "AlimentacaoWater" ADD CONSTRAINT "AlimentacaoWater_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
