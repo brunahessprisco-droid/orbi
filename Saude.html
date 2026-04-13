@@ -799,10 +799,10 @@
         const apiEIds=new Set(apiExames.map(e=>e.id));
         const apiCIds=new Set(apiConsultas.map(c=>c.id));
         // Only merge items that never had a _dbId (truly local, never synced to server)
-        const nwW=st.weights.filter(w=>!apiWIds.has(w.id) && !deleted.weights.has(w.id));
-        const nwM=st.doctors.filter(d=>!apiMIds.has(d.id) && !deleted.doctors.has(d.id));
-        const nwE=st.exams.filter(e=>!apiEIds.has(e.id) && !deleted.exams.has(e.id));
-        const nwC=st.consults.filter(c=>!apiCIds.has(c.id) && !deleted.consults.has(c.id));
+        const nwW=st.weights.filter(w=>!apiWIds.has(w.id) && !deleted.weights.has(w.id) && !w._dbId);
+        const nwM=st.doctors.filter(d=>!apiMIds.has(d.id) && !deleted.doctors.has(d.id) && !d._dbId);
+        const nwE=st.exams.filter(e=>!apiEIds.has(e.id) && !deleted.exams.has(e.id) && !e._dbId);
+        const nwC=st.consults.filter(c=>!apiCIds.has(c.id) && !deleted.consults.has(c.id) && !c._dbId);
         app.setState({
           weights:[...apiWeights,...nwW],
           doctors:[...apiMedicos,...nwM],

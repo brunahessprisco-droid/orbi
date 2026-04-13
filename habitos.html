@@ -1041,10 +1041,11 @@
         apiHabitos.forEach(h=>{
           const loc=localById[h.id];
           if(!loc) return;
+          const row=rows.find(r=>r.client_id===h.id);
           let changed=false;
-          if(!rows.find(r=>r.client_id===h.id)?.tipo && loc.tipo && loc.tipo!=='check'){ h.tipo=loc.tipo; changed=true; }
-          if(!rows.find(r=>r.client_id===h.id)?.unit && loc.unit){ h.unit=loc.unit; changed=true; }
-          if(!rows.find(r=>r.client_id===h.id)?.startDate && loc.startDate){ h.startDate=loc.startDate; changed=true; }
+          if(row?.tipo==null && loc.tipo && loc.tipo!=='check'){ h.tipo=loc.tipo; changed=true; }
+          if(row?.unit==null && loc.unit){ h.unit=loc.unit; changed=true; }
+          if(row?.startDate==null && loc.startDate){ h.startDate=loc.startDate; changed=true; }
           if(changed) toResync.push(h);
         });
         // Preserve user-defined order from local state

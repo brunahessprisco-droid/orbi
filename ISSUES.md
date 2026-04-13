@@ -26,18 +26,20 @@ Fallback `"orbi-admin-2025"` expõe listagem de usuários se a env var não esti
 Finanças, Casinha, Exercícios, Hábitos, Alimentação, Saúde — todos usam `.catch(()=>null)`.
 Usuário pensa que deletou, banco mantém o registro.
 
-### [ ] 5. Dados deletados ressurgem entre dispositivos
+### [x] 5. Dados deletados ressurgem entre dispositivos ✓ FIXED
 - Alimentação: `deletedMealIds` existe só no localStorage local
 - Exercícios: `SK_DEL` existe só no localStorage local
 - Saúde: `deletedState` existe só no localStorage local
 
-Outro dispositivo não sabe que o item foi deletado.
+**Fix:** `Alimentacao.html` e `Saude.html` (doctors, exams, consults, weights): filtro `naoSinc`/`nwM`/`nwE`/`nwC` agora inclui `&& !item._dbId`. Itens que já foram ao banco (`_dbId` presente) e não constam na API foram deletados em outro device — não são re-enviados. Padrão já usado corretamente em `exercicios.html` e `habitos.html`.
 
-### [ ] 6. Exercícios: dirty tracking pode recriar item deletado remotamente
+### [x] 6. Exercícios: dirty tracking pode recriar item deletado remotamente ✓ FIXED
 Item editado em A (marcado dirty) + deletado em B → A abre app, restaura o dirty e re-sincroniza → item ressurge no banco.
+**Fix:** O dirty block (linhas 919-930) itera apenas sobre itens presentes na resposta da API. Se o item foi deletado em B, não está na API → não é processado. A guard `!t._dbId` na linha 912 também protege o bloco de migração. Nenhuma alteração necessária.
 
-### [ ] 7. Hábitos: backfill do localStorage pode reverter edições remotas
+### [x] 7. Hábitos: backfill do localStorage pode reverter edições remotas ✓ FIXED
 Campos `tipo`, `unit`, `startDate` são sobrescritos com valores do cache local sem verificar se foram atualizados em outro dispositivo.
+**Fix:** Condição de backfill alterada de `!campo` (falsy — ativa em `''`) para `campo == null` (strict null). Strings vazias definidas remotamente não ativam mais o backfill.
 
 ### [x] 8. Bootstrap helper `h()` apaga cache válido quando API falha — `index.html`
 Retornava `[]` em qualquer erro e gravava esse vazio no localStorage. Dados anteriores eram perdidos.
