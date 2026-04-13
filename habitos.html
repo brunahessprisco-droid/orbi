@@ -7,6 +7,7 @@
   <title>Hábitos</title>
   <link rel="icon" type="image/png" href="assets/Hábitos.png">
   <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     [data-theme="dark"]{
@@ -110,6 +111,8 @@
       width:34px;height:34px;padding:0;
       display:flex;align-items:center;justify-content:center
     }
+    [data-theme="dark"] .bi-sun-fill{display:none;}
+    [data-theme="light"] .bi-moon-stars-fill{display:none;}
 
     .app{max-width:1680px;margin:0 auto;padding:24px}
     .page{display:none}
@@ -636,7 +639,7 @@
     <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
     <div class="nav-right">
       <button class="btn btn-primary" onclick="openHabitModal()">+ Novo hábito</button>
-      <button class="btn btn-icon" onclick="toggleTheme()" id="btn-theme" title="Tema">🌙</button>
+      <button class="btn btn-icon" onclick="toggleTheme()" id="btn-theme" title="Tema"><i class="bi bi-sun-fill"></i><i class="bi bi-moon-stars-fill"></i></button>
     </div>
   </nav>
   <div class="nav-menu" id="nav-menu">
@@ -681,9 +684,9 @@
       <div class="section">
         <div class="toolbar">
           <div class="month-nav">
-            <button class="btn btn-icon" onclick="changeMonth(-1)">‹</button>
+            <button class="btn btn-icon" onclick="changeMonth(-1)"><i class="bi bi-chevron-left"></i></button>
             <div class="month-label" id="month-label">—</div>
-            <button class="btn btn-icon" onclick="changeMonth(1)">›</button>
+            <button class="btn btn-icon" onclick="changeMonth(1)"><i class="bi bi-chevron-right"></i></button>
             <button class="btn" onclick="goToday()">Hoje</button>
           </div>
         </div>
@@ -720,9 +723,9 @@
     <div id="page-calendario" class="page">
       <div class="section">
         <div class="cal-page-header">
-          <button class="btn btn-icon" onclick="calPageNav(-1)">‹</button>
+          <button class="btn btn-icon" onclick="calPageNav(-1)"><i class="bi bi-chevron-left"></i></button>
           <div class="month-label" id="cal-page-label">—</div>
-          <button class="btn btn-icon" onclick="calPageNav(1)">›</button>
+          <button class="btn btn-icon" onclick="calPageNav(1)"><i class="bi bi-chevron-right"></i></button>
           <button class="btn" onclick="calPageToday()">Hoje</button>
         </div>
         <div class="cal-page-grid">
@@ -763,7 +766,7 @@
     <div class="modal">
       <div class="modal-head">
         <div class="modal-title" id="modal-title">Novo hábito</div>
-        <button class="btn btn-icon" onclick="closeHabitModal()">×</button>
+        <button class="btn btn-icon" onclick="closeHabitModal()"><i class="bi bi-x-lg"></i></button>
       </div>
 
       <div class="form-row">
@@ -1066,7 +1069,6 @@
       const next=root.getAttribute('data-theme')==='dark'?'light':'dark';
       root.setAttribute('data-theme',next);
       localStorage.setItem('app_theme',next);
-      document.getElementById('btn-theme').textContent=next==='dark'?'🌙':'☀️';
     }
 
     function changeMonth(n){
@@ -1613,9 +1615,9 @@
                 <div class="item-sub">${weekdayText}${h.note ? ' · ' + escapeHtml(h.note) : ''}</div>
               </div>
               <div class="item-actions">
-                <button class="btn btn-icon" onclick="openHabitModal('${h.id}')" title="Editar">✏️</button>
-                <button class="btn btn-icon" title="Arquivar" onclick="archiveHabit('${h.id}')">📦</button>
-                <button class="btn btn-icon" onclick="deleteHabit('${h.id}')" title="Excluir">🗑️</button>
+                <button class="btn btn-icon" onclick="openHabitModal('${h.id}')" title="Editar"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-icon" title="Arquivar" onclick="archiveHabit('${h.id}')"><i class="bi bi-archive"></i></button>
+                <button class="btn btn-icon" onclick="deleteHabit('${h.id}')" title="Excluir"><i class="bi bi-trash"></i></button>
               </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
@@ -1642,7 +1644,7 @@
               <span class="archived-item-name">${escapeHtml(h.name)}</span>
               <span style="font-size:11px;color:var(--muted);">${catLabel(h.cat)}</span>
               <button class="btn btn-icon" title="Restaurar" onclick="unarchiveHabit('${h.id}')" style="margin-left:auto;">↩️</button>
-              <button class="btn btn-icon" onclick="deleteHabit('${h.id}')" title="Excluir">🗑️</button>
+              <button class="btn btn-icon" onclick="deleteHabit('${h.id}')" title="Excluir"><i class="bi bi-trash"></i></button>
             </div>
           `).join('')}
         </div>
@@ -2140,7 +2142,7 @@
         return`<div class="cal-habit-row ${done?'done':'undone'}${isFuture?' future-day':''}" onclick="toggleCalHabit('${h.id}','${dateStr}')">
           <div class="cal-habit-row-icon">${escapeHtml(h.icon||'✨')}</div>
           <div class="cal-habit-row-name">${escapeHtml(h.name)}</div>
-          <div class="cal-habit-row-check">${done?'✓':'○'}</div>
+          <div class="cal-habit-row-check">${done?'<i class="bi bi-check-lg"></i>':'<i class="bi bi-circle"></i>'}</div>
         </div>`;
       }).join('');
     }
@@ -2189,7 +2191,6 @@
     async function init(){
       const th=localStorage.getItem('app_theme')||'dark';
       document.documentElement.setAttribute('data-theme',th);
-      document.getElementById('btn-theme').textContent=th==='dark'?'🌙':'☀️';
       const ok=await checkAuth();
       if(!ok){document.getElementById('auth-overlay').classList.add('open');renderAll();return;}
       applyUserIsolation(API_USER_ID);habits=[];
