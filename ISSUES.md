@@ -43,14 +43,14 @@ Campos `tipo`, `unit`, `startDate` são sobrescritos com valores do cache local 
 Retornava `[]` em qualquer erro e gravava esse vazio no localStorage. Dados anteriores eram perdidos.
 **Fix:** `h()` retorna `null` em falha. Cada `_lsSet` só executa se o resultado não for `null`.
 
-### [ ] 9. Saúde renderiza stale data antes da API carregar
+### [x] 9. Saúde renderiza stale data antes da API carregar ✓ FIXED
 `renderAll()` chamada com localStorage; `saudeBootstrap()` é async e roda depois.
 
 ---
 
 ## MÉDIO
 
-### [ ] 10. CORS sem whitelist de origem — `server.ts`
+### [x] 10. CORS sem whitelist de origem — `server.ts` ✓ FIXED
 `app.use(cors())` permite qualquer origem.
 
 ### [x] 11. Rollback dos modais de controle de hábito está quebrado — `index.html` ✓ FIXED
@@ -76,5 +76,5 @@ Se 1 endpoint falhar, bootstrap inteiro falha e usuário fica sem nenhum dado fi
 ### [ ] 16. `checkGcalStatus` silencia erros completamente
 `catch(e){}` vazio — falhas de rede passam sem log.
 
-### [ ] 17. Inconsistência de validação em `/saude/remedios` e `/saude/consumos`
+### [x] 17. Inconsistência de validação em `/saude/remedios` e `/saude/consumos` ✓ FIXED
 Únicos endpoints que não incluem `usuario_id` no schema (funcionalmente seguro, mas inconsistente).
