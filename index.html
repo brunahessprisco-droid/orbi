@@ -527,7 +527,7 @@ async function submitAuth(){
   }
 }
 
-async function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; if(typeof _hubActionQueue !== 'undefined' && _hubActionQueue){ try{ await Promise.race([_hubActionQueue, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))); }catch(_){} } try{ await apiReq('/auth/logout',{method:'POST'}); }catch(_){} localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
+async function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; if(typeof _hubActionQueue !== 'undefined' && _hubActionQueue){ try{ await Promise.race([_hubActionQueue, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))]); }catch(_){} } try{ await apiReq('/auth/logout',{method:'POST'}); }catch(_){} localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
 function toggleTheme(){ const isDark=document.documentElement.getAttribute('data-theme')==='dark'; const next=isDark?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('app_theme',next); }
 function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.innerHTML=on?'<i class="bi bi-eye-slash-fill"></i>':'<i class="bi bi-eye-fill"></i>'; }
 function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
@@ -537,40 +537,34 @@ function _lsGet(k){const uid=localStorage.getItem('hub_user_id')||'anon';const n
 function _lsSet(k,v){const uid=localStorage.getItem('hub_user_id')||'anon';localStorage.setItem('u_'+uid+'_'+k,v);}
 
 function updateHubSyncIndicator(){
-  const label=document.getElementById('hub-sync-label');
-  const btn=document.getElementById('hub-refresh-btn');
+  var label=document.getElementById('hub-sync-label');
+  var btn=document.getElementById('hub-refresh-btn');
   if(!label||!btn)return;
-  const lastSync=localStorage.getItem('u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1');
+  var uid=localStorage.getItem('hub_user_id')||'anon';
+  var lastSync=localStorage.getItem('u_'+uid+'_hub_lastsync_v1');
   if(!lastSync){
     label.textContent='Nunca sincronizado';
     label.style.color='var(--red)';
     return;
   }
-  const ago=Date.now()-Number(lastSync);
-  const mins=Math.floor(ago/60000);
-  const hours=Math.floor(ago/3600000);
-  if(mins<1){
-    label.textContent='Atualizado agora';
-    label.style.color='var(--green)';
-  }else if(mins<5){
-    label.textContent=`Atualizado há ${mins}min`;
-    label.style.color='var(--green)';
-  }else if(mins<30){
-    label.textContent=`Atualizado há ${mins}min`;
-    label.style.color='var(--amber)';
-  }else if(hours<2){
-    label.textContent=`Atualizado há ${hours}h${mins%60>0?mins%60+'min':''}`;
-    label.style.color='var(--amber)';
-  }else{
-    label.textContent=`Atualizado há ${hours}h — dados podem estar desatualizados`;
-    label.style.color='var(--red)';
-  }
+  var ago=Date.now()-Number(lastSync);
+  var mins=Math.floor(ago/60000);
+  var hours=Math.floor(ago/3600000);
+  var txt='';
+  var col='var(--green)';
+  if(mins<1){txt='Atualizado agora';}
+  else if(mins<5){txt='Atualizado ha '+mins+' min';}
+  else if(mins<30){txt='Atualizado ha '+mins+' min';col='var(--amber)';}
+  else if(hours<2){txt='Atualizado ha '+hours+' h';col='var(--amber)';}
+  else{txt='Atualizado ha '+hours+' h - dados desatualizados';col='var(--red)';}
+  label.textContent=txt;
+  label.style.color=col;
 }
 
 function refreshHubData(){
-  const icon=document.getElementById('hub-refresh-icon');
+  var icon=document.getElementById('hub-refresh-icon');
   if(icon)icon.textContent='⟳';
-  hubBootstrap().finally(()=>{
+  hubBootstrap().finally(function(){
     if(icon)icon.textContent='↻';
     updateHubSyncIndicator();
   });
