@@ -8,3 +8,6 @@ backend/prisma/.env
 # OS
 .DS_Store
 Thumbs.db
+
+# Ferramenta local só (admin secret); não versionar — deploy excluído no .vercelignore
+convites.html
