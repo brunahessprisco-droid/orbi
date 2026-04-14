@@ -840,6 +840,10 @@
         }).filter(r=>!deleted.exams.has(r.id)) : null;
         const apiConsultas=rC ? rC.map(r=>({id:r.client_id,_dbId:r.id,date:r.date,time:r.time||'',doctorId:r.medicoId||'',specialty:r.especialidade||'',reason:r.motivo||'',status:r.status||'agendada',returnDays:r.returnDays||null,nextDate:r.nextDate||'',summary:r.resumo||''})).filter(r=>!deleted.consults.has(r.id)) : null;
 
+        // Retry pending DELETEs for items still present on server
+        if(rW!==null){for(const r of (rW.data||rW)){const cid=r.client_id||r.extraJson?.id;if(cid&&deleted.weights.has(cid))deleteWeightApi({id:cid,_dbId:r.id});}}
+        if(rE!==null){for(const r of rE){if(deleted.exams.has(r.client_id))deleteExameApi({id:r.client_id,_dbId:r.id});}}
+        if(rC!==null){for(const r of rC){if(deleted.consults.has(r.client_id))deleteConsultaApi({id:r.client_id,_dbId:r.id});}}
         // Merge: API + local não sincronizados
         const app=window.saudeApp;
         if(!app)return;

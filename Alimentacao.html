@@ -519,6 +519,13 @@
           const rWater=_sWater.status==='fulfilled'?_sWater.value:null;
           if([_sRef,_sCfg,_sWater].some(r=>r.status==='rejected'))_showSyncWarn();
           const deletedIds=new Set(JSON.parse(lsGet(KEY_DELETED)||'[]'));
+          // Retry pending meal DELETEs for items still present on server
+          if(rRef!==null){
+            for(const r of rRef){
+              if(deletedIds.has(r.client_id)&&r.id)
+                deleteRefeicaoApi({id:r.client_id,_dbId:r.id});
+            }
+          }
           const apiMeals=(rRef||[])
             .map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,type:r.tipo||'almoco',date:r.date,time:r.time||'',calories:r.calories||0,note:r.obs||''}))
             .filter(m=>!deletedIds.has(m.id));

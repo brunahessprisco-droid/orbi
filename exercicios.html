@@ -781,7 +781,7 @@ async function doLogin(){
 }
 
 async function logoutUser(){
-  const dirtySets = [SK_DIRTY, SK_DIRTY_L, SK_DIRTY_TP].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
+  const dirtySets = [SK_DIRTY, SK_DIRTY_L, SK_DIRTY_TP, SK_DEL, SK_DEL_L, SK_DEL_TP].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
   const hasPending = dirtySets.some(s=>s.size>0);
   if(hasPending){
     const proceed = confirm('Alguns dados de exercícios podem não ter sido sincronizados. Deseja sair mesmo assim?');
