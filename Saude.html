@@ -1916,18 +1916,18 @@
       }
     });
 
-    // --- beforeunload: avisa sobre dados não sincronizados ---
+    // --- beforeunload: avisa sobre dados não sincronizados (lsGet; paridade com saudeLogout) ---
     window.addEventListener('beforeunload', function(e) {
-      const dirtyKeys = ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'];
+      const dirtyKeys = [KEY_DIRTY, KEY_DIRTY_REM, KEY_DIRTY_CONSUMO];
       let hasDirty = false;
       for (const k of dirtyKeys) {
         try {
-          const raw = JSON.parse(localStorage.getItem('u_' + _uid() + '_' + k) || '[]');
+          const raw = JSON.parse(lsGet(k) || '[]');
           if (raw && (Array.isArray(raw) ? raw.length > 0 : Object.keys(raw).length > 0)) { hasDirty = true; break; }
         } catch(_) {}
       }
-      const ds = typeof getDeletedState === 'function' ? getDeletedState() : {};
-      const hasDeleted = Object.values(ds).some(arr => arr && arr.length > 0);
+      const deletedRaw = (() => { try { return JSON.parse(lsGet(KEY_DELETED) || '{}'); } catch { return {}; } })();
+      const hasDeleted = Object.values(deletedRaw).some(arr => Array.isArray(arr) && arr.length > 0);
       if (hasDirty || hasDeleted) {
         e.preventDefault();
         e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';

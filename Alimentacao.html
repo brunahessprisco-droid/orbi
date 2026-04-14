@@ -1035,13 +1035,26 @@
       });
     });
 
-    // --- beforeunload: avisa sobre dados não sincronizados ---
+    // --- beforeunload: avisa sobre dados não sincronizados (localStorage; paridade com logoutUser) ---
     window.addEventListener('beforeunload', function(e) {
-      const dirtyMeals = typeof getMealDirty === 'function' ? getMealDirty().size : 0;
-      const dirtyWater = typeof _algGetSet === 'function' ? _algGetSet('alimentacao_water_dirty_v1').size : 0;
-      const dirtyConfig = typeof _algGetSet === 'function' ? _algGetSet('alimentacao_config_dirty_v1').size : 0;
-      const deletedMeals = typeof deletedMealIds !== 'undefined' ? deletedMealIds.length : 0;
-      if (dirtyMeals > 0 || dirtyWater > 0 || dirtyConfig > 0 || deletedMeals > 0) {
+      const uid = localStorage.getItem('hub_user_id') || 'anon';
+      const lsGet = k => {
+        const ns = 'u_' + uid + '_' + k;
+        const v = localStorage.getItem(ns);
+        if (v !== null) return v;
+        return localStorage.getItem(k);
+      };
+      const setSize = k => { try { return new Set(JSON.parse(lsGet(k) || '[]')).size; } catch { return 0; } };
+      let deletedMeals = 0;
+      try {
+        const arr = JSON.parse(lsGet('alimentacao_deleted_ids_v1') || '[]');
+        deletedMeals = Array.isArray(arr) ? arr.length : 0;
+      } catch (_) {}
+      const dirtyMeals = setSize('alimentacao_dirty_v1');
+      const dirtyWater = setSize('alimentacao_water_dirty_v1');
+      const dirtyConfig = setSize('alimentacao_config_dirty_v1');
+      const deletedWater = setSize('alimentacao_water_deleted_v1');
+      if (dirtyMeals > 0 || dirtyWater > 0 || dirtyConfig > 0 || deletedWater > 0 || deletedMeals > 0) {
         e.preventDefault();
         e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
         return e.returnValue;

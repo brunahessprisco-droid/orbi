@@ -527,7 +527,16 @@ async function submitAuth(){
   }
 }
 
-async function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; if(typeof _hubActionQueue !== 'undefined' && _hubActionQueue){ try{ await Promise.race([_hubActionQueue, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))]); }catch(_){} } const _tok=localStorage.getItem(AUTH_KEY); if(_tok)try{ await Promise.race([fetch(getApiBase()+'/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+_tok}}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),3000))]); }catch(_){} localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
+async function logout(){
+  if(!confirm('Tem certeza que deseja sair?')) return;
+  if(typeof _hubActionQueue !== 'undefined' && _hubActionQueue){
+    try{ await _hubActionQueue; }
+    catch(e){ console.warn('[Hub] Erro ao aguardar fila antes do logout:', e); }
+  }
+  const _tok=localStorage.getItem(AUTH_KEY);
+  if(_tok)try{ await Promise.race([fetch(getApiBase()+'/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+_tok}}),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),3000))]); }catch(_){}
+  localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload();
+}
 function toggleTheme(){ const isDark=document.documentElement.getAttribute('data-theme')==='dark'; const next=isDark?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('app_theme',next); }
 function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.innerHTML=on?'<i class="bi bi-eye-slash-fill"></i>':'<i class="bi bi-eye-fill"></i>'; }
 function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
@@ -884,8 +893,12 @@ function closeOv(){document.getElementById('ov-day').classList.remove('open');}
 // Rollback restaura a string exata — nenhuma mutação por referência possível.
 // _hubPost lança exceção em qualquer falha de rede ou status HTTP não-ok.
 let _hubActionQueue=Promise.resolve();
+let _hubPending=0;
 function _hubRun(fn){
-  _hubActionQueue=_hubActionQueue.then(()=>fn().catch(e=>console.error('[Hub] erro não tratado na fila:',e)));
+  _hubPending++;
+  _hubActionQueue=_hubActionQueue
+    .then(()=>Promise.resolve().then(()=>fn()).catch(e=>console.error('[Hub] erro não tratado na fila:',e)))
+    .finally(()=>{_hubPending--;});
 }
 async function _hubPost(path,body){
   const token=localStorage.getItem(AUTH_KEY);
@@ -1308,6 +1321,14 @@ document.querySelector('#profile-overlay .profile-modal').addEventListener('inpu
 })();
 
 if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { const _sn=localStorage.getItem('hub_user_nome'); if(_sn){profileData.nome=_sn;updateProfileUI();} fetchFinancas(); hubBootstrap().finally(()=>loadProfileData()); }
+
+window.addEventListener('beforeunload',function(e){
+  if(typeof _hubPending==='number'&&_hubPending>0){
+    e.preventDefault();
+    e.returnValue='O hub ainda está salvando alterações.';
+    return e.returnValue;
+  }
+});
 </script>
 </body>
 </html>

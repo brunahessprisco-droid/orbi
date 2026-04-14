@@ -2161,9 +2161,10 @@ async function stravaHandleCallback(){
   }
 })();
 
-// --- beforeunload: avisa sobre dados não sincronizados ---
+// --- beforeunload: avisa sobre dados não sincronizados (paridade com logoutUser) ---
 window.addEventListener('beforeunload', function(e) {
-  if (getDirty().size > 0 || getDeleted().size > 0) {
+  const pending = [SK_DIRTY, SK_DIRTY_L, SK_DIRTY_TP, SK_DEL, SK_DEL_L, SK_DEL_TP].some(k => _getSet(k).size > 0);
+  if (pending) {
     e.preventDefault();
     e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
     return e.returnValue;
