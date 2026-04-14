@@ -912,7 +912,7 @@
 
       <div class="modal-footer">
         <button class="btn" style="flex:1" onclick="closeHabitModal()">Cancelar</button>
-        <button class="btn btn-primary" style="flex:1" onclick="saveHabit()">Salvar</button>
+        <button class="btn btn-primary" style="flex:1" onclick="void saveHabit()">Salvar</button>
       </div>
     </div>
   </div>
@@ -1451,7 +1451,7 @@
       return [...document.querySelectorAll('.wd.active')].map(x=>Number(x.dataset.day));
     }
 
-    function saveHabit(){
+    async function saveHabit(){
       const name=document.getElementById('f-name').value.trim();
       const icon=document.getElementById('f-icon').value.trim()||'bi-stars';
       const cat=document.getElementById('f-cat').value;
@@ -1475,17 +1475,21 @@
       const unit=document.getElementById('f-unit').value.trim();
       const payload={name,icon,cat,freq,tipo,unit,weekdays:freq==='semanal'?weekdays:[],monthDay,startDate,note,autoType:tipo==='check'?autoType:'',autoKeyword:tipo==='check'?autoKeyword:''};
 
+      let hSync=null;
       if(editingId){
         const h=habits.find(x=>x.id===editingId);
         if(!h) return;
         Object.assign(h,payload);
-        save();markHabDirty(h.id);syncHabito(h).catch(e=>console.warn('[Hábitos] sync falhou, será retentado:',e));
+        save();markHabDirty(h.id);hSync=h;
       }else{
         const h={id:uid(),...payload,logs:{}};
         habits.push(h);
-        save();markHabDirty(h.id);syncHabito(h).catch(e=>console.warn('[Hábitos] sync falhou, será retentado:',e));
+        save();markHabDirty(h.id);hSync=h;
       }
 
+      if(hSync){
+        try{await syncHabito(hSync);}catch(e){console.warn('[Hábitos] sync falhou, será retentado:',e);}
+      }
       save();
       closeHabitModal();
       // Reset filters so the new/edited habit is always visible

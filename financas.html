@@ -1728,6 +1728,46 @@ async function syncProjExtrasToApi(){
   }
   savePR();
 }
+function finCancelDebouncedSyncTimers(){
+  clearTimeout(txSyncTimer);txSyncTimer=null;
+  clearTimeout(catSyncTimer);catSyncTimer=null;
+  clearTimeout(contaSyncTimer);contaSyncTimer=null;
+  clearTimeout(fixaSyncTimer);fixaSyncTimer=null;
+  clearTimeout(fixaValSyncTimer);fixaValSyncTimer=null;
+  clearTimeout(budgetSyncTimer);budgetSyncTimer=null;
+  clearTimeout(savingSyncTimer);savingSyncTimer=null;
+  clearTimeout(poupancaSyncTimer);poupancaSyncTimer=null;
+  clearTimeout(projExtrasSyncTimer);projExtrasSyncTimer=null;
+}
+let _finFlushHideChain=Promise.resolve();
+async function finFlushPendingSyncs(){
+  if(!canUseApi())return;
+  finCancelDebouncedSyncTimers();
+  let spins=0;
+  while(syncInFlight&&spins++<400)await new Promise(r=>setTimeout(r,25));
+  try{
+    syncInFlight=true;
+    await syncTxsToApi();
+    await syncCategoriasToApi();
+    await syncContasToApi();
+    await syncFixasToApi();
+    await syncFixaValsToApi();
+    await syncBudgetsToApi();
+    await syncSavingGoalToApi();
+    await syncPoupancaToApi();
+    await syncProjExtrasToApi();
+  }catch(e){console.warn('[Finanças] Flush ao sair/ocultar página:',e.message||e);}
+  finally{syncInFlight=false;}
+}
+function finQueueFlushOnDocumentHide(){
+  _finFlushHideChain=_finFlushHideChain
+    .then(()=>finFlushPendingSyncs())
+    .catch(e=>console.warn('[Finanças] flush hide:',e));
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden')finQueueFlushOnDocumentHide();
+});
+window.addEventListener('pagehide',()=>{finQueueFlushOnDocumentHide();});
 function scheduleCatSync(){
   clearTimeout(catSyncTimer);
   catSyncTimer=setTimeout(async()=>{
@@ -1737,7 +1777,7 @@ function scheduleCatSync(){
       await syncCategoriasToApi();
     }catch(e){console.warn('Falha ao sincronizar categorias:',e.message);}
     finally{syncInFlight=false;}
-  },450);
+  },80);
 }
 function scheduleTxSync(){
   clearTimeout(txSyncTimer);
@@ -1748,7 +1788,7 @@ function scheduleTxSync(){
       await syncTxsToApi();
     }catch(e){console.warn('Falha ao sincronizar transacoes:',e.message);}
     finally{syncInFlight=false;}
-  },200);
+  },50);
 }
 function scheduleContaSync(){
   clearTimeout(contaSyncTimer);
@@ -1759,7 +1799,7 @@ function scheduleContaSync(){
       await syncContasToApi();
     }catch(e){console.warn('Falha ao sincronizar contas:',e.message);}
     finally{syncInFlight=false;}
-  },500);
+  },80);
 }
 function scheduleFixaSync(){
   clearTimeout(fixaSyncTimer);
@@ -1770,7 +1810,7 @@ function scheduleFixaSync(){
       await syncFixasToApi();
     }catch(e){console.warn('Falha ao sincronizar contas fixas:',e.message);}
     finally{syncInFlight=false;}
-  },500);
+  },80);
 }
 function scheduleFixaValSync(){
   clearTimeout(fixaValSyncTimer);
@@ -1781,7 +1821,7 @@ function scheduleFixaValSync(){
       await syncFixaValsToApi();
     }catch(e){console.warn('Falha ao sincronizar valores de contas fixas:',e.message);}
     finally{syncInFlight=false;}
-  },500);
+  },80);
 }
 function scheduleBudgetSync(){
   clearTimeout(budgetSyncTimer);
@@ -1792,7 +1832,7 @@ function scheduleBudgetSync(){
       await syncBudgetsToApi();
     }catch(e){console.warn('Falha ao sincronizar orcamentos:',e.message);}
     finally{syncInFlight=false;}
-  },500);
+  },80);
 }
 function scheduleSavingSync(){
   clearTimeout(savingSyncTimer);
@@ -1803,7 +1843,7 @@ function scheduleSavingSync(){
       await syncSavingGoalToApi();
     }catch(e){console.warn('Falha ao sincronizar meta mensal:',e.message);}
     finally{syncInFlight=false;}
-  },400);
+  },60);
 }
 function schedulePoupancaSync(){
   clearTimeout(poupancaSyncTimer);
@@ -1814,7 +1854,7 @@ function schedulePoupancaSync(){
       await syncPoupancaToApi();
     }catch(e){console.warn('Falha ao sincronizar poupanca:',e.message);}
     finally{syncInFlight=false;}
-  },500);
+  },80);
 }
 function scheduleProjExtrasSync(){
   clearTimeout(projExtrasSyncTimer);
@@ -1825,7 +1865,7 @@ function scheduleProjExtrasSync(){
       await syncProjExtrasToApi();
     }catch(e){console.warn('Falha ao sincronizar despesas extras:',e.message);}
     finally{syncInFlight=false;}
-  },500);
+  },80);
 }
 async function bootstrapApi(){
   if(!canUseApi())return;
