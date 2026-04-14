@@ -607,16 +607,36 @@ async function hubBootstrap(){
     const weights=rWArr.map(r=>{const extra=r.extraJson||{};return{id:r.client_id||r.id,_dbId:r.id,date:typeof r.date==='string'?r.date.slice(0,10):new Date(r.date).toISOString().slice(0,10),time:extra.time||'',weight:r.weight!=null?Number(r.weight):null,fat:r.fat!=null?Number(r.fat):null,height:r.height!=null?Number(r.height):null};});
     const exams=(Array.isArray(rE)?rE:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',status:r.status||'',date:(r.date||'').slice(0,10)}));
     const consults=(Array.isArray(rC)?rC:[]).map(r=>({id:r.client_id,_dbId:r.id,date:(r.date||'').slice(0,10),time:r.time||'',specialty:r.especialidade||'',status:r.status||''}));
-    if(rTre!==null) _lsSet('saude_treinos_v1',JSON.stringify(treinos));
-    if(rTar!==null) _lsSet('casinha_tarefas',JSON.stringify(tarefas));
-    if(rHab!==null) _lsSet('habitos_app_v5',JSON.stringify(habitos));
+    if(rTre!==null){
+      const _delTre=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_saude_treinos_deleted_v1')||'[]'));
+      _lsSet('saude_treinos_v1',JSON.stringify(treinos.filter(t=>!_delTre.has(t._dbId))));
+    }
+    if(rTar!==null){
+      const _delTar=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_casinha_tarefas_deleted_v1')||'[]'));
+      _lsSet('casinha_tarefas',JSON.stringify(tarefas.filter(t=>!_delTar.has(t._dbId))));
+    }
+    if(rHab!==null){
+      const _delHab=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_habitos_deleted_v1')||'[]'));
+      _lsSet('habitos_app_v5',JSON.stringify(habitos.filter(h=>!_delHab.has(h._dbId))));
+    }
     if(rAli!==null){
       // Filtra refeições pendentes de deleção local (DELETE pode ainda não ter chegado à API)
       const _delAlim=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_alimentacao_deleted_ids_v1')||'[]'));
       _lsSet('alimentacao_meals_v3_light',JSON.stringify(meals.filter(m=>!_delAlim.has(m.id))));
     }
     if(rCfg!==null) _lsSet('alimentacao_plan_v3_light',JSON.stringify(plan));
-    if(rW!==null&&rE!==null&&rC!==null) _lsSet('saude_app_v1',JSON.stringify({weights,exams,consults,doctors:[]}));
+    if(rW!==null&&rE!==null&&rC!==null){
+      const _sauDel=JSON.parse(localStorage.getItem('u_'+uid+'_saude_deleted_ids_v1')||'{}');
+      const _delW=new Set(_sauDel.weights||[]);
+      const _delE=new Set(_sauDel.exams||[]);
+      const _delC=new Set(_sauDel.consults||[]);
+      _lsSet('saude_app_v1',JSON.stringify({
+        weights:weights.filter(w=>!_delW.has(w.id)),
+        exams:exams.filter(e=>!_delE.has(e.id)),
+        consults:consults.filter(c=>!_delC.has(c.id)),
+        doctors:[]
+      }));
+    }
     rendTodaySummary(); rendCal();
     localStorage.setItem('u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1', String(Date.now()));
     updateHubSyncIndicator();

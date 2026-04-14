@@ -1267,7 +1267,7 @@ async function apiReq(path,opts={}){
   try{
     res=await fetch(getApiBase()+path,{...opts,headers});
   }catch(e){
-    throw new Error(`Falha ao acessar API em ${getApiBase()} (${e.message||'erro de rede'})`);
+    const err=new Error(`Falha ao acessar API em ${getApiBase()} (${e.message||'erro de rede'})`);err.network=true;throw err;
   }
   if(!res.ok){
     let msg='Erro na API';
@@ -1556,7 +1556,7 @@ async function syncCategoriasToApi(){
   // Upsert local → API (só se tiver mudanças)
   for(const c of cats){
     if(!c.nome)continue;
-    try{await apiReq('/categorias',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:String(c.id),nome:c.nome,cor:c.cor||'#7b9cff'})});clearDirty(SK_DIRTY_CAT,c.id);}catch(_){}
+    try{await apiReq('/categorias',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:String(c.id),nome:c.nome,cor:c.cor||'#7b9cff'})});clearDirty(SK_DIRTY_CAT,c.id);}catch(e){console.warn('[Finanças] Sync categoria falhou, será retentado:',c.id,e);}
   }
   saveCAT();updCatFilter();
 }
@@ -1581,7 +1581,7 @@ async function syncTxsToApi(){
   }
   // Upsert local → API
   await Promise.allSettled(txs.map(async(t)=>{
-    try{await apiReq('/transacoes',{method:'POST',body:JSON.stringify(txToApi(t))});clearDirty(SK_DIRTY_TX,t.id);}catch(_){}
+    try{await apiReq('/transacoes',{method:'POST',body:JSON.stringify(txToApi(t))});clearDirty(SK_DIRTY_TX,t.id);}catch(e){console.warn('[Finanças] Sync transação falhou, será retentado:',t.id,e);}
   }));
   try{localStorage.setItem('u_'+API_USER_ID+'_'+SK,JSON.stringify(txs));}catch(_){}
 }
@@ -1606,7 +1606,7 @@ async function syncContasToApi(){
   }
   // Upsert local → API
   for(const c of cartoes){
-    try{await apiReq('/contas',{method:'POST',body:JSON.stringify(contaToApi(c))});clearDirty(SK_DIRTY_C,c.id);}catch(_){}
+    try{await apiReq('/contas',{method:'POST',body:JSON.stringify(contaToApi(c))});clearDirty(SK_DIRTY_C,c.id);}catch(e){console.warn('[Finanças] Sync conta falhou, será retentado:',c.id,e);}
   }
   saveC();updContaFilter();
 }
@@ -1631,7 +1631,7 @@ async function syncFixasToApi(){
   }
   // Upsert local → API
   for(const f of fixas){
-    try{await apiReq('/contas-fixas',{method:'POST',body:JSON.stringify(fixaToApi(f))});clearDirty(SK_DIRTY_FX,f.id);}catch(_){}
+    try{await apiReq('/contas-fixas',{method:'POST',body:JSON.stringify(fixaToApi(f))});clearDirty(SK_DIRTY_FX,f.id);}catch(e){console.warn('[Finanças] Sync conta fixa falhou, será retentado:',f.id,e);}
   }
   saveFX();
 }
@@ -1645,7 +1645,7 @@ async function syncFixaValsToApi(){
   //  pois são valores mensais derivados de fixas locais)
   // Upsert local → API
   for(const r of localRows){
-    try{await apiReq('/contas-fixas-valores',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,...r})});}catch(_){}
+    try{await apiReq('/contas-fixas-valores',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,...r})});}catch(e){console.warn('[Finanças] Sync conta fixa valor falhou:',r,e);}
   }
 }
 async function syncBudgetsToApi(){
@@ -1662,7 +1662,7 @@ async function syncBudgetsToApi(){
   for(const nome of Object.keys(budgets||{})){
     const lim=Number((budgets[nome]||{}).limite||0);
     if(lim<=0)continue;
-    try{await apiReq('/orcamentos-config',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,categoria_nome:nome,limite_valor:lim})});}catch(_){}
+    try{await apiReq('/orcamentos-config',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,categoria_nome:nome,limite_valor:lim})});}catch(e){console.warn('[Finanças] Sync orçamento falhou:',nome,e);}
   }
   saveBGT();
 }
@@ -1701,7 +1701,7 @@ async function syncProjExtrasToApi(){
   // Upsert local → API
   for(const r of (receitasProj||[])){
     if(!r.nome||!String(r.nome).trim())continue;
-    try{await apiReq('/projecao-extras',{method:'POST',body:JSON.stringify(projExtraToApi(r))});clearDirty(SK_DIRTY_PR,r.id);}catch(_){}
+    try{await apiReq('/projecao-extras',{method:'POST',body:JSON.stringify(projExtraToApi(r))});clearDirty(SK_DIRTY_PR,r.id);}catch(e){console.warn('[Finanças] Sync projeção falhou, será retentado:',r.id,e);}
   }
   savePR();
 }

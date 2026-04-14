@@ -961,13 +961,21 @@
       if(!el){el=document.createElement('div');el.id='_last-sync';el.style.cssText='text-align:center;font-size:11px;color:var(--text3,#9ca3af);padding:6px 0 2px;';(document.getElementById('main')||document.querySelector('.app')||document.body).append(el);}
       el.textContent='Sincronizado às '+hm;
     }
+    function _showSyncWarn(){
+      if(document.getElementById('_sync-warn'))return;
+      const d=document.createElement('div');
+      d.id='_sync-warn';
+      d.style.cssText='background:#fef3c7;color:#92400e;padding:8px 16px;font-size:13px;text-align:center;border-bottom:1px solid #f59e0b;';
+      d.textContent='⚠ Alguns dados não carregaram. Exibindo cache local.';
+      (document.getElementById('main')||document.body).prepend(d);
+    }
 
     async function apiReq(path,opts={}){
       const headers={'Content-Type':'application/json',...(opts.headers||{})};
       if(authToken)headers.Authorization='Bearer '+authToken;
       let res;
       try{res=await fetch(getApiBase()+path,{...opts,headers});}
-      catch(e){throw new Error('Falha de rede');}
+      catch(e){const err=new Error('Falha de rede');err.network=true;throw err;}
       if(!res.ok){let msg='Erro na API';try{const j=await res.json();msg=j.error||msg;}catch(_){}throw new Error(msg);}
       if(res.status===204)return null;
       return res.json();
@@ -1047,12 +1055,19 @@
     async function bootstrapApi(){
       if(!canUseApi())return;
       try{
-        const rows=await apiReq(`/habitos?usuario_id=${API_USER_ID}`);
-        // Process deleted queue first
-        const delSet=getHabDeleted();
-        for(const dbId of delSet){
-          try{await apiReq(`/habitos/${dbId}`,{method:'DELETE'});clearHabDeleted(dbId);}catch(_){}
+        // Step 1: Fire pending DELETEs before fetching server state
+        for(const dbId of getHabDeleted()){
+          apiReq(`/habitos/${dbId}`,{method:'DELETE'})
+            .then(()=>clearHabDeleted(dbId))
+            .catch(e=>console.warn('[Hábitos] Retry delete hábito:',dbId,e));
         }
+        // Step 2: Fetch server state
+        const[_sRows]=await Promise.allSettled([
+          apiReq(`/habitos?usuario_id=${API_USER_ID}`)
+        ]);
+        const rows=_sRows.status==='fulfilled'?_sRows.value:null;
+        if(rows===null){_showSyncWarn();return;}
+        const delSet=getHabDeleted();
         const apiHabitos=rows.map(r=>({
           id:r.client_id,_dbId:r.id,name:r.nome,icon:r.icone||'✨',
           cat:r.categoria||'outro',freq:r.frequencia||'diario',
@@ -1493,9 +1508,10 @@
         saveDismissed(dis);
       }
 
+      markHabDirty(h.id);
       save();
       renderAll();
-      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderAll(); }
+      try{ await syncHabito(h); }catch(e){ if(e.network){ console.warn('[Hábitos] Falha de rede ao sincronizar log, será retentado:',h.id,e); } else { clearHabDirty(h.id); habits=JSON.parse(snapshot); save(); renderAll(); } }
     }
 
     async function setControlLog(id, dateStr, val){
@@ -1505,11 +1521,12 @@
       h.logs||={};
       if(val) h.logs[dateStr]=val;
       else delete h.logs[dateStr];
+      markHabDirty(h.id);
       save();
       // Update the cell style without full re-render (keeps focus/cursor)
       const input=document.querySelector(`input.sq-val[onchange*="${id}"][onchange*="${dateStr}"]`);
       if(input){ input.className=`sq-val ${val?'has-val':''}`; input.value=val; }
-      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderAll(); }
+      try{ await syncHabito(h); }catch(e){ if(e.network){ console.warn('[Hábitos] Falha de rede ao sincronizar controle, será retentado:',h.id,e); } else { clearHabDirty(h.id); habits=JSON.parse(snapshot); save(); renderAll(); } }
     }
 
     function previousPlannedDate(h, date){
@@ -2395,11 +2412,12 @@
       h.logs||={};
       h.logs[dateStr]=!h.logs[dateStr];
       if(!h.logs[dateStr]) delete h.logs[dateStr];
+      markHabDirty(h.id);
       save();
       renderCalDayBody(dateStr);
       renderCalendario();
       renderSummary();
-      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderCalDayBody(dateStr); renderCalendario(); renderSummary(); }
+      try{ await syncHabito(h); }catch(e){ if(e.network){ console.warn('[Hábitos] Falha de rede ao sincronizar log (cal), será retentado:',h.id,e); } else { clearHabDirty(h.id); habits=JSON.parse(snapshot); save(); renderCalDayBody(dateStr); renderCalendario(); renderSummary(); } }
     }
 
     async function setCalControlLog(id, dateStr, val){
@@ -2409,11 +2427,12 @@
       h.logs||={};
       if(val) h.logs[dateStr]=val;
       else delete h.logs[dateStr];
+      markHabDirty(h.id);
       save();
       renderCalDayBody(dateStr);
       renderCalendario();
       renderSummary();
-      try{ await syncHabito(h); }catch(_){ habits=JSON.parse(snapshot); save(); renderCalDayBody(dateStr); renderCalendario(); renderSummary(); }
+      try{ await syncHabito(h); }catch(e){ if(e.network){ console.warn('[Hábitos] Falha de rede ao sincronizar controle (cal), será retentado:',h.id,e); } else { clearHabDirty(h.id); habits=JSON.parse(snapshot); save(); renderCalDayBody(dateStr); renderCalendario(); renderSummary(); } }
     }
 
     function closeCalDay(){ document.getElementById('cal-day-ov').classList.remove('open'); }

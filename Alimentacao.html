@@ -386,6 +386,14 @@
       if(!el){el=document.createElement('div');el.id='_last-sync';el.style.cssText='text-align:center;font-size:11px;color:var(--text3,#9ca3af);padding:6px 0 2px;';(document.getElementById('main')||document.querySelector('.app')||document.body).append(el);}
       el.textContent='Sincronizado às '+hm;
     }
+    function _showSyncWarn(){
+      if(document.getElementById('_sync-warn'))return;
+      const d=document.createElement('div');
+      d.id='_sync-warn';
+      d.style.cssText='background:#fef3c7;color:#92400e;padding:8px 16px;font-size:13px;text-align:center;border-bottom:1px solid #f59e0b;';
+      d.textContent='⚠ Alguns dados não carregaram. Exibindo cache local.';
+      (document.getElementById('main')||document.body).prepend(d);
+    }
     async function apiReq(path,opts={}){
       const headers={'Content-Type':'application/json',...(opts.headers||{})};
       if(authToken)headers.Authorization='Bearer '+authToken;
@@ -501,13 +509,17 @@
       async function bootstrapApi(){
         if(!canUseApi())return;
         try{
-          const[rRef,rCfg,rWater]=await Promise.all([
+          const[_sRef,_sCfg,_sWater]=await Promise.allSettled([
             apiReqRetry(`/alimentacao/refeicoes?usuario_id=${API_USER_ID}`),
             apiReqRetry(`/alimentacao/config?usuario_id=${API_USER_ID}`),
             apiReqRetry(`/alimentacao/water`),
           ]);
+          const rRef=_sRef.status==='fulfilled'?_sRef.value:null;
+          const rCfg=_sCfg.status==='fulfilled'?_sCfg.value:null;
+          const rWater=_sWater.status==='fulfilled'?_sWater.value:null;
+          if([_sRef,_sCfg,_sWater].some(r=>r.status==='rejected'))_showSyncWarn();
           const deletedIds=new Set(JSON.parse(lsGet(KEY_DELETED)||'[]'));
-          const apiMeals=rRef
+          const apiMeals=(rRef||[])
             .map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,type:r.tipo||'almoco',date:r.date,time:r.time||'',calories:r.calories||0,note:r.obs||''}))
             .filter(m=>!deletedIds.has(m.id));
           const localMeals=JSON.parse(lsGet(KEY_MEALS)||'[]').filter(m=>!deletedIds.has(m.id));
@@ -552,7 +564,7 @@
           }
           saveMeals();saveGoalsStore();savePlan();
           renderAll();
-          _showLastSync();
+          if([_sRef,_sCfg,_sWater].every(r=>r.status==='fulfilled'))_showLastSync();
         }catch(e){console.error('Bootstrap alimentação:',e);}
       }
       function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}

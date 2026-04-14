@@ -1137,11 +1137,11 @@ async function completarTarefa(id){
     const next={...t,id:uid(),_dbId:undefined,status:'pendente',dataVenc:nd,dataConclusao:null,createdAt:new Date().toISOString()};
     tarefas.push(next);markDirty(SK_DIRTY_T,next.id);syncTarefa(next).catch(e=>console.warn('[Casinha] Sync próxima ocorrência falhou, será retentado:',e));
   }
+  markDirty(SK_DIRTY_T,t.id);
   saveT();renderCurrent();
   try{ await syncTarefa(t); }catch(e){
-    console.warn('[Casinha] Sync completar falhou:',t.id,e);
-    tarefas=JSON.parse(snapshotT); rotinas=JSON.parse(snapshotR);
-    saveT(); renderCurrent();
+    if(e.network){ console.warn('[Casinha] Falha de rede ao completar tarefa, será retentado:',t.id,e); }
+    else { clearDirty(SK_DIRTY_T,t.id); console.warn('[Casinha] Sync completar falhou:',t.id,e); tarefas=JSON.parse(snapshotT); rotinas=JSON.parse(snapshotR); saveT(); renderCurrent(); }
   }
 }
 
@@ -1151,8 +1151,9 @@ async function adiarTarefa(id){
   const d=t.dataVenc?new Date(t.dataVenc+'T12:00:00'):new Date();
   d.setDate(d.getDate()+1);
   t.dataVenc=dateStr(d);t.status='adiada';
+  markDirty(SK_DIRTY_T,t.id);
   saveT();renderCurrent();
-  try{ await syncTarefa(t); }catch(e){ console.warn('[Casinha] Sync adiar falhou:',t.id,e); tarefas=JSON.parse(snapshot); saveT(); renderCurrent(); }
+  try{ await syncTarefa(t); }catch(e){ if(e.network){ console.warn('[Casinha] Falha de rede ao adiar tarefa, será retentado:',t.id,e); } else { clearDirty(SK_DIRTY_T,t.id); console.warn('[Casinha] Sync adiar falhou:',t.id,e); tarefas=JSON.parse(snapshot); saveT(); renderCurrent(); } }
 }
 
 function deletarTarefa(id){
@@ -1314,10 +1315,11 @@ async function toggleRotina(id){
     }
     saveT();
   }
+  markDirty(SK_DIRTY_R,r.id);
   saveR();renderRotinas();
-  try{ await syncRotina(r); }catch(_){
-    rotinas=JSON.parse(snapshotR); tarefas=JSON.parse(snapshotT);
-    saveR(); saveT(); renderRotinas();
+  try{ await syncRotina(r); }catch(e){
+    if(e.network){ console.warn('[Casinha] Falha de rede ao toggle rotina, será retentado:',r.id,e); }
+    else { clearDirty(SK_DIRTY_R,r.id); rotinas=JSON.parse(snapshotR); tarefas=JSON.parse(snapshotT); saveR(); saveT(); renderRotinas(); }
   }
 }
 
@@ -1645,10 +1647,9 @@ async function saveTarefa(){
   autoStatus();
   saveT();closeModal();renderCurrent();
   if(syncTarget){
-    try{ await syncTarefa(syncTarget); }catch(_){
-      tarefas=JSON.parse(snapshotT); rotinas=JSON.parse(snapshotR);
-      saveT(); saveR(); renderCurrent();
-      alert('Erro ao salvar tarefa. A alteração foi desfeita.');
+    try{ await syncTarefa(syncTarget); }catch(e){
+      if(e.network){ console.warn('[Casinha] Falha de rede ao salvar tarefa, será retentado:',syncTarget.id,e); }
+      else { clearDirty(SK_DIRTY_T,syncTarget.id); tarefas=JSON.parse(snapshotT); rotinas=JSON.parse(snapshotR); saveT(); saveR(); renderCurrent(); alert('Erro ao salvar tarefa. A alteração foi desfeita.'); }
     }
   }
 }
@@ -1735,10 +1736,9 @@ async function saveRotina(){
     syncTarget=r;
   }
   saveR();closeModal();renderCurrent();
-  try{ await syncRotina(syncTarget); }catch(_){
-    rotinas=JSON.parse(snapshotR); tarefas=JSON.parse(snapshotT);
-    saveR(); saveT(); renderCurrent();
-    alert('Erro ao salvar rotina. A alteração foi desfeita.');
+  try{ await syncRotina(syncTarget); }catch(e){
+    if(e.network){ console.warn('[Casinha] Falha de rede ao salvar rotina, será retentado:',syncTarget.id,e); }
+    else { clearDirty(SK_DIRTY_R,syncTarget.id); rotinas=JSON.parse(snapshotR); tarefas=JSON.parse(snapshotT); saveR(); saveT(); renderCurrent(); alert('Erro ao salvar rotina. A alteração foi desfeita.'); }
   }
 }
 
@@ -1782,11 +1782,11 @@ async function saveAmbiente(){
     if(old!==nome){tarefas.forEach(t=>{if(t.ambiente===old)t.ambiente=nome;});saveT();}
     syncTarget=a;
   } else {const a={id:uid(),nome,cor,icone};ambientes.push(a);syncTarget=a;}
+  markDirty(SK_DIRTY_A,syncTarget.id);
   saveA();closeModal();renderCurrent();
-  try{ await syncAmbiente(syncTarget); }catch(_){
-    ambientes=JSON.parse(snapshotA); tarefas=JSON.parse(snapshotT);
-    saveA(); saveT(); renderCurrent();
-    alert('Erro ao salvar ambiente. A alteração foi desfeita.');
+  try{ await syncAmbiente(syncTarget); }catch(e){
+    if(e.network){ console.warn('[Casinha] Falha de rede ao salvar ambiente, será retentado:',syncTarget.id,e); }
+    else { clearDirty(SK_DIRTY_A,syncTarget.id); ambientes=JSON.parse(snapshotA); tarefas=JSON.parse(snapshotT); saveA(); saveT(); renderCurrent(); alert('Erro ao salvar ambiente. A alteração foi desfeita.'); }
   }
 }
 
@@ -1831,11 +1831,11 @@ async function savePessoa(){
     if(old!==nome){tarefas.forEach(t=>{if(t.responsavel===old)t.responsavel=nome;});saveT();}
     syncTarget=p;
   } else {const p={id:uid(),nome,cor};pessoas.push(p);syncTarget=p;}
+  markDirty(SK_DIRTY_P,syncTarget.id);
   saveP();closeModal();renderCurrent();
-  try{ await syncPessoa(syncTarget); }catch(_){
-    pessoas=JSON.parse(snapshotP); tarefas=JSON.parse(snapshotT);
-    saveP(); saveT(); renderCurrent();
-    alert('Erro ao salvar pessoa. A alteração foi desfeita.');
+  try{ await syncPessoa(syncTarget); }catch(e){
+    if(e.network){ console.warn('[Casinha] Falha de rede ao salvar pessoa, será retentado:',syncTarget.id,e); }
+    else { clearDirty(SK_DIRTY_P,syncTarget.id); pessoas=JSON.parse(snapshotP); tarefas=JSON.parse(snapshotT); saveP(); saveT(); renderCurrent(); alert('Erro ao salvar pessoa. A alteração foi desfeita.'); }
   }
 }
 
@@ -1905,7 +1905,7 @@ async function apiReq(path,opts={}){
   if(authToken)headers.Authorization='Bearer '+authToken;
   let res;
   try{res=await fetch(getApiBase()+path,{...opts,headers});}
-  catch(e){throw new Error('Falha de rede: '+e.message);}
+  catch(e){const err=new Error('Falha de rede: '+e.message);err.network=true;throw err;}
   if(!res.ok){
     let msg='Erro na API';
     try{const j=await res.json();msg=j.error||msg;}catch(_){}
