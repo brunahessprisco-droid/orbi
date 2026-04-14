@@ -1076,14 +1076,17 @@
         const rows=_sRows.status==='fulfilled'?_sRows.value:null;
         if(rows===null){_showSyncWarn();return;}
         const delSet=getHabDeleted();
-        const apiHabitos=rows.map(r=>({
+        const apiHabitos=rows.map(r=>{
+          const fv=String(r.frequencia||'diario').toLowerCase();
+          const freq=['diario','semanal','mensal','livre'].includes(fv)?fv:'diario';
+          return{
           id:r.client_id,_dbId:r.id,name:r.nome,icon:r.icone||'✨',
-          cat:r.categoria||'outro',freq:r.frequencia||'diario',
+          cat:r.categoria||'outro',freq,
           weekdays:r.weekdays||[],monthDay:r.monthDay!=null?Number(r.monthDay):null,note:r.obs||'',
           autoType:r.autoType||'',autoKeyword:r.autoKeyword||'',
           tipo:r.tipo||'check',unit:r.unit||'',startDate:r.startDate||'',
           logs:r.logs||{},
-        })).filter(h=>!delSet.has(h._dbId));
+        };}).filter(h=>!delSet.has(h._dbId));
         const localHabits=JSON.parse(lsGet(KEY)||'[]');
         // Backfill tipo/unit/startDate from localStorage for habits that have null in the API
         // (happens for habits created before these columns were added to the schema)
@@ -1218,7 +1221,9 @@
         document.getElementById('f-name').value=h.name||'';
         _setIconVal(h.icon||'');
         document.getElementById('f-cat').value=h.cat||'outro';
-        document.getElementById('f-freq').value=h.freq||'diario';
+        { const fv=String(h.freq||'diario').toLowerCase();
+          document.getElementById('f-freq').value=['diario','semanal','mensal','livre'].includes(fv)?fv:'diario';
+        }
         document.getElementById('f-tipo').value=h.tipo||'check';
         document.getElementById('f-unit').value=h.unit||'';
         document.getElementById('f-start').value=h.startDate||todayStr();
@@ -1836,14 +1841,20 @@
 
       groups.forEach(({key,label,filter})=>{
         const members=active.filter(filter);
-        if(!members.length) return;
+        const alwaysShow=key==='diario'||key==='semanal'||key==='mensal';
+        if(!alwaysShow && !members.length) return;
         const collapsed=trackerCollapsed[key];
         html+=`<div class="hab-group-hd${collapsed?' collapsed':''}" onclick="toggleTrackerSection('${key}')" style="grid-column:1/-1">
           <div class="hab-group-hd-label">${label} (${members.length})</div>
           <div class="hab-group-hd-line"></div>
           <div class="hab-group-hd-arrow">▾</div>
         </div>`;
-        if(!collapsed) members.forEach(h=>{ html+=habitRow(h); });
+        if(!collapsed){
+          if(members.length) members.forEach(h=>{ html+=habitRow(h); });
+          else if(alwaysShow){
+            html+=`<div style="grid-column:1/-1;padding:10px 14px 14px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:4px">Nenhum hábito ${label.toLowerCase()}. Em <strong>Meus hábitos</strong> → <strong>+ Novo hábito</strong>, escolha frequência <strong>${label}</strong> (ou <strong>Mensal (dia do mês)</strong>).</div>`;
+          }
+        }
       });
 
       html+=`</div>`;
