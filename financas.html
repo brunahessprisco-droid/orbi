@@ -239,7 +239,7 @@ tbody tr:hover .row-actions{opacity:1;}
 .fixa-badge-pend:hover{opacity:.8;}
 .fixa-actions{display:flex;gap:6px;opacity:0;transition:opacity .15s;}
 .fixa-row:hover .fixa-actions{opacity:1;}
-.fixas-total{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-top:16px;}
+.fixas-total{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:24px;}.fixas-total-group{display:flex;flex-direction:column;gap:2px;}.fixas-total-group:last-child{text-align:right;}
 .fixas-total-label{font-size:13px;color:var(--muted);}
 .fixas-total-val{font-family:var(--mono);font-size:18px;font-weight:500;color:var(--red);}
 
@@ -822,7 +822,10 @@ html.privacy .fin-cal-tx-val{filter:blur(8px);user-select:none;pointer-events:no
     </div>
   </div>
   <div class="fixas-list" id="fixas-list"></div>
-  <div class="fixas-total"><div class="fixas-total-label">Total de contas fixas na fatura</div><div class="fixas-total-val" id="fixas-total">—</div></div>
+  <div class="fixas-total">
+    <div class="fixas-total-group"><div class="fixas-total-label">Total de contas fixas na fatura</div><div class="fixas-total-val" id="fixas-total">—</div></div>
+    <div class="fixas-total-group"><div class="fixas-total-label">Total de contas fixas</div><div class="fixas-total-val" id="fixas-total-geral">—</div></div>
+  </div>
 </div>
 
 <!-- PLANEJAMENTO -->
@@ -2508,11 +2511,12 @@ function isFixaLancada(fixaId,k){
 function rendFixas(){
   const k=curK();
   const activeFixas=fixas.filter(f=>!f.encerradoApos||f.encerradoApos>=k);
-  let total=0;
+  let total=0,totalGeral=0;
   document.getElementById('fixas-list').innerHTML=activeFixas.map(f=>{
     const lancada=isFixaLancada(f.id,k);
     const valOverride=getFixaValor(f.id,k);
     const val=valOverride!==null?valOverride:f.valor;
+    totalGeral+=val;
     if(lancada)total+=val;
     const statusBadge=lancada
       ?`<span class="fixa-badge-ok">✓ Lançada</span>`
@@ -2541,6 +2545,7 @@ function rendFixas(){
     </div>`;
   }).join('')||'<div style="color:var(--hint);padding:32px;text-align:center">Nenhuma conta fixa cadastrada</div>';
   document.getElementById('fixas-total').textContent=fmt(total);
+  document.getElementById('fixas-total-geral').textContent=fmt(totalGeral);
 }
 
 function renderAll(){updSummary();rendDash();rendTable();rendCartoes();rendCats();rendFixas();rendBudget();
