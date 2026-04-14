@@ -682,6 +682,14 @@
     function lsGet(k){const ns='u_'+_uid()+'_'+k;const v=localStorage.getItem(ns);if(v!==null)return v;const leg=localStorage.getItem(k);if(leg!==null){localStorage.setItem(ns,leg);localStorage.removeItem(k);}return leg;}
     function lsSet(k,v){localStorage.setItem('u_'+_uid()+'_'+k,v);}
     function lsRem(k){localStorage.removeItem('u_'+_uid()+'_'+k);}
+    /** Dirty queues usadas pelos sync* fora do DOMContentLoaded — o clearDirty interno não está no mesmo escopo. */
+    function saudeClearDirtyKey(dirtyKey,id){
+      try{
+        const s=new Set(JSON.parse(lsGet(dirtyKey)||'[]'));
+        s.delete(id);
+        lsSet(dirtyKey,JSON.stringify([...s]));
+      }catch(_){/* ignore */}
+    }
     function clearModuleStorage(){
       const keep=new Set(['fin_auth_token_v1','fin_api_base_v1','app_theme','app_last_user_id']);
       for(const k of[...Object.keys(localStorage)])if(!keep.has(k))localStorage.removeItem(k);
@@ -739,7 +747,7 @@
         date:w.date,weight:w.weight,height:w.height,fat:w.fat,note:w.note||null,
         extraJson:{muscle:w.muscle,goal:w.goal,waist:w.waist,hip:w.hip,chest:w.chest,time:w.time||null},
       })});
-      clearDirty('weights',w.id);
+      saudeClearDirtyKey('weights',w.id);
     }
     async function deleteWeightApi(w){
       if(!canUseApi()||!w._dbId)return;
@@ -754,7 +762,7 @@
         email:d.email||null,clinica:d.clinic||null,endereco:d.address||null,obs:d.note||null,
       })});
       if(r?.id)d._dbId=r.id;
-      clearDirty('doctors',d.id);
+      saudeClearDirtyKey('doctors',d.id);
     }
     async function deleteMedicoApi(d){
       if(!canUseApi()||!d._dbId)return;
@@ -770,7 +778,7 @@
         fileName:e.fileName||null,fileData:e.fileData||null,
       })});
       if(r?.id)e._dbId=r.id;
-      clearDirty('exams',e.id);
+      saudeClearDirtyKey('exams',e.id);
     }
     async function deleteExameApi(e){
       if(!canUseApi()||!e._dbId)return;
@@ -786,7 +794,7 @@
         resumo:c.summary||null,
       })});
       if(r?.id)c._dbId=r.id;
-      clearDirty('consults',c.id);
+      saudeClearDirtyKey('consults',c.id);
     }
     async function deleteConsultaApi(c){
       if(!canUseApi()||!c._dbId)return;
@@ -803,7 +811,7 @@
         intake_weekdays:Array.isArray(r.intakeWeekdays)?r.intakeWeekdays:null,
         intake_month_day:r.intakeMonthDay!=null?Number(r.intakeMonthDay):null,
       })});
-      clearDirty(KEY_DIRTY_REM,r.id);
+      saudeClearDirtyKey('saude_remedios_dirty_v1',r.id);
     }
     async function deleteRemedioApi(r){
       if(!canUseApi())return;
@@ -814,9 +822,9 @@
       if(!canUseApi())return;
       await apiReqRetry('/saude/consumos',{method:'POST',body:JSON.stringify({
         client_id:c.id,date:c.date,time:c.time||null,
-        name:c.name,dose:c.dose||null,reason:c.reason||null,
+        name:c.name,dose:c.dose||null,        reason:c.reason||null,
       })});
-      clearDirty(KEY_DIRTY_CONSUMO,c.id);
+      saudeClearDirtyKey('saude_consumos_dirty_v1',c.id);
     }
     async function deleteConsumoApi(c){
       if(!canUseApi())return;
