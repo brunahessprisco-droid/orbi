@@ -66,7 +66,7 @@ The hub (`index.html`) uses localStorage as a **read cache** only. On load, `hub
 
 PostgreSQL via Prisma. Schema in `backend/prisma/schema.prisma`. Migrations in `backend/prisma/migrations/`.
 
-The `start` script in `package.json` includes `prisma migrate resolve --applied <id>` for each migration that was created manually (not via `prisma migrate dev`) before running `prisma migrate deploy`. **When adding a new manual migration, append it to the start script.**
+The `start` script in `backend/package.json` runs `prisma migrate deploy` then `node dist/server.js`. Do **not** chain `prisma migrate resolve --applied` on every start: once a migration is already recorded in `_prisma_migrations`, repeating `--applied` fails with **P3008** and the service never binds a port. One-off `resolve` (if ever needed for a broken history) should be run **manually** in the Render shell, not in `start`.
 
 ### Third-party integrations
 
@@ -84,7 +84,7 @@ For both integrations: `client_id` is safe in frontend JS; `client_secret` is on
 
 ### Render deploy
 
-The Render service builds with `npm run build` and starts with `npm run start`. The start script resolves migration state before deploying. New env vars go in the Render dashboard (never committed).
+The Render service builds with `npm run build` and starts with `npm run start` (applies pending migrations, then starts the API). New env vars go in the Render dashboard (never committed).
 
 ---
 
