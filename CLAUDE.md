@@ -88,50 +88,108 @@ The Render service builds with `npm run build` and starts with `npm run start`. 
 
 ---
 
-## Reliability Standards (MANDATORY)
+## Reliability Standards
 
-This section documents patterns that **must** be followed in every module. These rules exist because all of the problems below have already occurred in production and been corrected. Any new code that violates these rules introduces a known regression.
+This section has two distinct parts:
+
+- **Current State** — what the code actually does today. Factually accurate as of the last audit.
+- **Rules for New Code** — what every new module or feature must do. These are prescriptive standards, not descriptions of the full existing codebase.
+
+Do not assume a rule in "Rules for New Code" is already implemented everywhere. Check "Current State" and the code itself.
+
+---
+
+## Current State — What Is and Isn't Implemented
+
+This is a factual audit of the codebase. Verified against source files.
+
+### ✅ Implemented consistently across all modules
+
+- **Dirty queue pattern** — all modules (`financas`, `exercicios`, `casinha`, `habitos`, `Alimentacao`, `Saude`) implement `markDirty` / `clearDirty` before and after API calls on write paths
+- **Deleted queue pattern** — all modules implement `markDeleted` / `clearDeleted` for delete operations
+- **Bootstrap retries dirty items** — all modules recover local-only items on bootstrap and retry sync
+- **`logoutUser` checks pending queues** — all modules check dirty/deleted queues and show `confirm()` before clearing state
+- **`beforeunload` warning** — all modules set `e.returnValue` if queues are non-empty (best-effort browser warning only, no sync)
+- **No `.catch(()=>null)` on write paths** — eliminated from all modules. The only remaining `.catch(()=>null)` is in `index.html:589`, the hub bootstrap read helper, which is read-only and null-guards all results
+- **`_showLastSync()`** — implemented in all 6 modules
+- **`assertUserMatchesQuery`** — implemented on all backend GET routes that accept `usuario_id` query param
+- **Network vs server error distinction in `Saude.html`** — `upsert()` does not rollback on `e.network === true`; only rolls back on server errors (4xx/5xx)
+
+### ⚠️ Implemented in some modules, not all
+
+- **`Promise.allSettled` in bootstrap:**
+  - ✅ `casinha.html`, `Saude.html`, `financas.html`, `exercicios.html`
+  - ❌ `Alimentacao.html` — uses `Promise.all`. A single endpoint failure aborts the entire bootstrap and falls through to `catch`. No partial-failure recovery.
+  - ❌ `habitos.html` — uses sequential awaits, not parallel. Effectively single-point-of-failure per call.
+  - ⚠️ `index.html` (hub) — uses `Promise.all` but wraps each fetch in `.catch(()=>null)` so individual failures return null without aborting the array. Effectively tolerates partial failures but does not use `allSettled`.
+
+- **`_showSyncWarn()` banner on partial bootstrap failure:**
+  - ✅ `casinha.html`, `Saude.html`
+  - ❌ `financas.html`, `habitos.html`, `Alimentacao.html` — no banner on partial failure
+  - ⚠️ `exercicios.html` — uses `setStatus(...)` (different implementation, same intent)
+
+- **Hub cache filtered for pending module deletes:**
+  - ✅ `alimentacao_meals_v3_light` — filtered against `alimentacao_deleted_ids_v1`
+  - ❌ `casinha_tarefas`, `habitos_app_v5`, `saude_treinos_v1`, `saude_app_v1` — not filtered. If the user deletes from those modules and navigates to the hub before the API DELETE completes, the hub will show the deleted item.
+
+- **Bootstrap retries pending DELETEs:**
+  - ✅ `casinha.html` (all 4 entity types), `Alimentacao.html` (water), `exercicios.html`
+  - ❌ `habitos.html`, `financas.html`, `Saude.html` — deleted queue exists but is not retried in bootstrap
+
+- **`beforeunload` checks all queues (including deleted):**
+  - ✅ Most modules
+  - ❌ `Alimentacao.html` — `beforeunload` does not check `KEY_WATER_DELETED` (though `logoutUser` does)
+
+### ❌ Known bugs — not yet fixed
+
+- **`financas.html` — transaction deletes do not reach the server.** `txFromApi()` does not set `_dbId` on the returned object. The guard `if(tx&&tx._dbId)` in `delTx` evaluates false, so `markDeleted` is never called. The deleted transaction is removed from local state but stays in the database. On the next `syncTxsToApi`, the import loop sees the transaction in the API response but not in local state and re-adds it. **Deleted transactions reappear on next sync.** Same issue applies to categories and accounts (`contaFromApi`, the cats map — none set `_dbId`).
+
+---
+
+## Rules for New Code
+
+These rules apply to any new module, new entity type added to an existing module, or significant refactor. They represent the target architecture.
 
 ---
 
 ### 🔴 ANTI-PATTERNS (PROHIBITED)
 
-These patterns are **banned** across all frontend modules. Never introduce them, regardless of context.
-
 #### 1. `.catch(()=>null)` on write paths
 
 ```js
-// ❌ PROHIBITED — error is silenced, caller receives null, failure is invisible
+// ❌ PROHIBITED
 await apiReq('/endpoint', { method: 'POST', body: ... }).catch(()=>null);
 
-// ✅ CORRECT — error propagates, dirty queue or catch handler deals with it
+// ✅ CORRECT — error propagates; dirty queue or explicit catch handles it
 await apiReq('/endpoint', { method: 'POST', body: ... });
 ```
 
-The only acceptable `.catch(()=>null)` is on **read-only hub bootstrap helpers** where the return value is null-guarded and no write operation depends on the result. Every write path must propagate or explicitly handle errors.
+The only acceptable `.catch(()=>null)` is on **read-only** fetches where the result is null-guarded and no write depends on it (e.g., the hub bootstrap helper `h(url)` in `index.html`).
 
 #### 2. Fire-and-forget on persistence
 
 ```js
-// ❌ PROHIBITED — no await, no error handling at call site
+// ❌ PROHIBITED
 syncData(item);
 
-// ✅ CORRECT — mark dirty before call, clear on success, warn on failure
+// ✅ CORRECT — mark dirty before, clear on success, warn on failure
 markDirty(item.id);
-await syncData(item).then(()=>clearDirty(item.id)).catch(e=>console.warn('[Module] sync failed, will retry:', e));
+syncData(item)
+  .then(() => clearDirty(item.id))
+  .catch(e => console.warn('[Module] sync failed, will retry:', e));
 ```
 
-Fire-and-forget is only acceptable for **non-persistence side-effects** (e.g., preloading UI, analytics). Any call that writes data to the API must be awaited or follow the dirty-queue pattern.
+Fire-and-forget is only acceptable for non-persistence side-effects (UI preloads, analytics). Any call that writes data to the API must be awaited or follow the dirty-queue pattern.
 
 #### 3. Optimistic update without rollback
 
 ```js
-// ❌ PROHIBITED — UI shows success, but failure is silent
+// ❌ PROHIBITED — UI shows success, failure is silent
 items.push(newItem);
 saveLocal();
-apiReq('/items', { method: 'POST', body: ... }).catch(()=>{});
+apiReq('/items', { method: 'POST', body: ... }).catch(() => {});
 
-// ✅ CORRECT OPTION A — await and rollback on failure
+// ✅ CORRECT — mark dirty, distinguish network errors from server errors
 items.push(newItem);
 saveLocal();
 markDirty(newItem.id);
@@ -139,116 +197,125 @@ try {
   await apiReq('/items', { method: 'POST', body: ... });
   clearDirty(newItem.id);
 } catch(e) {
-  // rollback only on server errors; network errors keep local state (dirty queue retries)
-  if (!e.network) {
+  if (e.network) {
+    // Request may have reached server. Local state is correct, dirty queue will retry.
+    console.warn('[Module] network error, will retry:', e);
+  } else {
+    // Server explicitly rejected. Rollback.
     items = items.filter(x => x.id !== newItem.id);
     saveLocal();
-    alert('Erro ao salvar.');
-  } else {
-    console.warn('[Module] sync failed (network), will retry:', e);
+    alert('Erro ao salvar. A alteração foi desfeita.');
   }
 }
-
-// ✅ CORRECT OPTION B — dirty queue pattern (no await at call site)
-markDirty(item.id);
-saveLocal();
-syncItem(item).then(()=>clearDirty(item.id)).catch(e=>console.warn('[Module] will retry:', e));
 ```
 
-**Critical distinction on rollback:** `e.network === true` means the request may have already been processed by the server (e.g., Render accepted the request but the response was lost in transit). In this case, **do not rollback** — the data is already in localStorage with the dirty flag set, and will be confirmed or retried on the next bootstrap. Rolling back on a network error that the server already handled creates the "ghost rollback" bug (UI shows error, refresh shows the data was saved).
+**The `e.network` distinction is critical.** `e.network === true` is set by `apiReq` when `fetch()` itself throws (connection failure, timeout, Render cold start). In this case the request may have already been processed server-side. Rolling back in this case creates the "ghost rollback" bug: UI shows error, user retries, a duplicate entry is created in the database, both appear after refresh. Do not rollback on `e.network`.
 
 #### 4. localStorage as source of truth
 
 ```js
-// ❌ PROHIBITED — treating localStorage as authoritative
-const items = JSON.parse(localStorage.getItem('my_key') || '[]');
-// ... never syncing with API
+// ❌ PROHIBITED
+const items = JSON.parse(localStorage.getItem('key') || '[]');
+// used without ever syncing to/from API
 
-// ✅ CORRECT — localStorage is a write-through cache
-// On bootstrap: always fetch from API, merge with localStorage pending items
-// localStorage is read only when API is unavailable (offline)
+// ✅ CORRECT — localStorage is write-through cache only
+// bootstrap always fetches from API and merges with local pending items
+// localStorage is only authoritative for items in the dirty queue (not yet confirmed by server)
 ```
 
 #### 5. Hub cache written without pending-delete filter
 
 ```js
-// ❌ PROHIBITED — hub overwrites cache with stale API data, resurrecting deleted items
-if(rItems !== null) _lsSet('module_key', JSON.stringify(items));
+// ❌ PROHIBITED — hub overwrites cache, resurrects deleted items
+if (rItems !== null) _lsSet('module_key', JSON.stringify(items));
 
 // ✅ CORRECT — filter locally-deleted items before writing hub cache
-if(rItems !== null) {
-  const pending = new Set(JSON.parse(localStorage.getItem('u_'+uid+'_module_deleted_ids')||'[]'));
+if (rItems !== null) {
+  const pending = new Set(
+    JSON.parse(localStorage.getItem('u_' + uid + '_module_deleted_ids_v1') || '[]')
+  );
   _lsSet('module_key', JSON.stringify(items.filter(x => !pending.has(x.id))));
 }
 ```
 
-This matters because module deletes are fire-and-forget (`deleteApi()` without await). If the user navigates to the hub before the DELETE reaches the server, `hubBootstrap` fetches from the API and overwrites the cache — resurrecting the deleted item.
+Module deletes are fire-and-forget. If the user navigates to the hub before the DELETE reaches the server, `hubBootstrap` fetches the pre-delete API state and overwrites the cache, resurrecting the item.
 
 ---
 
 ### 🔴 The Golden Rule
 
-> **The user must never believe data was saved when it was not.**
+> **The user must never believe data was saved when it was not. The user must never believe data was lost when it was not.**
 
-This has two sides:
+- **False success**: UI shows item saved → API failed silently → data gone on refresh. Caused by fire-and-forget, `.catch(()=>null)`, missing rollback.
+- **False failure**: UI shows error and rolls back → API actually succeeded → data reappears on refresh. Caused by rolling back on `e.network` errors. Creates duplicate entries if the user retries.
 
-- **False success**: UI shows item as saved → API failed silently → data is gone on refresh. This is caused by fire-and-forget, `.catch(()=>null)`, or missing rollback.
-- **False failure**: UI shows error and rolls back → API actually succeeded → data appears on refresh. This is caused by rolling back on network errors (`e.network === true`) without distinguishing from server rejections.
-
-Both are bugs. One loses data, the other erodes trust.
+Both are bugs. Both have occurred in this codebase and been fixed. Do not reintroduce either.
 
 ---
 
-### 🔴 Dirty Queue Pattern (Standard for all modules)
+### 🔴 Dirty Queue Pattern
 
-Every module that writes data must implement the dirty queue pattern. This is what makes the app resilient to network failures, tab closes, and device switches.
+Every entity type in every module must implement this pattern.
 
-**Required keys per entity type:**
-- `MODULE_DIRTY_KEY` — Set of `client_id`s pending sync to server
-- `MODULE_DELETED_KEY` — Set of `client_id`s (or server IDs) pending DELETE
+**Keys required per entity type:**
+- `u_${userId}_MODULE_ENTITY_dirty_v1` — Set of `client_id`s pending sync
+- `u_${userId}_MODULE_ENTITY_deleted_v1` — Set of server IDs (or `client_id`s) pending DELETE
 
-**Required lifecycle:**
+**Lifecycle for creates and edits:**
 
 ```js
-// CREATE / EDIT
-markDirty(item.id);       // 1. Mark before API call
-saveLocal();              // 2. Persist to localStorage
-syncItem(item)            // 3. Try to sync
-  .then(()=>clearDirty(item.id))   // 4. Clear on confirmed success
-  .catch(e=>console.warn('[Module] will retry:', e)); // 5. Warn, leave dirty for retry
+markDirty(item.id);    // 1. before API call — intent survives tab close
+saveLocal();           // 2. immediately available, even offline
+syncItem(item)
+  .then(() => clearDirty(item.id))              // 3. confirmed → drain queue
+  .catch(e => console.warn('[Module] ...', e)); // 4. failed → stays dirty, retried on bootstrap
+```
 
-// DELETE
-markDeleted(item.id);     // 1. Mark deleted before API call
-removeFromLocalState();   // 2. Remove from local array
-saveLocal();              // 3. Persist removal
+**Lifecycle for deletes:**
+
+```js
+markDeleted(item.id);          // 1. before API call
+removeFromLocalState(item.id); // 2. optimistic removal
+saveLocal();
 apiReq(`/items/${item._dbId}`, { method: 'DELETE' })
-  .then(()=>clearDeleted(item.id)) // 4. Clear on confirmed success
-  .catch(e=>console.warn('[Module] retry delete:', e)); // 5. Warn, retry on bootstrap
+  .then(() => clearDeleted(item.id))
+  .catch(e => console.warn('[Module] retry delete:', e));
 ```
 
 **Bootstrap must retry both queues:**
 
 ```js
 async function bootstrapApi() {
-  // 1. Retry pending DELETEs first (before fetching server state)
+  // Step 1 — fire pending DELETEs before fetching server state
   for (const id of getDeleted()) {
     apiReq(`/items/${id}`, { method: 'DELETE' })
-      .then(()=>clearDeleted(id))
-      .catch(e=>console.warn('[Module] retry delete:', id, e));
+      .then(() => clearDeleted(id))
+      .catch(e => console.warn('[Module] retry delete:', id, e));
   }
 
-  // 2. Fetch server state
-  const serverItems = await apiReq('/items');
+  // Step 2 — fetch server state (Promise.allSettled — never Promise.all)
+  const [_sItems] = await Promise.allSettled([apiReq('/items')]);
+  const serverItems = _sItems.status === 'fulfilled' ? _sItems.value : null;
 
-  // 3. Merge: server items + local items not yet on server (in dirty queue)
-  const serverIds = new Set(serverItems.map(x => x.client_id));
-  const localPending = getLocalItems().filter(x => getDirty().has(x.id) && !serverIds.has(x.id));
-  items = [...serverItems.map(fromApi), ...localPending];
+  if (serverItems !== null) {
+    // Step 3 — merge: server items + local dirty items not yet on server
+    const serverIds = new Set(serverItems.map(x => x.client_id));
+    const localPending = getLocalItems().filter(
+      x => getDirty().has(x.id) && !serverIds.has(x.id)
+    );
+    items = [...serverItems.map(fromApi), ...localPending];
 
-  // 4. Retry dirty items
-  for (const item of localPending) {
-    syncItem(item).then(()=>clearDirty(item.id)).catch(e=>console.warn('[Module] retry sync:', e));
+    // Step 4 — retry dirty items
+    for (const item of localPending) {
+      syncItem(item)
+        .then(() => clearDirty(item.id))
+        .catch(e => console.warn('[Module] retry sync:', e));
+    }
   }
+
+  // Step 5 — show sync warning if any fetch failed
+  if (_sItems.status === 'rejected') _showSyncWarn();
+  else _showLastSync();
 }
 ```
 
@@ -256,172 +323,143 @@ async function bootstrapApi() {
 
 ### 🔴 Bootstrap Integrity Rules
 
-Bootstrap is the most critical path — it runs on every page load and determines what the user sees. Violations here cause data loss, ghost data, and divergence between devices.
+1. **Use `Promise.allSettled`, never `Promise.all`.** A failed endpoint must not abort the entire bootstrap and leave the user with an empty or stale view.
 
-1. **Always use `Promise.allSettled` for parallel fetches**, not `Promise.all`. A single failed endpoint must not abort the entire bootstrap.
-   ```js
-   const [_sA, _sB, _sC] = await Promise.allSettled([fetchA(), fetchB(), fetchC()]);
-   const rA = _sA.status === 'fulfilled' ? _sA.value : null;
-   ```
+2. **Null-guard every result.** `null` means the endpoint failed. Keep existing local state — do not overwrite with nothing.
 
-2. **Null-guard every result** before merging. If an endpoint failed (`null`), keep the existing local state for that entity — do not overwrite it.
-   ```js
-   if (rA !== null) items = rA.map(fromApi); // only replace if server responded
-   ```
-
-3. **Never overwrite locally-dirty data with server data.** If the user has unsaved changes (dirty queue is non-empty for an entity), the local version takes precedence. The server's version may be stale.
+3. **Never overwrite locally-dirty data with server data.** If the dirty queue for an entity is non-empty, push local → server instead.
    ```js
    const configDirty = getDirty(KEY_CONFIG_DIRTY).size > 0;
    if (serverConfig && !configDirty) {
-     applyServerConfig(serverConfig); // safe to overwrite
+     applyServerConfig(serverConfig);
    } else if (configDirty) {
-     syncConfig().catch(e=>console.warn(...)); // push local to server instead
+     syncConfig().catch(e => console.warn('[Module] config sync failed:', e));
    }
    ```
 
-4. **Show a sync warning banner when bootstrap is partial.** If any endpoint fails, the UI must indicate that some data may be stale. Use the established `_showSyncWarn()` pattern.
+4. **Show `_showSyncWarn()` if any endpoint failed.** The user must know their data may be stale.
 
-5. **Show a last-sync timestamp after a successful bootstrap.** Use the established `_showLastSync()` pattern.
+5. **Show `_showLastSync()` after a fully successful bootstrap.**
 
 ---
 
 ### 🔴 Reliable Deletes
 
-A delete is only reliable if it satisfies all three conditions:
+A delete is only reliable when all three are true:
 
-1. **Local state is updated immediately** (optimistic removal from UI)
-2. **The intent is persisted** in a deleted queue in localStorage before the API call
-3. **The API call is retried** on the next bootstrap if it failed
+1. Intent is persisted in a deleted queue **before** the API call
+2. Local state is updated optimistically (item removed from UI immediately)
+3. The DELETE is retried on next bootstrap if it failed
 
-If any of these is missing, the deleted item will reappear on the next device, the next refresh, or the next bootstrap — whichever comes first.
+Missing any one of these causes the item to reappear — from the server, on another device, or on next refresh.
 
-**Additional rule:** when `hubBootstrap` writes module data to the hub's localStorage cache, it must filter out any IDs present in that module's deleted queue. The hub bootstrap runs before the module's fire-and-forget DELETE has time to complete, so without this filter, deleted items resurrect in the hub.
+**In addition:** when `hubBootstrap` writes a module's data to the hub cache, it must filter IDs present in that module's deleted queue (see anti-pattern #5 above).
 
 ---
 
 ### 🔴 Logout and Exit Safety
 
-Every module's `logoutUser()` must:
+`logoutUser()` must:
 
-1. Check **all** dirty and deleted queues (not just the main dirty key)
-2. Show a `confirm()` dialog if any queue is non-empty
-3. Allow the user to cancel and stay on the page
-4. Only clear queues after the user confirms intent to leave
+1. Check **every** dirty and deleted queue the module uses (not just the main dirty key)
+2. Show `confirm()` if any queue is non-empty
+3. Return early if the user cancels
+4. Clear queues only after confirmation
 
-```js
-async function logoutUser() {
-  const hasPending = getDirty().size > 0 || getDeleted().size > 0; // check ALL queues
-  if (hasPending) {
-    const proceed = confirm('Você tem dados não sincronizados. Deseja sair mesmo assim?');
-    if (!proceed) return;
-  }
-  try { await apiReq('/auth/logout', { method: 'POST' }); } catch(_) {}
-  clearAllQueues(); // only after user confirms
-  authToken = ''; API_USER_ID = null;
-  showLogin();
-}
-```
-
-Every module's `beforeunload` must check the same queues and set `e.returnValue` to warn the user. This is a best-effort browser warning — it does **not** perform any sync. Do not attempt async requests in `beforeunload`; they are not guaranteed to complete.
+`beforeunload` must check the same queues and set `e.returnValue`. This is a best-effort browser warning — it does not and cannot perform sync. Never attempt async API calls in `beforeunload`.
 
 ---
 
 ### 🔴 Multi-Device Consistency
 
-The app is offline-first with eventual consistency. The rules that make multi-device sync reliable:
-
-- **Creates**: new items use a frontend-generated UUID (`client_id`). API upserts are idempotent on `client_id`. Retrying the same create is safe.
-- **Edits**: same `client_id` → API upsert overwrites. Dirty queue ensures the latest local version is pushed on next sync.
-- **Deletes**: deleted queue ensures DELETE is eventually sent to the server. Until confirmed, the item is excluded from the local state and from hub cache writes.
-- **Bootstrap merge**: server state wins for items not in the dirty queue. Local state wins for items in the dirty queue. This prevents the server from overwriting unsaved local changes.
-
-A delete that only removes the item from local state without sending a DELETE to the server (or queuing it) **will cause the item to reappear** from the server on any other device or on the next bootstrap.
+- **Creates/edits** are idempotent: `client_id` is a frontend UUID, API upserts on `(userId, client_id)`. Retrying the same create is always safe.
+- **Deletes** must go through the deleted queue. A delete that only removes from local state without queuing a DELETE will reappear on every other device.
+- **Bootstrap merge**: server state overwrites local for items not in the dirty queue. Local state is preserved for items in the dirty queue. This is the only correct order.
+- **Hub cache** must respect pending deletes from all modules, not just the one the user is currently on.
 
 ---
 
 ### 🔴 Error Handling Standards
 
-- **Never silence API errors on write paths.** Use `console.warn` at minimum, with the module name prefix: `console.warn('[ModuleName] description:', e)`.
-- **Distinguish network errors from server errors.** `e.network === true` (set by `apiReq` on fetch failure) means the request may have reached the server. `e.network` absent or false means the server explicitly rejected the request.
-  - Network error on write → keep local state, leave dirty, log warning, retry via dirty queue.
-  - Server error on write → rollback local state, show user-facing error message.
-- **`apiReqRetry`** (used in Saúde and other modules) retries on network errors up to 4 times with backoff (3s, 8s, 15s). Use it for critical writes where the server may be cold-starting (Render free tier).
-- **Backend errors must never be swallowed.** The global error handler in `server.ts` handles Zod and Prisma errors. Individual routes should throw or return structured errors, never silently catch.
+- Never silence write-path errors. Minimum: `console.warn('[ModuleName] description:', e)`.
+- Always distinguish `e.network` (fetch threw — server may have succeeded) from server errors (server returned 4xx/5xx — server definitely rejected).
+- Use `apiReqRetry` for critical writes where Render cold starts are likely. It retries up to 4 times with backoff (3s, 8s, 15s) on network errors only.
+- Backend: never swallow errors in route handlers. Let Zod and Prisma errors propagate to the global handler in `server.ts`.
 
 ---
 
 ### 🔴 New Module Checklist
 
-When adding a new module, verify all of the following before shipping:
+Before shipping any new module or new entity type, verify all items:
 
 **Storage**
-- [ ] All localStorage keys are namespaced with `u_${userId}_` prefix
-- [ ] Dirty queue key defined per entity type (`MODULE_ENTITY_dirty_v1`)
-- [ ] Deleted queue key defined per entity type (`MODULE_ENTITY_deleted_v1`)
+- [ ] All localStorage keys use `u_${userId}_` namespace prefix
+- [ ] Dirty queue key per entity type: `MODULE_ENTITY_dirty_v1`
+- [ ] Deleted queue key per entity type: `MODULE_ENTITY_deleted_v1`
 - [ ] `markDirty`, `clearDirty`, `markDeleted`, `clearDeleted` helpers implemented
 
 **Bootstrap**
-- [ ] Uses `Promise.allSettled` for parallel fetches
+- [ ] Uses `Promise.allSettled` for all parallel fetches
 - [ ] Each result null-guarded before use
-- [ ] Retry pending DELETEs at bootstrap start
-- [ ] Merge server items + local pending (dirty) items
-- [ ] Retry dirty items that are not yet on server
-- [ ] Respects local dirty flag — does not overwrite unsaved local config/state
-- [ ] Calls `_showSyncWarn()` if any endpoint failed
-- [ ] Calls `_showLastSync()` after successful bootstrap
+- [ ] Pending DELETEs retried at bootstrap start (before fetching server state)
+- [ ] Bootstrap merges server items + local dirty-only items
+- [ ] Dirty items not on server are retried
+- [ ] Local config/settings not overwritten when dirty
+- [ ] `_showSyncWarn()` called if any endpoint failed
+- [ ] `_showLastSync()` called after full success
 
-**Write operations**
+**Writes**
 - [ ] `markDirty` called before API call
 - [ ] `clearDirty` called on confirmed success
 - [ ] No `.catch(()=>null)` on any write path
-- [ ] Network errors (`e.network`) do not trigger rollback
-- [ ] Server errors do trigger rollback with user-visible message
+- [ ] `e.network` errors do not trigger rollback
+- [ ] Server errors trigger rollback with user-visible alert
 
-**Delete operations**
+**Deletes**
 - [ ] `markDeleted` called before API call
 - [ ] `clearDeleted` called on confirmed success
-- [ ] Delete is retried on next bootstrap
-- [ ] Hub cache write (if applicable) filters this module's deleted IDs
+- [ ] Delete retried on next bootstrap
+- [ ] If module data appears in hub cache, hub filters this module's deleted IDs before writing cache
 
 **Exit safety**
-- [ ] `logoutUser` checks all dirty and deleted queues
+- [ ] `logoutUser` checks every dirty and deleted queue the module uses
 - [ ] `logoutUser` shows `confirm()` if any queue non-empty
 - [ ] `beforeunload` checks same queues and sets `e.returnValue`
 
 **Backend**
 - [ ] All GET routes with `usuario_id` param call `assertUserMatchesQuery(req)`
-- [ ] All write routes use `req.userId` from `requireAuth`, not from request body/params
+- [ ] All write routes use `req.userId` from `requireAuth` — never trust body/params for user identity
 - [ ] Upserts use composite unique key on `(userId, client_id)`
 
 ---
 
 ### Offline-First Architecture Summary
 
-The app follows an **offline-first, server-wins-except-for-pending-local** pattern:
-
 ```
 User action
     │
     ▼
-markDirty(id)          ← intent persisted before network call
-saveLocal()            ← data available immediately, even offline
+markDirty(id)       ← intent persisted before network call
+saveLocal()         ← immediately available offline
     │
     ▼
 syncToApi(item)
-    ├── success → clearDirty(id)         ← confirmed, queue drained
-    └── network error → leave dirty      ← retry on next bootstrap
-    └── server error → rollback + alert  ← user-visible failure
+    ├── success        → clearDirty(id)
+    ├── e.network      → leave dirty, log warn      ← retry on next bootstrap
+    └── server error   → rollback + alert           ← explicit user feedback
 ```
 
-On bootstrap:
 ```
-Fetch server state (Promise.allSettled)
+Bootstrap
     │
-    ├── Retry pending DELETEs
-    ├── Merge: server + local dirty
-    ├── Retry dirty items not on server
-    └── Show _showSyncWarn() if partial failure
-        Show _showLastSync() if full success
+    ├── 1. Retry pending DELETEs (fire-and-forget, with warn on failure)
+    ├── 2. Promise.allSettled([...all endpoints])
+    ├── 3. Null-guard each result
+    ├── 4. Merge: server + local dirty items not yet on server
+    ├── 5. Retry dirty items
+    ├── 6. If dirty config → push local to server (do not overwrite local)
+    ├── 7. If any endpoint failed → _showSyncWarn()
+    └── 8. If all succeeded    → _showLastSync()
 ```
 
-localStorage is written on every local change (write-through). It is read on bootstrap only as a fallback for items not yet confirmed by the server, never as the primary source of truth.
+localStorage is write-through: updated on every local change. On bootstrap it is read only to recover items in the dirty queue that have not yet reached the server. It is never the final source of truth.
