@@ -2444,7 +2444,6 @@
     document.querySelector('#ov-habit .modal').addEventListener('change',()=>{_habitDirty=true;});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('ov-habit').classList.contains('open'))_habitDirtyGuard();});
 
-    // --- beforeunload: flush pending sync before page close ---
     // --- beforeunload: avisa sobre dados não sincronizados ---
     window.addEventListener('beforeunload', function(e) {
       if (getHabDirty().size > 0 || getHabDeleted().size > 0) {
