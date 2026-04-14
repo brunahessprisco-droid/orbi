@@ -505,7 +505,7 @@
           const apiIds=new Set(apiMeals.map(m=>m.id));
           const naoSinc=localMeals.filter(m=>!apiIds.has(m.id)&&!m._dbId);
           meals=[...apiMeals,...naoSinc];
-          for(const m of naoSinc)await syncRefeicao(m).catch(()=>null);
+          for(const m of naoSinc)await syncRefeicao(m).catch(()=>{ markMealDirty(m.id); });
           if(rCfg&&rCfg.goals)goals=rCfg.goals;
           if(rCfg&&rCfg.plan)plan=rCfg.plan;
           if(Array.isArray(rWater)){
@@ -515,7 +515,7 @@
               // Migrar água local para API
               const localWater=JSON.parse(lsGet(KEY_WATER)||'[]');
               for(const w of localWater){
-                apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:w.date,ml:w.ml})}).catch(()=>null);
+                apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:w.date,ml:w.ml})}).catch(e=>console.warn('[Alimentação] Migração água falhou:',e));
               }
             }
             lsSet(KEY_WATER,JSON.stringify(waterLogs));
@@ -704,7 +704,7 @@
         const max=Number($('meta-cal-max').value||0);
         if(min&&max&&min>max){alert('Mínimo de calorias não pode ser maior que o máximo.');return;}
         goals={caloriesMin:min,caloriesMax:max||min,water:Number($('meta-water').value||0)};
-        saveGoalsStore();syncConfig().catch(()=>null);fillGoalsForm();renderDashboard();
+        saveGoalsStore();syncConfig().catch(e=>console.warn('[Alimentação] Sync config falhou, será retentado:',e));fillGoalsForm();renderDashboard();
       }
       function resetGoals(){ goals={caloriesMin:1800,caloriesMax:2200,water:2500}; saveGoalsStore(); fillGoalsForm(); renderDashboard(); }
 
@@ -789,7 +789,7 @@
         for(const m of wizardAccumulated){
           if(!existingIds.has(m.id)){
             meals.unshift(m);
-            syncRefeicao(m).catch(()=>null);
+            markMealDirty(m.id);syncRefeicao(m).catch(e=>console.warn('[Alimentação] Sync refeição wizard falhou, será retentado:',e));
           }
         }
         deletedMealIds=deletedMealIds.filter(id=>!wizardAccumulated.some(m=>m.id===id));
@@ -806,7 +806,7 @@
       function closeWaterModal(){ $('ov-water').classList.remove('open'); _waterDirty=false; }
       async function syncWaterLog(log){
         if(!canUseApi())return;
-        await apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:log.date,ml:log.ml,client_id:log.id})}).catch(()=>null);
+        await apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:log.date,ml:log.ml,client_id:log.id})}).catch(e=>console.warn('[Alimentação] Sync água falhou, será retentado:',e));
       }
       function saveWater(){
         const ml=Number($('water-ml').value||0);

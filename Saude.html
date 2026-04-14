@@ -837,10 +837,10 @@
           exams:[...apiExames,...nwE],
           consults:[...apiConsultas,...nwC],
         });
-        for(const w of nwW)syncWeight(w).catch(()=>null);
-        for(const m of nwM)syncMedico(m).catch(()=>null);
-        for(const e of nwE)syncExame(e).catch(()=>null);
-        for(const c of nwC)syncConsulta(c).catch(()=>null);
+        for(const w of nwW)syncWeight(w).catch(e=>console.warn('[Saúde] Sync peso falhou, será retentado:',e));
+        for(const m of nwM)syncMedico(m).catch(e=>console.warn('[Saúde] Sync médico falhou, será retentado:',e));
+        for(const e of nwE)syncExame(e).catch(e=>console.warn('[Saúde] Sync exame falhou, será retentado:',e));
+        for(const c of nwC)syncConsulta(c).catch(e=>console.warn('[Saúde] Sync consulta falhou, será retentado:',e));
 
         // Remédios e consumos
         const apiRemedios=(rRem||[]).map(r=>({id:r.clientId,name:r.name,cat:r.cat||'',dose:r.dose||'',stock:r.stock??null,qty:r.qty??null,days:r.days??null,lastBuy:r.lastBuy||'',note:r.note||'',habitId:r.habitId||undefined}));
@@ -853,8 +853,8 @@
         const nwCon=localCon.filter(c=>!apiConIds.has(c.id));
         app.setRemedios([...apiRemedios,...nwRem]);
         app.setConsumos([...apiConsumos,...nwCon]);
-        for(const r of nwRem)syncRemedio(r).catch(()=>null);
-        for(const c of nwCon)syncConsumo(c).catch(()=>null);
+        for(const r of nwRem)syncRemedio(r).catch(e=>console.warn('[Saúde] Sync remédio falhou, será retentado:',e));
+        for(const c of nwCon)syncConsumo(c).catch(e=>console.warn('[Saúde] Sync consumo falhou, será retentado:',e));
 
         app.renderAll();
       }catch(e){console.error('Bootstrap saúde:',e);window.saudeApp?.renderAll?.();}
@@ -1176,7 +1176,7 @@
           lsSet(KEY_HAB_HABITS,JSON.stringify(habitos));
           // store link back on the remédio
           const idx=remedios.findIndex(x=>x.id===r.id);
-          if(idx>=0){ remedios[idx].habitId=hid; saveRemedios(); syncRemedio(remedios[idx]).catch(()=>null); }
+          if(idx>=0){ remedios[idx].habitId=hid; saveRemedios(); markDirty(KEY_DIRTY_REM,remedios[idx].id); syncRemedio(remedios[idx]).catch(e=>console.warn('[Saúde] Sync remédio falhou, será retentado:',e)); }
         }catch(e){ console.error('createHabitoForRemedio',e); }
       }
 

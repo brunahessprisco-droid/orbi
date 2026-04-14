@@ -1088,16 +1088,16 @@
         // Hábitos com _dbId que não estão na API foram deletados em outro device — não ressuscitar
         const naoSinc=localHabits.filter(h=>!apiIds.has(h.id)&&!h._dbId);
         habits=[...apiHabitos,...naoSinc];
-        for(const h of naoSinc)await syncHabito(h).catch(()=>null);
+        for(const h of naoSinc)await syncHabito(h).catch(()=>{ markHabDirty(h.id); });
         // Resync habits that had tipo/unit/startDate backfilled from localStorage → grava no banco
-        for(const h of toResync)await syncHabito(h).catch(()=>null);
+        for(const h of toResync)await syncHabito(h).catch(()=>{ markHabDirty(h.id); });
         // Process dirty queue - push local changes that haven't been confirmed
         const dirtySet=getHabDirty();
         if(dirtySet.size>0){
           const localById2=Object.fromEntries(localHabits.map(h=>[h.id,h]));
           for(const id of dirtySet){
             const h=habits.find(x=>x.id===id)||localById2[id];
-            if(h)await syncHabito(h).catch(()=>null);
+            if(h)await syncHabito(h).catch(e=>console.warn('[Hábitos] sync dirty queue falhou, será retentado:',e));
           }
         }
         if(habits.length===0){
@@ -1106,7 +1106,7 @@
             {id:uid(),name:'Treinar',icon:'💪',cat:'saude',freq:'diario',weekdays:[],note:'',autoType:'treino_realizado',autoKeyword:'',logs:{}},
             {id:uid(),name:'Ler 10 min',icon:'📚',cat:'mental',freq:'diario',weekdays:[],note:'',autoType:'',autoKeyword:'',logs:{}},
           ];
-          for(const h of habits)await syncHabito(h).catch(()=>null);
+          for(const h of habits)await syncHabito(h).catch(()=>{ markHabDirty(h.id); });
         }
         save();
       }catch(e){console.error('Bootstrap hábitos:',e);}
@@ -1430,11 +1430,11 @@
         const h=habits.find(x=>x.id===editingId);
         if(!h) return;
         Object.assign(h,payload);
-        save();markHabDirty(h.id);syncHabito(h).catch(()=>null);
+        save();markHabDirty(h.id);syncHabito(h).catch(e=>console.warn('[Hábitos] sync falhou, será retentado:',e));
       }else{
         const h={id:uid(),...payload,logs:{}};
         habits.push(h);
-        save();markHabDirty(h.id);syncHabito(h).catch(()=>null);
+        save();markHabDirty(h.id);syncHabito(h).catch(e=>console.warn('[Hábitos] sync falhou, será retentado:',e));
       }
 
       save();

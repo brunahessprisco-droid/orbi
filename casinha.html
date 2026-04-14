@@ -1135,7 +1135,7 @@ async function completarTarefa(id){
     // Tarefa avulsa com recorrência: gera a próxima
     const nd=calcNextDate(t.dataVenc||today(),t.recorrencia);
     const next={...t,id:uid(),_dbId:undefined,status:'pendente',dataVenc:nd,dataConclusao:null,createdAt:new Date().toISOString()};
-    tarefas.push(next);syncTarefa(next).catch(()=>null);
+    tarefas.push(next);markDirty(SK_DIRTY_T,next.id);syncTarefa(next).catch(e=>console.warn('[Casinha] Sync próxima ocorrência falhou, será retentado:',e));
   }
   saveT();renderCurrent();
   try{ await syncTarefa(t); }catch(e){
@@ -1618,12 +1618,12 @@ async function saveTarefa(){
       const r=rotinas.find(x=>x.id===t.rotinaId);
       if(r){
         const futuras=tarefas.filter(x=>x.rotinaId===r.id&&x.id!==t.id&&x.status!=='concluida');
-        futuras.forEach(x=>deleteTarefaApi(x).catch(()=>null));
+        futuras.forEach(x=>deleteTarefaApi(x).catch(e=>console.warn('[Casinha] Delete tarefa futura falhou:',x.id,e)));
         tarefas=tarefas.filter(x=>!(x.rotinaId===r.id&&x.id!==t.id&&x.status!=='concluida'));
         r.proximaData=calcNextDate(dataVenc,r.recorrencia);
         const ns=preencherOcorrenciasRotina(r);
-        ns.forEach(n=>{markDirty(SK_DIRTY_T,n.id);syncTarefa(n).catch(()=>null);});
-        saveR();markDirty(SK_DIRTY_R,r.id);syncRotina(r).catch(()=>null);
+        ns.forEach(n=>{markDirty(SK_DIRTY_T,n.id);syncTarefa(n).catch(e=>console.warn('[Casinha] Sync ocorrência falhou, será retentado:',n.id,e));});
+        saveR();markDirty(SK_DIRTY_R,r.id);syncRotina(r).catch(e=>console.warn('[Casinha] Sync rotina falhou, será retentado:',r.id,e));
       }
     }
     syncTarget=t;
@@ -1731,7 +1731,7 @@ async function saveRotina(){
     rotinas.push(r);
     markDirty(SK_DIRTY_R,r.id);
     const ns=preencherOcorrenciasRotina(r);
-    ns.forEach(t=>{markDirty(SK_DIRTY_T,t.id);syncTarefa(t).catch(()=>null);});
+    ns.forEach(t=>{markDirty(SK_DIRTY_T,t.id);syncTarefa(t).catch(e=>console.warn('[Casinha] Sync ocorrência falhou, será retentado:',t.id,e));});
     syncTarget=r;
   }
   saveR();closeModal();renderCurrent();
@@ -2013,11 +2013,11 @@ async function bootstrapApi(){
       ambientes.push(a);
       apiAmbIds.add(a.id);
       apiAmbNomes.add((a.nome||'').trim().toLowerCase());
-      await syncAmbiente(a).catch(()=>null);
+      await syncAmbiente(a).catch(()=>{ markDirty(SK_DIRTY_A,a.id); });
     }
-    for(const p of migPess){pessoas.push(p);await syncPessoa(p).catch(()=>null);}
-    for(const r of migRot){rotinas.push(r);await syncRotina(r).catch(()=>null);}
-    for(const t of migTar){tarefas.push(t);await syncTarefa(t).catch(()=>null);}
+    for(const p of migPess){pessoas.push(p);await syncPessoa(p).catch(()=>{ markDirty(SK_DIRTY_P,p.id); });}
+    for(const r of migRot){rotinas.push(r);await syncRotina(r).catch(()=>{ markDirty(SK_DIRTY_R,r.id); });}
+    for(const t of migTar){tarefas.push(t);await syncTarefa(t).catch(()=>{ markDirty(SK_DIRTY_T,t.id); });}
     if(migAmb.length||migPess.length||migTar.length||migRot.length)
       console.log(`Migração casinha: ${migAmb.length} ambientes, ${migPess.length} pessoas, ${migTar.length} tarefas, ${migRot.length} rotinas enviados ao banco`);
 
