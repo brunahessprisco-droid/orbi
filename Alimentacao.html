@@ -474,6 +474,11 @@
       function saveGoalsStore(){lsSet(KEY_GOALS,JSON.stringify(goals));markConfigDirty();}
       function savePlan(){lsSet(KEY_PLAN,JSON.stringify(plan));}
       function saveDeletedMeals(){lsSet(KEY_DELETED,JSON.stringify([...new Set(deletedMealIds)]));}
+      function hasPendingSync(){
+        try{
+          return getMealDirty().size > 0 || _algGetSet(KEY_WATER_DIRTY).size > 0 || _algGetSet(KEY_WATER_DELETED).size > 0 || _algGetSet(KEY_CONFIG_DIRTY).size > 0 || _algGetSet(KEY_DELETED).size > 0;
+        }catch(_){ return false; }
+      }
 
       async function syncRefeicao(m){
         if(!canUseApi())return;
@@ -940,8 +945,7 @@
         }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
       }
       async function logoutUser(){
-        const hasPending = getMealDirty().size > 0 || _algGetSet(KEY_WATER_DIRTY).size > 0 || _algGetSet(KEY_WATER_DELETED).size > 0 || _algGetSet(KEY_CONFIG_DIRTY).size > 0 || deletedMealIds.length > 0;
-        if(hasPending){
+        if(hasPendingSync()){
           const proceed = confirm('Alguns dados de alimentação podem não ter sido sincronizados. Deseja sair mesmo assim?');
           if(!proceed) return;
         }
@@ -1033,32 +1037,15 @@
         applyUserIsolation(API_USER_ID);
         bootstrapApi().then(()=>renderAll()).catch(()=>{renderAll();});
       });
-    });
 
-    // --- beforeunload: avisa sobre dados não sincronizados (localStorage; paridade com logoutUser) ---
-    window.addEventListener('beforeunload', function(e) {
-      const uid = localStorage.getItem('hub_user_id') || 'anon';
-      const lsGet = k => {
-        const ns = 'u_' + uid + '_' + k;
-        const v = localStorage.getItem(ns);
-        if (v !== null) return v;
-        return localStorage.getItem(k);
-      };
-      const setSize = k => { try { return new Set(JSON.parse(lsGet(k) || '[]')).size; } catch { return 0; } };
-      let deletedMeals = 0;
-      try {
-        const arr = JSON.parse(lsGet('alimentacao_deleted_ids_v1') || '[]');
-        deletedMeals = Array.isArray(arr) ? arr.length : 0;
-      } catch (_) {}
-      const dirtyMeals = setSize('alimentacao_dirty_v1');
-      const dirtyWater = setSize('alimentacao_water_dirty_v1');
-      const dirtyConfig = setSize('alimentacao_config_dirty_v1');
-      const deletedWater = setSize('alimentacao_water_deleted_v1');
-      if (dirtyMeals > 0 || dirtyWater > 0 || dirtyConfig > 0 || deletedWater > 0 || deletedMeals > 0) {
-        e.preventDefault();
-        e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
-        return e.returnValue;
-      }
+      // --- beforeunload: mesmas filas que logoutUser (hasPendingSync) ---
+      window.addEventListener('beforeunload', function(e) {
+        if (hasPendingSync()) {
+          e.preventDefault();
+          e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
+          return e.returnValue;
+        }
+      });
     });
   </script>
 </body>

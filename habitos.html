@@ -947,6 +947,10 @@
     function markHabDeleted(dbId){if(!dbId)return;const s=_habGetSet(KEY_DELETED);s.add(dbId);_habSetSet(KEY_DELETED,s);}
     function clearHabDeleted(dbId){if(!dbId)return;const s=_habGetSet(KEY_DELETED);s.delete(dbId);_habSetSet(KEY_DELETED,s);}
     function getHabDeleted(){return _habGetSet(KEY_DELETED);}
+    function hasPendingSync(){
+      try{ return getHabDirty().size > 0 || getHabDeleted().size > 0; }
+      catch(_){ return false; }
+    }
     const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
     let authToken=localStorage.getItem(SK_AUTH)||'';
@@ -1018,12 +1022,10 @@
     }
 
     async function logoutUser(){
-      try{
-        if(getHabDirty().size > 0 || getHabDeleted().size > 0){
-          const proceed = confirm('Alguns dados de hábitos podem não ter sido sincronizados. Deseja sair mesmo assim?');
-          if(!proceed) return;
-        }
-      }catch(_){}
+      if(hasPendingSync()){
+        const proceed = confirm('Alguns dados de hábitos podem não ter sido sincronizados. Deseja sair mesmo assim?');
+        if(!proceed) return;
+      }
       try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
       lsRem(KEY_DIRTY);
       lsRem(KEY_DELETED);
@@ -2464,9 +2466,9 @@
     document.querySelector('#ov-habit .modal').addEventListener('change',()=>{_habitDirty=true;});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('ov-habit').classList.contains('open'))_habitDirtyGuard();});
 
-    // --- beforeunload: avisa sobre dados não sincronizados ---
+    // --- beforeunload: mesmas filas que logoutUser (hasPendingSync) ---
     window.addEventListener('beforeunload', function(e) {
-      if (getHabDirty().size > 0 || getHabDeleted().size > 0) {
+      if (hasPendingSync()) {
         e.preventDefault();
         e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
         return e.returnValue;

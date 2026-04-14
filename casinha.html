@@ -604,7 +604,9 @@ function markDeleted(entity,id){_casSetSet(entity,new Set([..._casGetSet(entity)
 function clearDeleted(entity,id){const s=_casGetSet(entity);s.delete(id);_casSetSet(entity,s);}
 function getDeleted(entity){return _casGetSet(entity);}
 function hasPendingSync(){
-  return [SK_DIRTY_T,SK_DEL_T,SK_DIRTY_R,SK_DEL_R,SK_DIRTY_A,SK_DEL_A,SK_DIRTY_P,SK_DEL_P].some(k=>{try{const v=lsGet(k);return v&&v!=='[]'&&v!=='{}';}catch{return false;}});
+  try{
+    return [SK_DIRTY_T,SK_DEL_T,SK_DIRTY_R,SK_DEL_R,SK_DIRTY_A,SK_DEL_A,SK_DIRTY_P,SK_DEL_P].some(k=>_casGetSet(k).size>0);
+  }catch(_){ return false; }
 }
 
 // ===== STATE =====
@@ -2182,7 +2184,7 @@ function closeTaskQuick(){
   document.getElementById('task-quick-panel').style.display='none';
 }
 
-// --- beforeunload: avisa sobre dados não sincronizados ---
+// --- beforeunload: mesmas filas que logoutUser (hasPendingSync) ---
 window.addEventListener('beforeunload', function(e) {
   if (hasPendingSync()) {
     e.preventDefault();

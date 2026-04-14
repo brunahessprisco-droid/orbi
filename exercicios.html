@@ -781,9 +781,7 @@ async function doLogin(){
 }
 
 async function logoutUser(){
-  const dirtySets = [SK_DIRTY, SK_DIRTY_L, SK_DIRTY_TP, SK_DEL, SK_DEL_L, SK_DEL_TP].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
-  const hasPending = dirtySets.some(s=>s.size>0);
-  if(hasPending){
+  if(hasPendingSync()){
     const proceed = confirm('Alguns dados de exercícios podem não ter sido sincronizados. Deseja sair mesmo assim?');
     if(!proceed) return;
   }
@@ -809,6 +807,11 @@ function clearDeleted(dbId){if(!dbId)return;const s=getDeleted();s.delete(dbId);
 // Generic dirty/deleted helpers for any entity type
 function _getSet(k){try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}}
 function _setSet(k,s){lsSet(k,JSON.stringify([...s]));}
+function hasPendingSync(){
+  try{
+    return [SK_DIRTY, SK_DIRTY_L, SK_DIRTY_TP, SK_DEL, SK_DEL_L, SK_DEL_TP].some(k=>_getSet(k).size>0);
+  }catch(_){ return false; }
+}
 function markDirtyEntity(k,id){const s=_getSet(k);s.add(id);_setSet(k,s);}
 function clearDirtyEntity(k,id){const s=_getSet(k);s.delete(id);_setSet(k,s);}
 function markDeletedEntity(k,dbId){if(!dbId)return;const s=_getSet(k);s.add(dbId);_setSet(k,s);}
@@ -2161,10 +2164,9 @@ async function stravaHandleCallback(){
   }
 })();
 
-// --- beforeunload: avisa sobre dados não sincronizados (paridade com logoutUser) ---
+// --- beforeunload: mesmas filas que logoutUser (hasPendingSync) ---
 window.addEventListener('beforeunload', function(e) {
-  const pending = [SK_DIRTY, SK_DIRTY_L, SK_DIRTY_TP, SK_DEL, SK_DEL_L, SK_DEL_TP].some(k => _getSet(k).size > 0);
-  if (pending) {
+  if (hasPendingSync()) {
     e.preventDefault();
     e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
     return e.returnValue;

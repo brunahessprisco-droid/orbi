@@ -667,6 +667,15 @@
       localStorage.setItem(SK_LAST_USER,String(userId));
     }
 
+    function saudeHasPendingSync(){
+      try{
+        const dirtySets=['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
+        if(dirtySets.some(s=>s.size>0))return true;
+        const deletedRaw=(()=>{try{return JSON.parse(lsGet('saude_deleted_ids_v1')||'{}');}catch{return {};}})();
+        return Object.values(deletedRaw).some(arr=>Array.isArray(arr)&&arr.length>0);
+      }catch(_){ return false; }
+    }
+
     async function saudeLogin(){
       const email=document.getElementById('auth-email').value.trim();
       const senha=document.getElementById('auth-pass').value;
@@ -686,11 +695,7 @@
       }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
     }
     async function saudeLogout(){
-      const dirtySets = ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
-      const deletedRaw = (() => { try { return JSON.parse(lsGet('saude_deleted_ids_v1')||'{}'); } catch { return {}; } })();
-      const hasDeleted = Object.values(deletedRaw).some(arr=>Array.isArray(arr)&&arr.length>0);
-      const hasPending = dirtySets.some(s=>s.size>0) || hasDeleted;
-      if(hasPending){
+      if(saudeHasPendingSync()){
         const proceed = confirm('Alguns dados de saúde podem não ter sido sincronizados. Deseja sair mesmo assim?');
         if(!proceed) return;
       }
@@ -1916,19 +1921,9 @@
       }
     });
 
-    // --- beforeunload: avisa sobre dados não sincronizados (lsGet; paridade com saudeLogout) ---
+    // --- beforeunload: mesmas filas que saudeLogout (saudeHasPendingSync) ---
     window.addEventListener('beforeunload', function(e) {
-      const dirtyKeys = [KEY_DIRTY, KEY_DIRTY_REM, KEY_DIRTY_CONSUMO];
-      let hasDirty = false;
-      for (const k of dirtyKeys) {
-        try {
-          const raw = JSON.parse(lsGet(k) || '[]');
-          if (raw && (Array.isArray(raw) ? raw.length > 0 : Object.keys(raw).length > 0)) { hasDirty = true; break; }
-        } catch(_) {}
-      }
-      const deletedRaw = (() => { try { return JSON.parse(lsGet(KEY_DELETED) || '{}'); } catch { return {}; } })();
-      const hasDeleted = Object.values(deletedRaw).some(arr => Array.isArray(arr) && arr.length > 0);
-      if (hasDirty || hasDeleted) {
+      if (saudeHasPendingSync()) {
         e.preventDefault();
         e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
         return e.returnValue;

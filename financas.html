@@ -1176,7 +1176,9 @@ function markDeleted(entity,id){_finSetSet(entity,new Set([..._finGetSet(entity)
 function clearDeleted(entity,id){const s=_finGetSet(entity);s.delete(id);_finSetSet(entity,s);}
 function getDeleted(entity){return _finGetSet(entity);}
 function hasPendingSync(){
-  return [SK_DIRTY_TX,SK_DEL_TX,SK_DIRTY_CAT,SK_DEL_CAT,SK_DIRTY_C,SK_DEL_C,SK_DIRTY_FX,SK_DEL_FX,SK_DIRTY_FXV,SK_DEL_FXV,SK_DIRTY_PR,SK_DEL_PR].some(k=>{try{const v=localStorage.getItem(_finDirtyKey(k));return v&&v!=='[]'&&v!=='{}';}catch{return false;}});
+  try{
+    return [SK_DIRTY_TX,SK_DEL_TX,SK_DIRTY_CAT,SK_DEL_CAT,SK_DIRTY_C,SK_DEL_C,SK_DIRTY_FX,SK_DEL_FX,SK_DIRTY_FXV,SK_DEL_FXV,SK_DIRTY_PR,SK_DEL_PR].some(k=>_finGetSet(k).size>0);
+  }catch(_){ return false; }
 }
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MESES_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -3676,7 +3678,7 @@ async function relançarFaltantes(){
   document.getElementById('revisar-btn-fix').style.display='none';
 }
 
-// --- beforeunload: avisa sobre dados não sincronizados ---
+// --- beforeunload: mesmas filas que logoutUser (hasPendingSync) ---
 window.addEventListener('beforeunload', function(e) {
   if (hasPendingSync()) {
     e.preventDefault();
