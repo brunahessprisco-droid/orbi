@@ -189,7 +189,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover{opacity:1;}
 .btn-period{border:1px solid var(--border);background:var(--surface2);color:var(--muted);border-radius:6px;padding:0 10px;height:28px;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .btn-period:hover,.btn-period.active{border-color:var(--purple);color:var(--purple);}
 /* PERIOD PICKER */
-.period-picker{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:16px;box-shadow:0 16px 40px rgba(0,0,0,.35);z-index:200;min-width:320px;display:none;}
+.period-picker{position:fixed;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:16px;box-shadow:0 16px 40px rgba(0,0,0,.35);z-index:200;min-width:320px;display:none;}
 .period-picker.open{display:block;}
 .period-picker-title{font-size:12px;color:var(--muted);font-weight:500;margin-bottom:10px;}
 .period-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
@@ -314,7 +314,7 @@ select.sel{background:var(--surface);border:1px solid var(--border);border-radiu
   .card{padding:14px 16px;}
   .cal-nav-label{min-width:100px;font-size:12px;}
   .nav-month-label{min-width:80px;font-size:12px;}
-  .period-picker{min-width:0;width:calc(100vw - 32px);right:auto;left:0;}
+  .period-picker{min-width:0;width:calc(100vw - 32px);}
   .fields-picker{min-width:0;width:calc(100vw - 32px);right:0;left:auto;}
   .cal-week-grid{grid-template-columns:repeat(3,1fr);gap:6px;}
   .cal-week-col{min-height:120px;padding:7px;}
@@ -912,22 +912,34 @@ async function bootstrapApi(){
     const apiTipos=_sTp.status==='fulfilled'?_sTp.value:null;
     if([_sT,_sL,_sTp].some(r=>r.status==='rejected'))setStatus('Alguns dados não carregaram. Exibindo cache local.');
     // Seed tipos padrão se banco vazio
+    let _delL=_getSet(SK_DEL_L);
+    let _delTp=_getSet(SK_DEL_TP);
     if(apiTipos!==null){
+      // Migra entradas antigas da queue (client_id → server id)
+      for(const entry of [..._delTp]){
+        const match=apiTipos.find(r=>String(r.client_id)===entry);
+        if(match){clearDeletedEntity(SK_DEL_TP,entry);markDeletedEntity(SK_DEL_TP,match.id);_delTp.delete(entry);_delTp.add(match.id);}
+      }
       if(apiTipos.length===0){
         for(const t of DEF_TIPOS)
           await apiReq('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
-        tipos=(await apiReq(`/tipos-exercicio?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome,cat:r.cat}));
+        tipos=(await apiReq(`/tipos-exercicio?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome,cat:r.cat,_dbId:r.id}));
       } else {
-        tipos=apiTipos.map(r=>({id:r.client_id,nome:r.nome,cat:r.cat}));
+        tipos=apiTipos.filter(r=>!_delTp.has(r.id)&&!_delTp.has(String(r.client_id))).map(r=>({id:r.client_id,nome:r.nome,cat:r.cat,_dbId:r.id}));
       }
     }
     if(apiLocais!==null){
+      // Migra entradas antigas da queue (client_id → server id)
+      for(const entry of [..._delL]){
+        const match=apiLocais.find(r=>String(r.client_id)===entry);
+        if(match){clearDeletedEntity(SK_DEL_L,entry);markDeletedEntity(SK_DEL_L,match.id);_delL.delete(entry);_delL.add(match.id);}
+      }
       if(apiLocais.length===0){
         for(const l of DEF_LOCAIS)
           await apiReq('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
-        locais=(await apiReq(`/locais-treino?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome}));
+        locais=(await apiReq(`/locais-treino?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome,_dbId:r.id}));
       } else {
-        locais=apiLocais.map(r=>({id:r.client_id,nome:r.nome}));
+        locais=apiLocais.filter(r=>!_delL.has(r.id)&&!_delL.has(String(r.client_id))).map(r=>({id:r.client_id,nome:r.nome,_dbId:r.id}));
       }
     }
     const deleted=getDeleted();
@@ -935,6 +947,12 @@ async function bootstrapApi(){
     // Retentar DELETEs pendentes
     for(const dbId of deleted){
       apiReq(`/treinos/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(dbId)).catch((e)=>{ console.warn('[Sync] Falha retry delete treino:', dbId, e); });
+    }
+    for(const dbId of _delL){
+      apiReq(`/locais-treino/${dbId}`,{method:'DELETE'}).then(()=>clearDeletedEntity(SK_DEL_L,dbId)).catch(e=>{ console.warn('[Sync] Falha retry delete local:', dbId, e); });
+    }
+    for(const dbId of _delTp){
+      apiReq(`/tipos-exercicio/${dbId}`,{method:'DELETE'}).then(()=>clearDeletedEntity(SK_DEL_TP,dbId)).catch(e=>{ console.warn('[Sync] Falha retry delete tipo:', dbId, e); });
     }
     // Migração: sobe qualquer treino local que não está na API
     const localCache=JSON.parse(lsGet(SK_T)||'[]');
@@ -989,7 +1007,8 @@ async function deleteTreinoApi(t){
 }
 async function syncLocal(l){
   if(!canUseApi())return;
-  await apiReqRetry('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
+  const res=await apiReqRetry('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
+  if(res?.id&&!l._dbId){l._dbId=res.id;const idx=locais.findIndex(x=>x.id===l.id);if(idx>=0){locais[idx]._dbId=res.id;saveLocal_();}}
   clearDirtyEntity(SK_DIRTY_L,l.id);
 }
 async function deleteLocalApi(l){
@@ -1000,7 +1019,8 @@ async function deleteLocalApi(l){
 }
 async function syncTipo(t){
   if(!canUseApi())return;
-  await apiReqRetry('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
+  const res=await apiReqRetry('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
+  if(res?.id&&!t._dbId){t._dbId=res.id;const idx=tipos.findIndex(x=>x.id===t.id);if(idx>=0){tipos[idx]._dbId=res.id;saveLocal_();}}
   clearDirtyEntity(SK_DIRTY_TP,t.id);
 }
 async function deleteTipoApi(t){
@@ -1078,8 +1098,15 @@ function toggleMonthSel(k){
 
 function togglePeriodPicker(){
   const picker=document.getElementById('period-picker');
+  const btn=document.getElementById('btn-period');
   const isOpen=picker.classList.contains('open');
-  if(!isOpen)buildPeriodChips();
+  if(!isOpen){
+    buildPeriodChips();
+    const r=btn.getBoundingClientRect();
+    picker.style.top=(r.bottom+8)+'px';
+    if(window.innerWidth<=600){picker.style.left='16px';picker.style.right='16px';}
+    else{picker.style.left='';picker.style.right=(window.innerWidth-r.right)+'px';}
+  }
   picker.classList.toggle('open');
 }
 
