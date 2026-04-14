@@ -1885,6 +1885,14 @@ let API_USER_ID=null;
 function getApiBase(){return(localStorage.getItem(SK_API_BASE)||'https://orbi-api-b9ev.onrender.com/api').replace(/\/+$/,'');}
 
 function canUseApi(){return!!(authToken&&API_USER_ID);}
+function _showSyncWarn(){
+  if(document.getElementById('_sync-warn'))return;
+  const d=document.createElement('div');
+  d.id='_sync-warn';
+  d.style.cssText='background:#fef3c7;color:#92400e;padding:8px 16px;font-size:13px;text-align:center;border-bottom:1px solid #f59e0b;';
+  d.textContent='⚠ Alguns dados não carregaram. Exibindo cache local.';
+  (document.getElementById('main')||document.body).prepend(d);
+}
 
 async function apiReq(path,opts={}){
   const headers={'Content-Type':'application/json',...(opts.headers||{})};
@@ -1967,15 +1975,20 @@ async function syncManual(){
 async function bootstrapApi(){
   if(!canUseApi())return;
   try{
-    const[rAmb,rPess,rTar,rRot]=await Promise.all([
+    const[_sAmb,_sPess,_sTar,_sRot]=await Promise.allSettled([
       apiReq(`/casinha/ambientes?usuario_id=${API_USER_ID}`),
       apiReq(`/casinha/pessoas?usuario_id=${API_USER_ID}`),
       apiReq(`/casinha/tarefas?usuario_id=${API_USER_ID}`),
       apiReq(`/casinha/rotinas?usuario_id=${API_USER_ID}`),
     ]);
-    ambientes=rAmb.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor,icone:r.icone}));
-    pessoas=rPess.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor}));
-    tarefas=rTar.map(r=>({
+    const rAmb=_sAmb.status==='fulfilled'?_sAmb.value:null;
+    const rPess=_sPess.status==='fulfilled'?_sPess.value:null;
+    const rTar=_sTar.status==='fulfilled'?_sTar.value:null;
+    const rRot=_sRot.status==='fulfilled'?_sRot.value:null;
+    if([_sAmb,_sPess,_sTar,_sRot].some(r=>r.status==='rejected'))_showSyncWarn();
+    if(rAmb!==null)ambientes=rAmb.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor,icone:r.icone}));
+    if(rPess!==null)pessoas=rPess.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor}));
+    if(rTar!==null)tarefas=rTar.map(r=>({
       id:r.client_id,_dbId:r.id,titulo:r.titulo,descricao:r.descricao||'',
       tipo:r.tipo||'',ambiente:r.ambiente||'',responsavel:r.responsavel||'',
       prioridade:r.prioridade,status:r.status,dataVenc:r.dataVenc||'',
@@ -1984,7 +1997,7 @@ async function bootstrapApi(){
       dataConclusao:r.dataConclusao||null,rotinaId:r.rotinaId||null,
       createdAt:r.createdAt,
     }));
-    rotinas=rRot.map(r=>({
+    if(rRot!==null)rotinas=rRot.map(r=>({
       id:r.client_id,_dbId:r.id,nome:r.nome,icone:r.icone||'🔄',
       tipo:r.tipo||'',ambiente:r.ambiente||'',responsavel:r.responsavel||'',
       prioridade:r.prioridade||'media',recorrencia:r.recorrencia,

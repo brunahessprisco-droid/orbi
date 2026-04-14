@@ -896,28 +896,36 @@ async function syncManual(){
 async function bootstrapApi(){
   if(!canUseApi())return;
   try{
-    const[apiTreinos,apiLocais,apiTipos]=await Promise.all([
+    const[_sT,_sL,_sTp]=await Promise.allSettled([
       apiReq(`/treinos?usuario_id=${API_USER_ID}`),
       apiReq(`/locais-treino?usuario_id=${API_USER_ID}`),
       apiReq(`/tipos-exercicio?usuario_id=${API_USER_ID}`),
     ]);
+    const apiTreinos=_sT.status==='fulfilled'?_sT.value:null;
+    const apiLocais=_sL.status==='fulfilled'?_sL.value:null;
+    const apiTipos=_sTp.status==='fulfilled'?_sTp.value:null;
+    if([_sT,_sL,_sTp].some(r=>r.status==='rejected'))setStatus('Alguns dados não carregaram. Exibindo cache local.');
     // Seed tipos padrão se banco vazio
-    if(apiTipos.length===0){
-      for(const t of DEF_TIPOS)
-        await apiReq('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
-      tipos=(await apiReq(`/tipos-exercicio?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome,cat:r.cat}));
-    } else {
-      tipos=apiTipos.map(r=>({id:r.client_id,nome:r.nome,cat:r.cat}));
+    if(apiTipos!==null){
+      if(apiTipos.length===0){
+        for(const t of DEF_TIPOS)
+          await apiReq('/tipos-exercicio',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:t.id,nome:t.nome,cat:t.cat})});
+        tipos=(await apiReq(`/tipos-exercicio?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome,cat:r.cat}));
+      } else {
+        tipos=apiTipos.map(r=>({id:r.client_id,nome:r.nome,cat:r.cat}));
+      }
     }
-    if(apiLocais.length===0){
-      for(const l of DEF_LOCAIS)
-        await apiReq('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
-      locais=(await apiReq(`/locais-treino?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome}));
-    } else {
-      locais=apiLocais.map(r=>({id:r.client_id,nome:r.nome}));
+    if(apiLocais!==null){
+      if(apiLocais.length===0){
+        for(const l of DEF_LOCAIS)
+          await apiReq('/locais-treino',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,client_id:l.id,nome:l.nome})});
+        locais=(await apiReq(`/locais-treino?usuario_id=${API_USER_ID}`)).map(r=>({id:r.client_id,nome:r.nome}));
+      } else {
+        locais=apiLocais.map(r=>({id:r.client_id,nome:r.nome}));
+      }
     }
     const deleted=getDeleted();
-    treinos=apiTreinos.map(r=>treinoFromApi(r)).filter(t=>!deleted.has(t._dbId));
+    if(apiTreinos!==null)treinos=apiTreinos.map(r=>treinoFromApi(r)).filter(t=>!deleted.has(t._dbId));
     // Retentar DELETEs pendentes
     for(const dbId of deleted){
       apiReq(`/treinos/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(dbId)).catch((e)=>{ console.warn('[Sync] Falha retry delete treino:', dbId, e); });
@@ -945,7 +953,7 @@ async function bootstrapApi(){
       });
     }
     saveLocal_();
-    setStatus(null);
+    if([_sT,_sL,_sTp].every(r=>r.status==='fulfilled'))setStatus(null);
   }catch(e){
     console.error('Erro ao carregar da API:',e);
     setStatus('Erro ao sincronizar: '+e.message,true);

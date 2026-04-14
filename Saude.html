@@ -609,6 +609,14 @@
     let API_USER_ID=null;
     function getApiBase(){return(apiBase||'https://orbi-api-b9ev.onrender.com/api').replace(/\/+$/,'');}
     function canUseApi(){return!!(authToken&&API_USER_ID);}
+    function _showSyncWarn(){
+      if(document.getElementById('_sync-warn'))return;
+      const d=document.createElement('div');
+      d.id='_sync-warn';
+      d.style.cssText='background:#fef3c7;color:#92400e;padding:8px 16px;font-size:13px;text-align:center;border-bottom:1px solid #f59e0b;';
+      d.textContent='⚠ Alguns dados não carregaram. Exibindo cache local.';
+      (document.querySelector('.app')||document.body).prepend(d);
+    }
     async function apiReq(path,opts={}){
       const headers={'Content-Type':'application/json',...(opts.headers||{})};
       if(authToken)headers.Authorization='Bearer '+authToken;
@@ -781,7 +789,7 @@
       // Bootstrap é chamado depois que state já está carregado do localStorage
       // Puxamos dados da API e mesclamos com o estado local
       try{
-        const[rW,rM,rE,rC,rRem,rCon]=await Promise.all([
+        const[_sW,_sM,_sE,_sC,_sRem,_sCon]=await Promise.allSettled([
           apiReqRetry('/health/weights'),
           apiReqRetry(`/saude/medicos?usuario_id=${API_USER_ID}`),
           apiReqRetry(`/saude/exames?usuario_id=${API_USER_ID}`),
@@ -789,6 +797,13 @@
           apiReqRetry('/saude/remedios'),
           apiReqRetry('/saude/consumos'),
         ]);
+        const rW=_sW.status==='fulfilled'?_sW.value:null;
+        const rM=_sM.status==='fulfilled'?_sM.value:null;
+        const rE=_sE.status==='fulfilled'?_sE.value:null;
+        const rC=_sC.status==='fulfilled'?_sC.value:null;
+        const rRem=_sRem.status==='fulfilled'?_sRem.value:null;
+        const rCon=_sCon.status==='fulfilled'?_sCon.value:null;
+        if([_sW,_sM,_sE,_sC,_sRem,_sCon].some(r=>r.status==='rejected'))_showSyncWarn();
         // HealthWeight usa modelo diferente — mapeamos via extraJson
         const _ds=window.saudeApp?.getDeletedState?.()||{};
         const deleted = {
@@ -797,7 +812,7 @@
           exams:new Set((_ds.exams)||[]),
           consults:new Set((_ds.consults)||[])
         };
-        const apiWeights=(rW.data||rW).map(r=>({
+        const apiWeights=rW ? (rW.data||rW).map(r=>({
           id:r.client_id||r.extraJson?.id||r.id,_dbId:r.id,
           date:typeof r.date==='string'?r.date.slice(0,10):new Date(r.date).toISOString().slice(0,10),
           weight:r.weight!=null?Number(r.weight):null,
@@ -806,36 +821,41 @@
           note:r.note||'',
           muscle:r.extraJson?.muscle||null,goal:r.extraJson?.goal||null,
           waist:r.extraJson?.waist||null,hip:r.extraJson?.hip||null,chest:r.extraJson?.chest||null,
-        })).filter(r=>!deleted.weights.has(r.id));
-        const apiMedicos=rM.map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,specialty:r.especialidade||'',frequencyDays:r.frequencyDays||null,phone:r.phone||'',whats:r.whats||'',email:r.email||'',clinic:r.clinica||'',address:r.endereco||'',note:r.obs||''})).filter(r=>!deleted.doctors.has(r.id));
-        const apiExames=rE.map(r=>{
+        })).filter(r=>!deleted.weights.has(r.id)) : null;
+        const apiMedicos=rM ? rM.map(r=>({id:r.client_id,_dbId:r.id,name:r.nome,specialty:r.especialidade||'',frequencyDays:r.frequencyDays||null,phone:r.phone||'',whats:r.whats||'',email:r.email||'',clinic:r.clinica||'',address:r.endereco||'',note:r.obs||''})).filter(r=>!deleted.doctors.has(r.id)) : null;
+        const apiExames=rE ? rE.map(r=>{
           let status=r.status||'realizado';
           let resultado=r.resultado||'';
           // backwards compat: old status values were ok/atencao/critico/aguardando
           if(['ok','atencao','critico'].includes(status)){resultado=status;status='realizado';}
           else if(status==='aguardando'){resultado='';status='agendado';}
           return {id:r.client_id,_dbId:r.id,name:r.nome,category:r.categoria||'',status,resultado,lab:r.laboratorio||'',doctorId:r.medicoId||'',date:r.date,nextDate:r.nextDate||'',note:r.obs||'',fileName:r.fileName||'',fileData:r.fileData||''};
-        }).filter(r=>!deleted.exams.has(r.id));
-        const apiConsultas=rC.map(r=>({id:r.client_id,_dbId:r.id,date:r.date,time:r.time||'',doctorId:r.medicoId||'',specialty:r.especialidade||'',reason:r.motivo||'',status:r.status||'agendada',returnDays:r.returnDays||null,nextDate:r.nextDate||'',summary:r.resumo||''})).filter(r=>!deleted.consults.has(r.id));
+        }).filter(r=>!deleted.exams.has(r.id)) : null;
+        const apiConsultas=rC ? rC.map(r=>({id:r.client_id,_dbId:r.id,date:r.date,time:r.time||'',doctorId:r.medicoId||'',specialty:r.especialidade||'',reason:r.motivo||'',status:r.status||'agendada',returnDays:r.returnDays||null,nextDate:r.nextDate||'',summary:r.resumo||''})).filter(r=>!deleted.consults.has(r.id)) : null;
 
         // Merge: API + local não sincronizados
         const app=window.saudeApp;
         if(!app)return;
         const st=app.getState();
-        const apiWIds=new Set(apiWeights.map(w=>w.id));
-        const apiMIds=new Set(apiMedicos.map(m=>m.id));
-        const apiEIds=new Set(apiExames.map(e=>e.id));
-        const apiCIds=new Set(apiConsultas.map(c=>c.id));
+        // Se fetch falhou (null), usa estado local → nwX fica vazio → sem syncs espúrios
+        const _weights=apiWeights??st.weights;
+        const _medicos=apiMedicos??st.doctors;
+        const _exames=apiExames??st.exams;
+        const _consultas=apiConsultas??st.consults;
+        const apiWIds=new Set(_weights.map(w=>w.id));
+        const apiMIds=new Set(_medicos.map(m=>m.id));
+        const apiEIds=new Set(_exames.map(e=>e.id));
+        const apiCIds=new Set(_consultas.map(c=>c.id));
         // Only merge items that never had a _dbId (truly local, never synced to server)
         const nwW=st.weights.filter(w=>!apiWIds.has(w.id) && !deleted.weights.has(w.id) && !w._dbId);
         const nwM=st.doctors.filter(d=>!apiMIds.has(d.id) && !deleted.doctors.has(d.id) && !d._dbId);
         const nwE=st.exams.filter(e=>!apiEIds.has(e.id) && !deleted.exams.has(e.id) && !e._dbId);
         const nwC=st.consults.filter(c=>!apiCIds.has(c.id) && !deleted.consults.has(c.id) && !c._dbId);
         app.setState({
-          weights:[...apiWeights,...nwW],
-          doctors:[...apiMedicos,...nwM],
-          exams:[...apiExames,...nwE],
-          consults:[...apiConsultas,...nwC],
+          weights:[..._weights,...nwW],
+          doctors:[..._medicos,...nwM],
+          exams:[..._exames,...nwE],
+          consults:[..._consultas,...nwC],
         });
         for(const w of nwW)syncWeight(w).catch(e=>console.warn('[Saúde] Sync peso falhou, será retentado:',e));
         for(const m of nwM)syncMedico(m).catch(e=>console.warn('[Saúde] Sync médico falhou, será retentado:',e));
