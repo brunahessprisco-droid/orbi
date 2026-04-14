@@ -1430,6 +1430,7 @@ function txFromApi(r){
   const obs=projecao?rawObs.slice(6):rawObs;
   return{
     id:String(r.client_id||r.id),
+    _dbId:String(r.client_id||r.id),
     tipo:r.tipo,
     descricao:r.descricao||'',
     valor:toNum(r.valor),
@@ -1462,6 +1463,7 @@ function contaToApi(c){
 function contaFromApi(r){
   return{
     id:String(r.client_id||r.id),
+    _dbId:String(r.client_id||r.id),
     nome:r.nome||'Conta principal',
     banco:r.banco||'Banco',
     tipo:r.tipo||'credito',
@@ -1485,6 +1487,7 @@ function fixaToApi(f){
 function fixaFromApi(r){
   return{
     id:String(r.client_id||r.id),
+    _dbId:String(r.client_id||r.id),
     nome:r.nome||'Conta fixa',
     valor:Number(r.valor_padrao)||0,
     dia:r.dia_venc||null,
@@ -1525,6 +1528,7 @@ function projExtraToApi(r){
 function projExtraFromApi(r){
   return{
     id:String(r.client_id||r.id),
+    _dbId:String(r.client_id||r.id),
     nome:r.nome||'',
     valor:Number(r.valor)||0,
     ativo:!!r.ativo
@@ -1545,8 +1549,8 @@ async function syncCategoriasToApi(){
   }
   // Importar categorias que existem na API mas não local (vieram de outro device)
   for(const[cid,apiC]of Object.entries(apiByCid)){
-    if(!localIds.has(cid)){
-      cats.push({id:cid,_dbId:apiC.id,nome:apiC.nome||'Outros',cor:apiC.cor||'#7b9cff'});
+    if(!localIds.has(cid)&&!delSet.has(cid)){
+      cats.push({id:cid,_dbId:cid,nome:apiC.nome||'Outros',cor:apiC.cor||'#7b9cff'});
     }
   }
   // Upsert local → API (só se tiver mudanças)
@@ -1571,7 +1575,7 @@ async function syncTxsToApi(){
   }
   // Importar transações que existem na API mas não local (vieram de outro device)
   for(const[cid,apiT]of Object.entries(apiByCid)){
-    if(!localIds.has(cid)){
+    if(!localIds.has(cid)&&!delSet.has(cid)){
       txs.push(txFromApi(apiT));
     }
   }
@@ -1596,7 +1600,7 @@ async function syncContasToApi(){
   }
   // Importar contas que existem na API mas não local
   for(const[cid,apiC]of Object.entries(apiByCid)){
-    if(!localIds.has(cid)){
+    if(!localIds.has(cid)&&!delSet.has(cid)){
       cartoes.push(contaFromApi(apiC));
     }
   }
@@ -1621,7 +1625,7 @@ async function syncFixasToApi(){
   }
   // Importar contas fixas que existem na API mas não local
   for(const[cid,apiF]of Object.entries(apiByCid)){
-    if(!localIds.has(cid)){
+    if(!localIds.has(cid)&&!delSet.has(cid)){
       fixas.push(fixaFromApi(apiF));
     }
   }
@@ -1690,7 +1694,7 @@ async function syncProjExtrasToApi(){
   }
   // Importar projeções extras que existem na API mas não local
   for(const[cid,apiR]of Object.entries(apiByCid)){
-    if(!localIds.has(cid)){
+    if(!localIds.has(cid)&&!delSet.has(cid)){
       receitasProj.push(projExtraFromApi(apiR));
     }
   }
@@ -1844,7 +1848,7 @@ async function bootstrapApi(){
     }
 
     // Sempre espelha do banco para o estado local (apenas se o endpoint respondeu)
-    if(apiCats!==null) cats=apiCats.map(c=>({id:String(c.client_id||c.id),nome:c.nome,cor:c.cor||'#7b9cff'}));
+    if(apiCats!==null) cats=apiCats.map(c=>({id:String(c.client_id||c.id),_dbId:String(c.client_id||c.id),nome:c.nome,cor:c.cor||'#7b9cff'}));
     if(apiTxs!==null){
       txs=apiTxs.map(txFromApi);
       // Resgata transações criadas localmente antes do debounce disparar (tab fechada rapidamente)
