@@ -568,7 +568,7 @@ apiRouter.delete("/orcamentos-config", requireAuth, async (req: AuthedRequest, r
   if (!categoriaNome) return res.status(400).json({ error: "BAD_REQUEST" });
   await prisma.apiOrcamentoConfig.delete({
     where: { userId_categoria_nome: { userId: req.userId!, categoria_nome: categoriaNome } },
-  }).catch(() => null);
+  });
   res.status(204).send();
 });
 
@@ -1146,6 +1146,7 @@ apiRouter.delete("/alimentacao/water/:id", requireAuth, async (req: AuthedReques
 
 // ── REMÉDIOS ─────────────────────────────────────────────────────────────────
 apiRouter.get("/saude/remedios", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
   const rows = await prisma.saudeRemedio.findMany({ where: { userId: req.userId! }, orderBy: { name: "asc" } });
   res.json(rows);
 });
@@ -1180,6 +1181,7 @@ apiRouter.delete("/saude/remedios/:id", requireAuth, async (req: AuthedRequest, 
 
 // ── CONSUMOS ──────────────────────────────────────────────────────────────────
 apiRouter.get("/saude/consumos", requireAuth, async (req: AuthedRequest, res) => {
+  assertUserMatchesQuery(req);
   const rows = await prisma.saudeConsumo.findMany({ where: { userId: req.userId! }, orderBy: [{ date: "desc" }, { time: "desc" }] });
   res.json(rows);
 });
