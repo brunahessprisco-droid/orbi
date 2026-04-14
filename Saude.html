@@ -1806,17 +1806,24 @@
         markDirty(collection,item.id);
         saveState();
         renderAll();
-        // sync com API — rollback on failure
+        // sync com API — rollback only on server errors; network errors keep local state (dirty queue retries)
         try{
           if(collection==='weights') await syncWeight(item);
           else if(collection==='doctors') await syncMedico(item);
           else if(collection==='exams') await syncExame(item);
           else if(collection==='consults') await syncConsulta(item);
-        }catch(_){
-          state=JSON.parse(snapshotState);
-          deletedState=JSON.parse(snapshotDeleted);
-          saveDeletedState(); saveState(); renderAll();
-          alert('Erro ao salvar. A alteração foi desfeita.');
+        }catch(e){
+          if(e&&e.network){
+            // Erro de rede: request pode ter chegado ao servidor. Dado já está em localStorage
+            // e dirty marcado — será retentado no próximo bootstrap. Não reverter.
+            console.warn('[Saúde] Sync falhou por rede, será retentado:',e.message);
+          } else {
+            // Erro do servidor (4xx/5xx): reverter
+            state=JSON.parse(snapshotState);
+            deletedState=JSON.parse(snapshotDeleted);
+            saveDeletedState(); saveState(); renderAll();
+            alert('Erro ao salvar. A alteração foi desfeita.');
+          }
         }
       }
       function setValue(id,v){ document.getElementById(id).value=(v ?? ''); }
