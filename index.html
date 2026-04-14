@@ -583,6 +583,20 @@ function loadTreinos(){ try{return JSON.parse(_lsGet('saude_treinos_v1')||'[]');
 function loadTarefas(){ try{return JSON.parse(_lsGet('casinha_tarefas')||'[]');}catch{return [];} }
 function loadSaude(){ try{const s=JSON.parse(_lsGet('saude_app_v1')||'null');return s||{weights:[],exams:[],consults:[]};}catch{return {weights:[],exams:[],consults:[]};} }
 function loadHabitos(){ try{return JSON.parse(_lsGet('habitos_app_v5')||'[]');}catch{return [];} }
+function hubIsPlannedForDate(h,dateStr){
+  if(!h||!dateStr) return false;
+  if(h.startDate&&dateStr<h.startDate) return false;
+  const d=new Date(dateStr+'T12:00:00');
+  const f=h.freq||'diario';
+  if(f==='livre'||f==='diario') return true;
+  if(f==='semanal') return (h.weekdays||[]).includes(d.getDay());
+  if(f==='mensal'){
+    const want=Math.max(1,Math.min(31,Number(h.monthDay)||1));
+    const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+    return d.getDate()===Math.min(want,last);
+  }
+  return true;
+}
 function loadAlimentacao(){ try{return JSON.parse(_lsGet('alimentacao_meals_v3_light')||'[]');}catch{return [];} }
 function loadMealPlan(){ try{return JSON.parse(_lsGet('alimentacao_plan_v3_light')||'{}');}catch{return {};} }
 function getMealPlanForDate(dateStr){ const p=loadMealPlan(); for(const week of Object.values(p)){ if(Array.isArray(week)){const row=week.find(x=>x.date===dateStr); if(row)return row.slots||null;} } return null; }
@@ -610,7 +624,7 @@ async function hubBootstrap(){
     ]);
     const treinos=(Array.isArray(rTre)?rTre:[]).map(r=>{const rawObs=r.obs||'';const planejado=rawObs.startsWith('[PLAN]');const naoFeito=rawObs.startsWith('[SKIP]');const obs=planejado?rawObs.slice(6):naoFeito?rawObs.slice(6):rawObs;return{id:r.client_id,_dbId:r.id,data:(r.data||'').slice(0,10),hora_inicio:r.hora_inicio||'',titulo:r.titulo||'',nome:r.titulo||'',tipo_ex:r.tipo_ex||'',tipo_cat:r.tipo_cat||'cardio',local:r.local_nome||'',duracao:r.duracao,obs,planejado,naoFeito};});
     const tarefas=(Array.isArray(rTar)?rTar:[]).map(r=>({id:r.client_id,_dbId:r.id,titulo:r.titulo||'',status:r.status||'',ambiente:r.ambiente||'',pessoa:r.responsavel||'',prioridade:r.prioridade||'',tipo:r.tipo||'',dataVenc:r.data_venc||'',horario:r.horario||'',dataConclusao:r.data_conclusao||''}));
-    const habitos=(Array.isArray(rHab)?rHab:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',icon:r.icone||'',cat:r.categoria||'',freq:r.frequencia||'',weekdays:r.weekdays||[],note:r.obs||'',autoType:r.autoType||'',autoKeyword:r.autoKeyword||'',tipo:r.tipo||'check',unit:r.unit||'',startDate:r.startDate||'',logs:r.logs||{}}));
+    const habitos=(Array.isArray(rHab)?rHab:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',icon:r.icone||'',cat:r.categoria||'',freq:r.frequencia||'',weekdays:r.weekdays||[],monthDay:r.monthDay!=null?Number(r.monthDay):null,note:r.obs||'',autoType:r.autoType||'',autoKeyword:r.autoKeyword||'',tipo:r.tipo||'check',unit:r.unit||'',startDate:r.startDate||'',logs:r.logs||{}}));
     const meals=(Array.isArray(rAli)?rAli:[]).map(r=>({id:r.client_id,_dbId:r.id,name:r.nome||'',type:r.tipo||'',date:(r.date||'').slice(0,10),time:r.time||'',calories:r.calorias,note:r.obs||''}));
     const plan=(rCfg&&!Array.isArray(rCfg)&&rCfg.plan)||{};
     const rWArr=Array.isArray(rW)?rW:(Array.isArray(rW?.data)?rW.data:[]);
@@ -800,12 +814,13 @@ function getDayData(dateStr){
   const consultas=sortT((saude.consults||[]).filter(c=>(c.date||'').slice(0,10)===dateStr),'time');
   const todosHabitos=loadHabitos();
   const archivedIds=getArchivedHabits();
-  const habitosFeitos=todosHabitos.filter(h=>!archivedIds.has(h.id)&&h.logs&&h.logs[dateStr]);
+  const habitosPlanned=todosHabitos.filter(h=>!archivedIds.has(h.id)&&hubIsPlannedForDate(h,dateStr));
+  const habitosFeitos=habitosPlanned.filter(h=>h.logs&&h.logs[dateStr]);
   const habitosAtivos=todosHabitos.filter(h=>!archivedIds.has(h.id));
   const refeicoes=sortT(loadAlimentacao().filter(m=>m.date===dateStr),'time');
   const planSlots=getMealPlanForDate(dateStr);
   const gcalEvents=sortT(loadGoogleEvents().filter(e=>e.date===dateStr),'time');
-  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosAtivos,refeicoes,planSlots,gcalEvents};
+  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosPlanned,habitosAtivos,refeicoes,planSlots,gcalEvents};
 }
 
 let calFilter='todos';
@@ -845,7 +860,7 @@ function rendCal(){
     }
     if((f==='todos'||f==='cas')&&day.tarefas.length){dots.push(`<div class="cal-dot cas">${_ci('assets/Casinha.png')} ${day.tarefas.length} tarefa${day.tarefas.length!==1?'s':''}</div>`);}
     if((f==='todos'||f==='sau')&&(day.pesos.length||day.consultas.length||day.exames.length)){const parts=[];if(day.pesos.length)parts.push(day.pesos[0].weight?`<span class="sensitive">${day.pesos[0].weight}kg</span>`:'Peso');if(day.consultas.length)parts.push(`${day.consultas.length} consulta${day.consultas.length!==1?'s':''}`);dots.push(`<div class="cal-dot sau">${_ci('assets/Saúde.png')} ${parts.join(' · ')}</div>`);}
-    if((f==='todos'||f==='hab')&&day.habitosFeitos.length){dots.push(`<div class="cal-dot hab">${_ci('assets/Hábitos.png')} ${day.habitosFeitos.length}/${day.habitosAtivos.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
+    if((f==='todos'||f==='hab')&&day.habitosPlanned.length){dots.push(`<div class="cal-dot hab">${_ci('assets/Hábitos.png')} ${day.habitosFeitos.length}/${day.habitosPlanned.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
     if((f==='todos'||f==='ali')&&day.refeicoes.length){const kcal=day.refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);dots.push(`<div class="cal-dot ali">${_ci('assets/Alimentação.png')} ${day.refeicoes.length} ref${kcal?` · ${fmtNum(kcal)} kcal`:''}</div>`);}
     if((f==='todos'||f==='gcal')&&day.gcalEvents.length){dots.push(`<div class="cal-dot gcal">📅 ${day.gcalEvents.length} evento${day.gcalEvents.length!==1?'s':''}</div>`);}
     const hasData=dots.length>0;
@@ -856,8 +871,8 @@ function rendCal(){
 }
 
 function openDay(dateStr){
-  const{receitas,despesas,parcelados,treinos,tarefas,pesos,exames,consultas,habitosFeitos,habitosAtivos,refeicoes,gcalEvents}=getDayData(dateStr);
-  const hasAny=receitas.length||despesas.length||parcelados.length||treinos.length||tarefas.length||pesos.length||exames.length||consultas.length||habitosFeitos.length||refeicoes.length||gcalEvents.length;
+  const{receitas,despesas,parcelados,treinos,tarefas,pesos,exames,consultas,habitosFeitos,habitosPlanned,habitosAtivos,refeicoes,gcalEvents}=getDayData(dateStr);
+  const hasAny=receitas.length||despesas.length||parcelados.length||treinos.length||tarefas.length||pesos.length||exames.length||consultas.length||habitosPlanned.length||habitosFeitos.length||refeicoes.length||gcalEvents.length;
   const[y,mo,d]=dateStr.split('-'); const dateObj=new Date(Number(y),Number(mo)-1,Number(d)); const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   document.getElementById('popup-title').textContent=DIAS[dateObj.getDay()]+', '+Number(d)+' de '+MESES[Number(mo)-1];
   document.getElementById('popup-date').textContent=dateStr.split('-').reverse().join('/');
@@ -869,7 +884,7 @@ function openDay(dateStr){
   if(treinos.length) chips.push(`<div class="popup-sum-chip ex">${_ci(_MI.ex)}${treinos.length} treino${treinos.length!==1?'s':''}</div>`);
   if(tarefas.length) chips.push(`<div class="popup-sum-chip cas">${_ci(_MI.cas)}${tarefas.length} tarefa${tarefas.length!==1?'s':''}</div>`);
   if(pesos.length||consultas.length||exames.length){ const p=[];if(pesos.length&&pesos[0].weight)p.push(`<span class="sensitive">${pesos[0].weight}kg</span>`);if(consultas.length)p.push(`${consultas.length} consulta${consultas.length!==1?'s':''}`); chips.push(`<div class="popup-sum-chip sau">${_ci(_MI.sau)}${p.join(' · ')||'Saúde'}</div>`); }
-  if(habitosFeitos.length) chips.push(`<div class="popup-sum-chip hab">${_ci(_MI.hab)}${habitosFeitos.length}/${habitosAtivos.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
+  if(habitosPlanned.length) chips.push(`<div class="popup-sum-chip hab">${_ci(_MI.hab)}${habitosFeitos.length}/${habitosPlanned.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
   if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); chips.push(`<div class="popup-sum-chip ali">${_ci(_MI.ali)}${refeicoes.length} refeição${refeicoes.length!==1?'ões':''} · ${fmtNum(kcal)} kcal</div>`); }
   if(gcalEvents.length) chips.push(`<div class="popup-sum-chip" style="background:var(--gcal-bg);color:var(--gcal-c);border:1px solid var(--gcal-border);">📅 ${gcalEvents.length} evento${gcalEvents.length!==1?'s':''}</div>`);
   let html=`<div class="popup-summary">${chips.join('')}</div>`;
@@ -879,20 +894,22 @@ function openDay(dateStr){
   if(treinos.length){ html+=`<div class="popup-section"><div class="popup-section-title ex">${_ci(_MI.ex,12)}Exercícios</div>${treinos.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.hora_inicio?`<span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;">${t.hora_inicio}</span>`:''}${t.titulo||t.nome||'Treino'}${t.local?` <span style="color:var(--hint);font-size:10px;">· ${t.local}</span>`:''}</div><div class="popup-item-val purple">${t.duracao?t.duracao+'min':t.tipo_cat||''}</div></div>`).join('')}</div>`; }
   if(tarefas.length){ html+=`<div class="popup-section"><div class="popup-section-title cas">${_ci(_MI.cas,12)}Casa/Tarefas</div>${tarefas.map(t=>`<div class="popup-item"><div class="popup-item-name">${t.horario?`<span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;">${t.horario}</span>`:''}${t.titulo||'Tarefa'}${t.ambiente?` <span style="color:var(--hint);font-size:10px;">· ${t.ambiente}</span>`:''}</div><div class="popup-item-val pink">✓ concluída</div></div>`).join('')}</div>`; }
   if(pesos.length||exames.length||consultas.length){ html+=`<div class="popup-section"><div class="popup-section-title sau">${_ci(_MI.sau,12)}Saúde</div>${pesos.map(w=>`<div class="popup-item"><div class="popup-item-name">${w.time?`<span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;">${w.time}</span>`:''}Peso registrado</div><div class="popup-item-val" style="color:var(--sau-c);"><span class="sensitive">${w.weight?w.weight+'kg':'—'}${w.fat?` · ${w.fat}% gordura`:''}</span></div></div>`).join('')}${exames.map(e=>`<div class="popup-item"><div class="popup-item-name">${e.name||'Exame'}</div><div class="popup-item-val muted">${e.status||'exame'}</div></div>`).join('')}${consultas.map(c=>`<div class="popup-item"><div class="popup-item-name">${c.time?`<span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;">${c.time}</span>`:''}${c.doctor||c.specialty||'Consulta'}</div><div class="popup-item-val muted">${c.status||'consulta'}</div></div>`).join('')}</div>`; }
-  if(habitosFeitos.length){
+  if(habitosPlanned.length){
     const POP_GROUPS=[
-      {label:'Manual',    filter:h=>!h.autoType&&h.tipo!=='controle'},
-      {label:'Automático',filter:h=>!!h.autoType},
-      {label:'Controle',  filter:h=>h.tipo==='controle'},
+      {label:'Diário',     filter:h=>!h.autoType&&h.tipo!=='controle'&&(h.freq==='diario'||!h.freq||h.freq==='livre')},
+      {label:'Semanal',    filter:h=>!h.autoType&&h.tipo!=='controle'&&h.freq==='semanal'},
+      {label:'Mensal',     filter:h=>!h.autoType&&h.tipo!=='controle'&&h.freq==='mensal'},
+      {label:'Automático', filter:h=>!!h.autoType},
+      {label:'Controle',   filter:h=>h.tipo==='controle'},
     ];
     let habPopHtml=`<div class="popup-section"><div class="popup-section-title hab">${_ci(_MI.hab,12)}Hábitos</div>`;
     POP_GROUPS.forEach(g=>{
-      const gh=habitosFeitos.filter(g.filter);
+      const gh=habitosPlanned.filter(g.filter);
       if(!gh.length) return;
       if(g.label==='Controle'){
-        habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>{const val=h.logs[dateStr]||'';const esc=String(val||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');return`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}${h.unit?` <span style="color:var(--hint);font-size:10px;">(${String(h.unit).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')})</span>`:''}</div><div class="popup-item-val blue">${esc||'—'}</div></div>`;}).join('')}`;
+        habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>{const val=h.logs&&h.logs[dateStr]||'';const esc=String(val||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');return`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}${h.unit?` <span style="color:var(--hint);font-size:10px;">(${String(h.unit).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')})</span>`:''}</div><div class="popup-item-val blue">${esc&&String(val).trim()?'✓ '+esc:'—'}</div></div>`;}).join('')}`;
       } else {
-        habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}</div><div class="popup-item-val blue">✓ feito</div></div>`).join('')}`;
+        habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>{const done=!!(h.logs&&h.logs[dateStr]);return`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}</div><div class="popup-item-val blue">${done?'✓ feito':'○ pendente'}</div></div>`;}).join('')}`;
       }
     });
     habPopHtml+='</div>';
@@ -957,6 +974,7 @@ async function hubSyncHabito(h){
   await _hubPost('/habitos',{
     usuario_id:uid,client_id:h.id,nome:h.name,icone:h.icon||null,
     categoria:h.cat||null,frequencia:h.freq||null,weekdays:h.weekdays||[],
+    monthDay:h.freq==='mensal'?(Number(h.monthDay)||1):null,
     obs:h.note||null,autoType:h.autoType||null,autoKeyword:h.autoKeyword||null,
     tipo:h.tipo||'check',unit:h.unit||null,startDate:h.startDate||null,
     logs:h.logs||{},
@@ -968,6 +986,7 @@ function hubToggleHabito(id,dateStr){
   // Verificação síncrona de tipo antes de entrar na fila
   const check=loadHabitos().find(x=>x.id===id);
   if(!check) return;
+  if(!hubIsPlannedForDate(check,dateStr)) return;
   if(check.tipo==='controle'){ _openControleModal(check,dateStr); return; }
   _hubRun(async()=>{
     // 1. Snapshot completo como string bruta (imune a mutação por referência)
@@ -988,6 +1007,7 @@ function hubToggleHabito(id,dateStr){
       await _hubPost('/habitos',{
         usuario_id:uid,client_id:hab.id,nome:hab.name,icone:hab.icon||null,
         categoria:hab.cat||null,frequencia:hab.freq||null,weekdays:hab.weekdays||[],
+        monthDay:hab.freq==='mensal'?(Number(hab.monthDay)||1):null,
         obs:hab.note||null,autoType:hab.autoType||null,autoKeyword:hab.autoKeyword||null,
         tipo:hab.tipo||'check',unit:hab.unit||null,startDate:hab.startDate||null,
         logs:hab.logs||{},
@@ -1126,7 +1146,7 @@ function rendTodaySummary(){
   const todayStr=ds(new Date());
   const cardStr=ds(cardDate);
   const isToday=cardStr===todayStr;
-  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosAtivos,refeicoes,planSlots,gcalEvents}=getDayData(cardStr);
+  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosPlanned,habitosAtivos,refeicoes,planSlots,gcalEvents}=getDayData(cardStr);
   const f=calFilter;
   const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   const el=document.getElementById('today-summary');
@@ -1136,12 +1156,14 @@ function rendTodaySummary(){
 
   // ── Hábitos: só ícones no topo ──
   let habHtml='';
-  if((f==='todos'||f==='hab')&&habitosAtivos.length){
-    const habList=habitosAtivos;
+  if((f==='todos'||f==='hab')&&habitosPlanned.length){
+    const habList=habitosPlanned;
     const HAB_GROUPS=[
-      {key:'manual',     label:'Manual',     filter:h=>!h.autoType&&h.tipo!=='controle'},
+      {key:'diario',     label:'Diário',      filter:h=>!h.autoType&&h.tipo!=='controle'&&(h.freq==='diario'||!h.freq||h.freq==='livre')},
+      {key:'semanal',    label:'Semanal',     filter:h=>!h.autoType&&h.tipo!=='controle'&&h.freq==='semanal'},
+      {key:'mensal',     label:'Mensal',      filter:h=>!h.autoType&&h.tipo!=='controle'&&h.freq==='mensal'},
       {key:'automatico', label:'Automático',  filter:h=>!!h.autoType},
-      {key:'controle',   label:'Controle',   filter:h=>h.tipo==='controle'},
+      {key:'controle',   label:'Controle',    filter:h=>h.tipo==='controle'},
     ];
     habHtml='<div class="td-habits">'+HAB_GROUPS.map(g=>{
       const gh=habList.filter(g.filter);

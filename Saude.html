@@ -147,6 +147,7 @@
     .mono{font-family:var(--mono)}
 
     /* REMÉDIOS */
+    .rm-wd.active{background:var(--health-bg);color:var(--health);border-color:var(--health-border)!important;font-weight:600}
     .rem-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
     .rem-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px;}
     .rem-card-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
@@ -439,9 +440,33 @@
         </div>
       </div>
       <div class="form-row triple">
-        <div class="field"><label>Dose diária</label><input class="input" id="rm-dose" placeholder="Ex: 1 comprimido"></div>
+        <div class="field"><label id="rm-dose-label">Dose (por dia)</label><input class="input" id="rm-dose" placeholder="Ex: 1 comprimido"></div>
         <div class="field"><label>Estoque atual (unid.)</label><input class="input" id="rm-stock" type="number" min="0"></div>
         <div class="field"><label>Qtd. por compra</label><input class="input" id="rm-qty" type="number" min="1" placeholder="Ex: 30"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Recorrência de uso</label>
+          <select class="sel" id="rm-intake-recur" onchange="window.saudeApp.rmToggleIntakeFields()">
+            <option value="diario">Diário</option>
+            <option value="semanal">Semanal (dias da semana)</option>
+            <option value="mensal">Mensal (dia do mês)</option>
+          </select>
+        </div>
+        <div class="field" id="rm-intake-monthday-wrap" style="display:none"><label>Dia do mês</label>
+          <select class="sel" id="rm-intake-monthday"></select>
+        </div>
+      </div>
+      <div class="field" id="rm-intake-weekdays" style="display:none;margin-bottom:12px">
+        <label>Dias da semana em que tomas</label>
+        <div class="weekdays" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+          <div class="rm-wd" data-day="1" onclick="this.classList.toggle('active')" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px">Seg</div>
+          <div class="rm-wd" data-day="2" onclick="this.classList.toggle('active')" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px">Ter</div>
+          <div class="rm-wd" data-day="3" onclick="this.classList.toggle('active')" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px">Qua</div>
+          <div class="rm-wd" data-day="4" onclick="this.classList.toggle('active')" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px">Qui</div>
+          <div class="rm-wd" data-day="5" onclick="this.classList.toggle('active')" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px">Sex</div>
+          <div class="rm-wd" data-day="6" onclick="this.classList.toggle('active')" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px">Sáb</div>
+          <div class="rm-wd" data-day="0" onclick="this.classList.toggle('active')" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px">Dom</div>
+        </div>
       </div>
       <div class="form-row">
         <div class="field"><label>Duração (dias entre compras)</label><input class="input" id="rm-days" type="number" min="1" placeholder="Ex: 30"></div>
@@ -450,7 +475,7 @@
       <div class="field" style="margin-bottom:12px"><label>Observação</label><textarea class="textarea" id="rm-note" placeholder="Opcional"></textarea></div>
       <div id="rm-criar-habito-row" style="display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--border);margin-bottom:4px">
         <input type="checkbox" id="rm-criar-habito" style="width:16px;height:16px;cursor:pointer;accent-color:var(--health)">
-        <label for="rm-criar-habito" style="font-size:13px;color:var(--text);cursor:pointer;margin:0">Criar hábito diário no módulo Hábitos para registrar o uso</label>
+        <label for="rm-criar-habito" style="font-size:13px;color:var(--text);cursor:pointer;margin:0">Criar hábito no módulo Hábitos (mesma recorrência) para registrar o uso</label>
       </div>
       <div class="modal-footer">
         <button class="btn" id="cancel-remedio-modal" type="button">Cancelar</button>
@@ -773,6 +798,9 @@
         client_id:r.id,name:r.name,cat:r.cat||null,dose:r.dose||null,
         stock:r.stock??null,qty:r.qty??null,days:r.days??null,
         lastBuy:r.lastBuy||null,note:r.note||null,habitId:r.habitId||null,
+        intake_recurrence:r.intakeRecurrence||null,
+        intake_weekdays:Array.isArray(r.intakeWeekdays)?r.intakeWeekdays:null,
+        intake_month_day:r.intakeMonthDay!=null?Number(r.intakeMonthDay):null,
       })});
       clearDirty(KEY_DIRTY_REM,r.id);
     }
@@ -879,7 +907,12 @@
         for(const c of nwC)syncConsulta(c).catch(e=>console.warn('[Saúde] Sync consulta falhou, será retentado:',e));
 
         // Remédios e consumos
-        const apiRemedios=(rRem||[]).map(r=>({id:r.clientId,name:r.name,cat:r.cat||'',dose:r.dose||'',stock:r.stock??null,qty:r.qty??null,days:r.days??null,lastBuy:r.lastBuy||'',note:r.note||'',habitId:r.habitId||undefined}));
+        const apiRemedios=(rRem||[]).map(r=>({
+          id:r.clientId,name:r.name,cat:r.cat||'',dose:r.dose||'',stock:r.stock??null,qty:r.qty??null,days:r.days??null,lastBuy:r.lastBuy||'',note:r.note||'',habitId:r.habitId||undefined,
+          intakeRecurrence:r.intakeRecurrence||'diario',
+          intakeWeekdays:Array.isArray(r.intakeWeekdays)?r.intakeWeekdays:[],
+          intakeMonthDay:r.intakeMonthDay!=null?Number(r.intakeMonthDay):null,
+        }));
         const apiConsumos=(rCon||[]).map(c=>({id:c.clientId,date:c.date,time:c.time||'',name:c.name,dose:c.dose||'',reason:c.reason||''}));
         const apiRemIds=new Set(apiRemedios.map(r=>r.id));
         const apiConIds=new Set(apiConsumos.map(c=>c.id));
@@ -907,6 +940,7 @@
       const KEY_REM='saude_remedios_v1';
       const KEY_CONSUMO='saude_consumos_v1';
       const REM_CAT_LABEL={hipertensao:'Hipertensão',diabetes:'Diabetes',colesterol:'Colesterol',ansiedade:'Ansiedade / Humor',tireoide:'Tireoide',vitamina:'Vitamina / Suplemento',outro:'Outro'};
+      const REM_INTAKE_LABEL={diario:'Uso diário',semanal:'Uso semanal',mensal:'Uso mensal'};
 
       const defaultData={
         settings:{theme:document.documentElement.getAttribute('data-theme')||'dark'},
@@ -983,6 +1017,7 @@
         getConsumos:()=>consumos,
         setConsumos:(list)=>{ consumos=list; saveConsumos(); renderConsumos(); },
         renderAll:()=>renderAll(),
+        rmToggleIntakeFields:()=>rmToggleIntakeFields(),
       };
       function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
       function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1173,6 +1208,28 @@
       function saveRemedios(){ try{ lsSet(KEY_REM,JSON.stringify(remedios)); }catch(e){ console.error('saveRemedios:',e); } }
       function saveConsumos(){ lsSet(KEY_CONSUMO,JSON.stringify(consumos)); }
 
+      function ensureRmIntakeMonthdaySelect(){
+        const sel=document.getElementById('rm-intake-monthday');
+        if(!sel||sel.options.length>0) return;
+        for(let n=1;n<=31;n++){
+          const o=document.createElement('option');
+          o.value=String(n); o.textContent=String(n);
+          sel.appendChild(o);
+        }
+      }
+      function rmClearWeekdayChips(){ document.querySelectorAll('.rm-wd').forEach(w=>w.classList.remove('active')); }
+      function rmGetSelectedWeekdays(){ return [...document.querySelectorAll('.rm-wd.active')].map(w=>Number(w.dataset.day)); }
+      function rmToggleIntakeFields(){
+        const recurEl=document.getElementById('rm-intake-recur');
+        const v=(recurEl&&recurEl.value)||'diario';
+        const wk=document.getElementById('rm-intake-weekdays');
+        const mdw=document.getElementById('rm-intake-monthday-wrap');
+        if(wk) wk.style.display=v==='semanal'?'block':'none';
+        if(mdw) mdw.style.display=v==='mensal'?'block':'none';
+        const lab=document.getElementById('rm-dose-label');
+        if(lab) lab.textContent=v==='diario'?'Dose (por dia)':'Dose (cada toma)';
+      }
+
       function remedioStockStatus(r){
         const stock=Number(r.stock||0);
         const qty=Number(r.qty||30);
@@ -1193,15 +1250,20 @@
         try{
           const habitos=JSON.parse(lsGet(KEY_HAB_HABITS)||'[]');
           const hid=uid();
+          const rec=r.intakeRecurrence||'diario';
+          let freq='diario',weekdays=[],monthDay=null;
+          if(rec==='semanal'){ freq='semanal'; weekdays=[...(r.intakeWeekdays||[])]; }
+          else if(rec==='mensal'){ freq='mensal'; monthDay=Math.max(1,Math.min(31,Number(r.intakeMonthDay)||1)); }
           habitos.push({
             id:hid,
             name:`Tomar ${r.name}`,
             icon:'💊',
             cat:'saude',
-            freq:'diario',
+            freq,
             tipo:'check',
             unit:'',
-            weekdays:[],
+            weekdays,
+            monthDay,
             startDate:todayStr(),
             note:r.dose||'',
             autoType:'',
@@ -1216,6 +1278,21 @@
         }catch(e){ console.error('createHabitoForRemedio',e); }
       }
 
+      function saudeHabPlannedOnDate(h,dateStr){
+        if(!h||!dateStr) return true;
+        if(h.startDate&&dateStr<h.startDate) return false;
+        const d=new Date(dateStr+'T12:00:00');
+        const f=h.freq||'diario';
+        if(f==='livre'||f==='diario') return true;
+        if(f==='semanal') return (h.weekdays||[]).includes(d.getDay());
+        if(f==='mensal'){
+          const want=Math.max(1,Math.min(31,Number(h.monthDay)||1));
+          const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+          return d.getDate()===Math.min(want,last);
+        }
+        return true;
+      }
+
       function remedioHabitoStatus(r){
         if(!r.habitId) return '';
         try{
@@ -1225,16 +1302,21 @@
           const logs=h.logs||{};
           const today=new Date();
           const todayDs=today.toISOString().slice(0,10);
-          const todayDone=!!logs[todayDs];
+          const plannedToday=saudeHabPlannedOnDate(h,todayDs);
+          const todayDone=plannedToday&&!!logs[todayDs];
           const dots=[];
           for(let i=6;i>=0;i--){
             const d=new Date(today); d.setDate(d.getDate()-i);
             const ds=d.toISOString().slice(0,10);
             const isFuture=ds>todayDs;
-            dots.push(`<div class="rem-h-dot ${isFuture?'future':logs[ds]?'done':'miss'}" title="${ds}"></div>`);
+            const pl=saudeHabPlannedOnDate(h,ds);
+            const done=!!logs[ds];
+            const cls=isFuture?'future':!pl?'future':done?'done':'miss';
+            dots.push(`<div class="rem-h-dot ${cls}" title="${ds}"></div>`);
           }
+          const badge=!plannedToday?'— Fora do plano hoje':(todayDone?'✓ Tomado hoje':'○ Pendente hoje');
           return `<div class="rem-habito-link">
-            <span class="rem-habito-badge ${todayDone?'done':'pending'}">${todayDone?'✓ Tomado hoje':'○ Pendente hoje'}</span>
+            <span class="rem-habito-badge ${todayDone?'done':'pending'}">${badge}</span>
             <div class="rem-habito-dots">${dots.join('')}</div>
           </div>`;
         }catch{ return ''; }
@@ -1267,6 +1349,7 @@
             <div class="rem-stock-bar"><div class="rem-stock-fill" style="width:${(st.pct*100).toFixed(0)}%;background:${barColor}"></div></div>
             <div class="rem-card-meta">
               <span>📋 ${r.dose||'—'}</span>
+              <span>⏱ ${escapeHtml(REM_INTAKE_LABEL[r.intakeRecurrence]||REM_INTAKE_LABEL.diario)}</span>
               ${r.days?`<span>🔁 a cada ${r.days} dias</span>`:''}
               ${next?`<span>🛒 próxima compra ${fmtDate(next)}</span>`:''}
               ${r.note?`<span>📝 ${escapeHtml(r.note)}</span>`:''}
@@ -1301,6 +1384,18 @@
         setValue('rm-dose',r.dose||''); setValue('rm-stock',r.stock??'');
         setValue('rm-qty',r.qty||''); setValue('rm-days',r.days||'');
         setValue('rm-last-buy',r.lastBuy||todayStr()); setValue('rm-note',r.note||'');
+        ensureRmIntakeMonthdaySelect();
+        const ir=['diario','semanal','mensal'].includes(r.intakeRecurrence)?r.intakeRecurrence:'diario';
+        const recurEl=document.getElementById('rm-intake-recur');
+        if(recurEl) recurEl.value=ir;
+        rmClearWeekdayChips();
+        (r.intakeWeekdays||[]).forEach(day=>{
+          const el=document.querySelector(`.rm-wd[data-day="${day}"]`);
+          if(el) el.classList.add('active');
+        });
+        const md=document.getElementById('rm-intake-monthday');
+        if(md) md.value=String(Math.max(1,Math.min(31,Number(r.intakeMonthDay)||1)));
+        rmToggleIntakeFields();
         // show checkbox only for new remédios that don't already have a linked habit
         const isNew=!editing.remedio;
         const hasHabit=!isNew && !!(editing.remedio?.habitId);
@@ -1314,6 +1409,13 @@
       async function saveRemedio(){
         const name=document.getElementById('rm-name').value.trim();
         if(!name){alert('Informe o nome do remédio.');return;}
+        const intakeRecurrence=(document.getElementById('rm-intake-recur')||{}).value||'diario';
+        const intakeWeekdays=intakeRecurrence==='semanal'?rmGetSelectedWeekdays():[];
+        if(intakeRecurrence==='semanal' && intakeWeekdays.length===0){
+          alert('Selecione pelo menos um dia da semana para recorrência semanal.');
+          return;
+        }
+        const intakeMonthDay=intakeRecurrence==='mensal'?Math.max(1,Math.min(31,parseInt((document.getElementById('rm-intake-monthday')||{}).value,10)||1)):null;
         const isNew=!editing.remedio;
         const item={
           id:editing.remedio?.id||uid(),
@@ -1324,6 +1426,7 @@
           days:safeNum(document.getElementById('rm-days').value),
           lastBuy:document.getElementById('rm-last-buy').value,
           note:document.getElementById('rm-note').value.trim(),
+          intakeRecurrence,intakeWeekdays,intakeMonthDay,
           // preserve existing habitId if editing
           habitId:editing.remedio?.habitId||undefined
         };
@@ -1880,7 +1983,8 @@
         },
         vincularHabito:(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r) return;
-          if(!confirm(`Criar hábito diário "Tomar ${r.name}" no módulo Hábitos?`)) return;
+          const lab=REM_INTAKE_LABEL[r.intakeRecurrence]||REM_INTAKE_LABEL.diario;
+          if(!confirm(`Criar hábito "Tomar ${r.name}" no módulo Hábitos (${lab})?`)) return;
           createHabitoForRemedio(r); renderRemedios();
         },
         desvincularHabito:async(id)=>{

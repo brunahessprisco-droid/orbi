@@ -748,7 +748,7 @@
           </select>
           <select class="sel" id="habit-filter-auto" onchange="renderHabitsPage()" style="max-width:200px">
             <option value="">Todos</option>
-            <option value="manual">Só manuais</option>
+            <option value="manual">Só check (sem auto)</option>
             <option value="auto">Só automáticos</option>
           </select>
         </div>
@@ -849,9 +849,10 @@
         </div>
         <div class="field">
           <label>Frequência</label>
-          <select class="sel" id="f-freq" onchange="toggleWeekdaysBlock()">
+          <select class="sel" id="f-freq" onchange="toggleRecurrenceFields()">
             <option value="diario">Diário</option>
             <option value="semanal">Dias da semana</option>
+            <option value="mensal">Mensal (dia do mês)</option>
             <option value="livre">Livre</option>
           </select>
         </div>
@@ -893,6 +894,10 @@
           <div class="wd" data-day="6" onclick="toggleWeekday(this)">Sáb</div>
           <div class="wd" data-day="0" onclick="toggleWeekday(this)">Dom</div>
         </div>
+      </div>
+      <div class="field" id="monthday-block" style="display:none;margin-bottom:12px">
+        <label>Dia do mês (repete nesse dia)</label>
+        <select class="sel" id="f-monthday"></select>
       </div>
 
       <div class="field" style="margin-bottom:12px">
@@ -1040,6 +1045,7 @@
       await apiReq('/habitos',{method:'POST',body:JSON.stringify({
         usuario_id:API_USER_ID,client_id:h.id,nome:h.name,icone:h.icon||null,
         categoria:h.cat||null,frequencia:h.freq||null,weekdays:h.weekdays||[],
+        monthDay:h.freq==='mensal'?(Number(h.monthDay)||1):null,
         obs:h.note||null,autoType:h.autoType||null,autoKeyword:h.autoKeyword||null,
         tipo:h.tipo||'check',unit:h.unit||null,startDate:h.startDate||null,
         logs:h.logs||{},
@@ -1073,7 +1079,7 @@
         const apiHabitos=rows.map(r=>({
           id:r.client_id,_dbId:r.id,name:r.nome,icon:r.icone||'✨',
           cat:r.categoria||'outro',freq:r.frequencia||'diario',
-          weekdays:r.weekdays||[],note:r.obs||'',
+          weekdays:r.weekdays||[],monthDay:r.monthDay!=null?Number(r.monthDay):null,note:r.obs||'',
           autoType:r.autoType||'',autoKeyword:r.autoKeyword||'',
           tipo:r.tipo||'check',unit:r.unit||'',startDate:r.startDate||'',
           logs:r.logs||{},
@@ -1091,6 +1097,7 @@
           if(row?.tipo==null && loc.tipo && loc.tipo!=='check'){ h.tipo=loc.tipo; changed=true; }
           if(row?.unit==null && loc.unit){ h.unit=loc.unit; changed=true; }
           if(row?.startDate==null && loc.startDate){ h.startDate=loc.startDate; changed=true; }
+          if(row?.monthDay==null && loc.monthDay!=null && (loc.freq==='mensal'||h.freq==='mensal')){ h.monthDay=loc.monthDay; changed=true; }
           if(changed) toResync.push(h);
         });
         // Preserve user-defined order from local state
@@ -1120,9 +1127,9 @@
         }
         if(habits.length===0){
           habits=[
-            {id:uid(),name:'Beber água',icon:'💧',cat:'saude',freq:'diario',weekdays:[],note:'',autoType:'',autoKeyword:'',logs:{}},
-            {id:uid(),name:'Treinar',icon:'💪',cat:'saude',freq:'diario',weekdays:[],note:'',autoType:'treino_realizado',autoKeyword:'',logs:{}},
-            {id:uid(),name:'Ler 10 min',icon:'📚',cat:'mental',freq:'diario',weekdays:[],note:'',autoType:'',autoKeyword:'',logs:{}},
+            {id:uid(),name:'Beber água',icon:'💧',cat:'saude',freq:'diario',weekdays:[],monthDay:null,note:'',autoType:'',autoKeyword:'',logs:{}},
+            {id:uid(),name:'Treinar',icon:'💪',cat:'saude',freq:'diario',weekdays:[],monthDay:null,note:'',autoType:'treino_realizado',autoKeyword:'',logs:{}},
+            {id:uid(),name:'Ler 10 min',icon:'📚',cat:'mental',freq:'diario',weekdays:[],monthDay:null,note:'',autoType:'',autoKeyword:'',logs:{}},
           ];
           for(const h of habits)await syncHabito(h).catch(()=>{ markHabDirty(h.id); });
         }
@@ -1134,7 +1141,7 @@
     let habits=JSON.parse(lsGet(KEY)||'[]');
     let ref=new Date();
     let editingId=null;
-    let trackerCollapsed={manual:false,automatico:false,controle:false};
+    let trackerCollapsed={diario:false,semanal:false,mensal:false,automatico:false,controle:false};
     function toggleTrackerSection(key){ trackerCollapsed[key]=!trackerCollapsed[key]; renderGrid(); }
 
     let chartWeekly=null;
@@ -1219,7 +1226,9 @@
         document.getElementById('f-auto-type').value=h.autoType||'';
         document.getElementById('f-auto-keyword').value=h.autoKeyword||'';
 
-        toggleWeekdaysBlock();
+        ensureMonthDayOptions();
+        document.getElementById('f-monthday').value=String(Math.max(1,Math.min(31,Number(h.monthDay)||1)));
+        toggleRecurrenceFields();
         toggleAutoFields();
 
         (h.weekdays||[]).forEach(day=>{
@@ -1228,7 +1237,7 @@
         });
       }else{
         document.getElementById('modal-title').textContent='Novo hábito';
-        toggleWeekdaysBlock();
+        toggleRecurrenceFields();
         toggleAutoFields();
       }
 
@@ -1380,12 +1389,24 @@
       if(prev) prev.innerHTML='';
     }
 
+    function ensureMonthDayOptions(){
+      const mSel=document.getElementById('f-monthday');
+      if(!mSel||mSel.options.length) return;
+      for(let n=1;n<=31;n++){
+        const o=document.createElement('option');
+        o.value=String(n); o.textContent=String(n);
+        mSel.appendChild(o);
+      }
+    }
+
     function resetForm(){
       editingId=null;
+      ensureMonthDayOptions();
       document.getElementById('f-name').value='';
       _setIconVal('');
       document.getElementById('f-cat').value='saude';
       document.getElementById('f-freq').value='diario';
+      document.getElementById('f-monthday').value='1';
       document.getElementById('f-tipo').value='check';
       document.getElementById('f-unit').value='';
       document.getElementById('f-start').value=todayStr();
@@ -1394,6 +1415,7 @@
       document.getElementById('f-auto-keyword').value='';
       document.querySelectorAll('.wd').forEach(x=>x.classList.remove('active'));
       toggleTipoFields();
+      toggleRecurrenceFields();
     }
 
     function toggleTipoFields(){
@@ -1404,9 +1426,10 @@
       if(autoRow) autoRow.style.display=tipo==='controle'?'none':'';
     }
 
-    function toggleWeekdaysBlock(){
+    function toggleRecurrenceFields(){
       const freq=document.getElementById('f-freq').value;
       document.getElementById('weekdays-block').style.display = freq==='semanal' ? 'block' : 'none';
+      document.getElementById('monthday-block').style.display = freq==='mensal' ? 'block' : 'none';
     }
 
     function toggleWeekday(el){
@@ -1439,11 +1462,13 @@
         alert('Selecione pelo menos um dia da semana.');
         return;
       }
+      ensureMonthDayOptions();
+      const monthDay=freq==='mensal'?Math.max(1,Math.min(31,parseInt(document.getElementById('f-monthday').value,10)||1)):null;
 
       const startDate=document.getElementById('f-start').value||todayStr();
       const tipo=document.getElementById('f-tipo').value||'check';
       const unit=document.getElementById('f-unit').value.trim();
-      const payload={name,icon,cat,freq,tipo,unit,weekdays,startDate,note,autoType:tipo==='check'?autoType:'',autoKeyword:tipo==='check'?autoKeyword:''};
+      const payload={name,icon,cat,freq,tipo,unit,weekdays:freq==='semanal'?weekdays:[],monthDay,startDate,note,autoType:tipo==='check'?autoType:'',autoKeyword:tipo==='check'?autoKeyword:''};
 
       if(editingId){
         const h=habits.find(x=>x.id===editingId);
@@ -1482,10 +1507,16 @@
 
     function isPlannedForDate(h, dateStr){
       if(h.startDate && dateStr < h.startDate) return false;
-      const d=new Date(dateStr+'T00:00:00');
+      const d=new Date(dateStr+'T12:00:00');
       if(h.freq==='livre') return true;
-      if(h.freq==='diario') return true;
+      if(h.freq==='diario'||!h.freq) return true;
       if(h.freq==='semanal') return (h.weekdays||[]).includes(d.getDay());
+      if(h.freq==='mensal'){
+        const want=Math.max(1,Math.min(31,Number(h.monthDay)||1));
+        const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+        const target=Math.min(want,last);
+        return d.getDate()===target;
+      }
       return true;
     }
 
@@ -1747,9 +1778,11 @@
       }
 
       const groups=[
-        {key:'manual',   label:'Manual',    filter:h=>!h.autoType && h.tipo!=='controle'},
-        {key:'automatico',label:'Automático',filter:h=>!!h.autoType},
-        {key:'controle', label:'Controle',  filter:h=>h.tipo==='controle'},
+        {key:'diario',     label:'Diário',     filter:h=>!h.autoType && h.tipo!=='controle' && (h.freq==='diario'||!h.freq||h.freq==='livre')},
+        {key:'semanal',    label:'Semanal',    filter:h=>!h.autoType && h.tipo!=='controle' && h.freq==='semanal'},
+        {key:'mensal',     label:'Mensal',     filter:h=>!h.autoType && h.tipo!=='controle' && h.freq==='mensal'},
+        {key:'automatico', label:'Automático', filter:h=>!!h.autoType},
+        {key:'controle',   label:'Controle',   filter:h=>h.tipo==='controle'},
       ];
 
       function habitRow(h){
@@ -1865,7 +1898,7 @@
         const s=streak(h);
         const weekdayText = h.freq==='semanal'
           ? 'Dias: ' + (h.weekdays||[]).map(dayLabelShort).join(', ')
-          : (h.freq==='diario' ? 'Diário' : 'Livre');
+          : (h.freq==='mensal' ? ('Dia ' + (h.monthDay||1) + ' de cada mês') : (h.freq==='diario'||!h.freq ? 'Diário' : 'Livre'));
         return `
           <div class="item-card">
             <div class="item-top">
