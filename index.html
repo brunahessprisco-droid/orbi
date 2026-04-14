@@ -610,7 +610,11 @@ async function hubBootstrap(){
     if(rTre!==null) _lsSet('saude_treinos_v1',JSON.stringify(treinos));
     if(rTar!==null) _lsSet('casinha_tarefas',JSON.stringify(tarefas));
     if(rHab!==null) _lsSet('habitos_app_v5',JSON.stringify(habitos));
-    if(rAli!==null) _lsSet('alimentacao_meals_v3_light',JSON.stringify(meals));
+    if(rAli!==null){
+      // Filtra refeições pendentes de deleção local (DELETE pode ainda não ter chegado à API)
+      const _delAlim=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_alimentacao_deleted_ids_v1')||'[]'));
+      _lsSet('alimentacao_meals_v3_light',JSON.stringify(meals.filter(m=>!_delAlim.has(m.id))));
+    }
     if(rCfg!==null) _lsSet('alimentacao_plan_v3_light',JSON.stringify(plan));
     if(rW!==null&&rE!==null&&rC!==null) _lsSet('saude_app_v1',JSON.stringify({weights,exams,consults,doctors:[]}));
     rendTodaySummary(); rendCal();
