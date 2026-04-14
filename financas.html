@@ -1043,6 +1043,7 @@ html.privacy .fin-cal-tx-val{filter:blur(8px);user-select:none;pointer-events:no
       <div class="field"><label>Dia vencimento</label><input type="number" id="fx-dia" min="1" max="31" placeholder="10"></div>
     </div>
     <div class="form-row single"><div class="field"><label>Categoria</label><select id="fx-cat"></select></div></div>
+    <div class="form-row single"><div class="field"><label>Conta / cartão</label><select id="fx-conta"></select></div></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeOv('ov-fixa')">Cancelar</button>
       <button class="btn-save" onclick="saveFixa()">Salvar</button>
@@ -1485,6 +1486,13 @@ function contaFromApi(r){
     cor:r.cor||'#7b9cff'
   };
 }
+function fixaContaNomePadrao(f){
+  const esc=(f&&f.conta&&String(f.conta).trim())||'';
+  if(esc)return esc;
+  const primeiro=(sortCartoes(cartoes)[0]||{}).nome;
+  if(primeiro&&String(primeiro).trim())return String(primeiro).trim();
+  return 'Principal';
+}
 function fixaToApi(f){
   return{
     usuario_id:API_USER_ID,
@@ -1493,6 +1501,7 @@ function fixaToApi(f){
     valor_padrao:Number.isFinite(Number(f.valor))?Number(f.valor):0,
     dia_venc:Number.isFinite(Number(f.dia))?Number(f.dia):null,
     categoria_nome:(f.categoria&&String(f.categoria).trim())?String(f.categoria).trim():'Outros',
+    conta_nome:fixaContaNomePadrao(f),
     cor:'#7b9cff',
     encerrado_apos:f.encerradoApos||null
   };
@@ -1505,6 +1514,7 @@ function fixaFromApi(r){
     valor:Number(r.valor_padrao)||0,
     dia:r.dia_venc||null,
     categoria:r.categoria_nome||'Outros',
+    conta:(r.conta_nome&&String(r.conta_nome).trim())?String(r.conta_nome).trim():fixaContaNomePadrao(null),
     encerradoApos:r.encerrado_apos||null
   };
 }
@@ -2978,9 +2988,9 @@ function saveCat(){const nome=document.getElementById('cat-nome').value.trim();i
 function delCat(id){if(!confirm('Excluir categoria? Os lançamentos não serão afetados.'))return;const c=cats.find(x=>x.id===id);if(c&&c._dbId)markDeleted(SK_DEL_CAT,c._dbId);cats=cats.filter(c=>c.id!==id);saveCAT();updCatFilter();renderAll();}
 
 // CONTA FIXA MODAL
-function openFixaModal(){editFixaId=null;document.getElementById('fixa-modal-title').textContent='Nova conta fixa';['fx-nome','fx-valor','fx-dia'].forEach(id=>document.getElementById(id).value='');document.getElementById('fx-cat').innerHTML=getCatOpts('');document.getElementById('ov-fixa').classList.add('open');}
-function editFixa(id){const f=fixas.find(x=>x.id===id);if(!f)return;editFixaId=id;document.getElementById('fixa-modal-title').textContent='Editar conta fixa';document.getElementById('fx-nome').value=f.nome;document.getElementById('fx-valor').value=f.valor;document.getElementById('fx-dia').value=f.dia||'';document.getElementById('fx-cat').innerHTML=getCatOpts(f.categoria);document.getElementById('ov-fixa').classList.add('open');}
-function saveFixa(){const nome=document.getElementById('fx-nome').value.trim(),valor=parseFloat(document.getElementById('fx-valor').value);if(!nome||!valor){alert('Preencha nome e valor.');return;}const obj={id:editFixaId||Date.now().toString(),nome,valor,dia:parseInt(document.getElementById('fx-dia').value)||null,categoria:document.getElementById('fx-cat').value,encerradoApos:null};if(editFixaId){fixas=fixas.map(f=>f.id===editFixaId?{...f,...obj,id:f.id}:f);saveFXDirty(editFixaId);}else{fixas.push(obj);saveFXDirty(obj.id);}renderAll();closeOv('ov-fixa');}
+function openFixaModal(){editFixaId=null;document.getElementById('fixa-modal-title').textContent='Nova conta fixa';['fx-nome','fx-valor','fx-dia'].forEach(id=>document.getElementById(id).value='');document.getElementById('fx-cat').innerHTML=getCatOpts('');const defC=(sortCartoes(cartoes)[0]||{}).nome||'';document.getElementById('fx-conta').innerHTML=getContaOpts(defC);document.getElementById('ov-fixa').classList.add('open');}
+function editFixa(id){const f=fixas.find(x=>x.id===id);if(!f)return;editFixaId=id;document.getElementById('fixa-modal-title').textContent='Editar conta fixa';document.getElementById('fx-nome').value=f.nome;document.getElementById('fx-valor').value=f.valor;document.getElementById('fx-dia').value=f.dia||'';document.getElementById('fx-cat').innerHTML=getCatOpts(f.categoria);document.getElementById('fx-conta').innerHTML=getContaOpts(f.conta||'');document.getElementById('ov-fixa').classList.add('open');}
+function saveFixa(){const nome=document.getElementById('fx-nome').value.trim(),valor=parseFloat(document.getElementById('fx-valor').value);if(!nome||!valor){alert('Preencha nome e valor.');return;}const contaSel=(document.getElementById('fx-conta')||{}).value;const conta=(contaSel&&String(contaSel).trim())||fixaContaNomePadrao(null);const obj={id:editFixaId||Date.now().toString(),nome,valor,dia:parseInt(document.getElementById('fx-dia').value)||null,categoria:document.getElementById('fx-cat').value,conta,encerradoApos:null};if(editFixaId){fixas=fixas.map(f=>f.id===editFixaId?{...f,...obj,id:f.id}:f);saveFXDirty(editFixaId);}else{fixas.push(obj);saveFXDirty(obj.id);}renderAll();closeOv('ov-fixa');}
 function encerrarFixa(id){if(!confirm('Encerrar esta conta fixa a partir de agora? Os lançamentos passados são mantidos.'))return;const k=curK();fixas=fixas.map(f=>f.id===id?{...f,encerradoApos:addM(k,-1)}:f);saveFX();renderAll();}
 
 // FIXA VAL MODAL
