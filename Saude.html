@@ -672,13 +672,16 @@
       }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
     }
     async function saudeLogout(){
-      const dirtySets = ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'].map(k=>{try{return new Set(JSON.parse(localStorage.getItem(k)||'[]'));}catch{return new Set();}});
-      const hasPending = dirtySets.some(s=>s.size>0);
+      const dirtySets = ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
+      const deletedRaw = (() => { try { return JSON.parse(lsGet('saude_deleted_ids_v1')||'{}'); } catch { return {}; } })();
+      const hasDeleted = Object.values(deletedRaw).some(arr=>Array.isArray(arr)&&arr.length>0);
+      const hasPending = dirtySets.some(s=>s.size>0) || hasDeleted;
       if(hasPending){
         const proceed = confirm('Alguns dados de saúde podem não ter sido sincronizados. Deseja sair mesmo assim?');
         if(!proceed) return;
       }
       if(authToken)try{await apiReq('/auth/logout',{method:'POST'});}catch(_){}
+      ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1','saude_deleted_ids_v1'].forEach(k=>lsRem(k));
       authToken='';API_USER_ID=null;localStorage.removeItem(SK_AUTH);
       document.getElementById('auth-overlay').classList.add('open');
     }
@@ -1875,7 +1878,7 @@
       }
     });
 
-    // --- beforeunload: flush pending sync before page close ---
+    // --- beforeunload: avisa sobre dados não sincronizados ---
     window.addEventListener('beforeunload', function(e) {
       const dirtyKeys = ['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'];
       let hasDirty = false;
@@ -1888,21 +1891,6 @@
       const ds = typeof getDeletedState === 'function' ? getDeletedState() : {};
       const hasDeleted = Object.values(ds).some(arr => arr && arr.length > 0);
       if (hasDirty || hasDeleted) {
-        const token = authToken;
-        const uid = _uid();
-        if (token && uid) {
-          try {
-            navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
-          } catch(_) {}
-          // synchronous XHR fallback
-          try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', getApiBase() + '/health', false);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-            xhr.send(JSON.stringify({flush: true}));
-          } catch(_) {}
-        }
         e.preventDefault();
         e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
         return e.returnValue;

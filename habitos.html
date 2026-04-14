@@ -1010,13 +1010,14 @@
 
     async function logoutUser(){
       try{
-        const dirtySet = (()=>{try{return new Set(JSON.parse(localStorage.getItem('habitos_dirty_v1')||'[]'));}catch{return new Set();}})();
-        if(dirtySet.size>0){
+        if(getHabDirty().size > 0 || getHabDeleted().size > 0){
           const proceed = confirm('Alguns dados de hábitos podem não ter sido sincronizados. Deseja sair mesmo assim?');
           if(!proceed) return;
         }
       }catch(_){}
       try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
+      lsRem(KEY_DIRTY);
+      lsRem(KEY_DELETED);
       authToken='';API_USER_ID=null;
       localStorage.removeItem(SK_AUTH);
       habits=[];save();
@@ -2444,23 +2445,9 @@
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('ov-habit').classList.contains('open'))_habitDirtyGuard();});
 
     // --- beforeunload: flush pending sync before page close ---
+    // --- beforeunload: avisa sobre dados não sincronizados ---
     window.addEventListener('beforeunload', function(e) {
       if (getHabDirty().size > 0 || getHabDeleted().size > 0) {
-        const token = authToken;
-        const uid = API_USER_ID;
-        if (token && uid) {
-          try {
-            navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
-          } catch(_) {}
-          // synchronous XHR fallback
-          try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', getApiBase() + '/health', false);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-            xhr.send(JSON.stringify({flush: true}));
-          } catch(_) {}
-        }
         e.preventDefault();
         e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
         return e.returnValue;

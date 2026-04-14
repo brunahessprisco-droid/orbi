@@ -883,13 +883,13 @@
         }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
       }
       async function logoutUser(){
-        const dirtySets = ['alimentacao_dirty_v1','alimentacao_water_dirty_v1','alimentacao_config_dirty_v1'].map(k=>{try{return new Set(JSON.parse(localStorage.getItem(k)||'[]'));}catch{return new Set();}});
-        const hasPending = dirtySets.some(s=>s.size>0);
+        const hasPending = getMealDirty().size > 0 || _algGetSet(KEY_WATER_DIRTY).size > 0 || _algGetSet(KEY_CONFIG_DIRTY).size > 0 || deletedMealIds.length > 0;
         if(hasPending){
           const proceed = confirm('Alguns dados de alimentação podem não ter sido sincronizados. Deseja sair mesmo assim?');
           if(!proceed) return;
         }
         try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
+        lsRem(KEY_DIRTY);lsRem(KEY_WATER_DIRTY);lsRem(KEY_CONFIG_DIRTY);lsRem(KEY_DELETED);
         authToken='';API_USER_ID=null;localStorage.removeItem(SK_AUTH);
         document.getElementById('auth-overlay').classList.add('open');
       }
@@ -975,28 +975,13 @@
       });
     });
 
-    // --- beforeunload: flush pending sync before page close ---
+    // --- beforeunload: avisa sobre dados não sincronizados ---
     window.addEventListener('beforeunload', function(e) {
       const dirtyMeals = typeof getMealDirty === 'function' ? getMealDirty().size : 0;
       const dirtyWater = typeof _algGetSet === 'function' ? _algGetSet('alimentacao_water_dirty_v1').size : 0;
       const dirtyConfig = typeof _algGetSet === 'function' ? _algGetSet('alimentacao_config_dirty_v1').size : 0;
       const deletedMeals = typeof deletedMealIds !== 'undefined' ? deletedMealIds.length : 0;
       if (dirtyMeals > 0 || dirtyWater > 0 || dirtyConfig > 0 || deletedMeals > 0) {
-        const token = authToken;
-        const uid = API_USER_ID;
-        if (token && uid) {
-          try {
-            navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
-          } catch(_) {}
-          // synchronous XHR fallback
-          try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', getApiBase() + '/health', false);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-            xhr.send(JSON.stringify({flush: true}));
-          } catch(_) {}
-        }
         e.preventDefault();
         e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
         return e.returnValue;

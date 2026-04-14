@@ -1944,6 +1944,7 @@ async function logoutUser(){
     if(!proceed) return;
   }
   try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
+  [SK_DIRTY_T,SK_DEL_T,SK_DIRTY_R,SK_DEL_R,SK_DIRTY_A,SK_DEL_A,SK_DIRTY_P,SK_DEL_P].forEach(k=>lsRem(k));
   authToken='';API_USER_ID=null;
   localStorage.removeItem(SK_AUTH);
   showLogin();
@@ -2156,24 +2157,9 @@ function closeTaskQuick(){
   document.getElementById('task-quick-panel').style.display='none';
 }
 
-// --- beforeunload: flush pending sync before page close ---
+// --- beforeunload: avisa sobre dados não sincronizados ---
 window.addEventListener('beforeunload', function(e) {
   if (hasPendingSync()) {
-    const token = authToken;
-    const uid = _uid();
-    if (token && uid) {
-      try {
-        navigator.sendBeacon(getApiBase() + '/health', JSON.stringify({flush: true}));
-      } catch(_) {}
-      // synchronous XHR fallback
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', getApiBase() + '/health', false);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-        xhr.send(JSON.stringify({flush: true}));
-      } catch(_) {}
-    }
     e.preventDefault();
     e.returnValue = 'Você tem dados não sincronizados. Se sair agora, eles podem ser perdidos.';
     return e.returnValue;

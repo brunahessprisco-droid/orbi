@@ -527,7 +527,7 @@ async function submitAuth(){
   }
 }
 
-async function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; if(typeof _hubActionQueue !== 'undefined' && _hubActionQueue){ try{ await Promise.race([_hubActionQueue, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))]); }catch(_){} } try{ await apiReq('/auth/logout',{method:'POST'}); }catch(_){} localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
+async function logout(){ if(!confirm('Tem certeza que deseja sair?')) return; if(typeof _hubActionQueue !== 'undefined' && _hubActionQueue){ try{ await Promise.race([_hubActionQueue, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))]); }catch(_){} } const _tok=localStorage.getItem(AUTH_KEY); if(_tok)try{ await fetch(getApiBase()+'/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+_tok}}); }catch(_){} localStorage.removeItem(AUTH_KEY); localStorage.removeItem('hub_user_id'); localStorage.removeItem('hub_user_nome'); location.reload(); }
 function toggleTheme(){ const isDark=document.documentElement.getAttribute('data-theme')==='dark'; const next=isDark?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('app_theme',next); }
 function applyPrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; document.documentElement.classList.toggle('privacy',on); const btn=document.getElementById('btn-privacy'); if(btn)btn.innerHTML=on?'<i class="bi bi-eye-slash-fill"></i>':'<i class="bi bi-eye-fill"></i>'; }
 function togglePrivacy(){ const on=localStorage.getItem('app_privacy')==='1'; localStorage.setItem('app_privacy',on?'0':'1'); applyPrivacy(); }
