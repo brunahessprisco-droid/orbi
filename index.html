@@ -729,6 +729,7 @@ function getUserId(){ return localStorage.getItem('hub_user_id')||''; }
 function ds(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function sortT(arr,field){return [...arr].sort((a,b)=>(a[field]||'').localeCompare(b[field]||''));}
 function loadGoogleEvents(){ try{return JSON.parse(_lsGet('hub_gcal_events')||'[]');}catch{return [];} }
+function getArchivedHabits(){ try{return new Set(JSON.parse(_lsGet('habitos_archived_v1')||'[]'));}catch{return new Set();} }
 function getDayData(dateStr){
   const allTxs=loadTxs();
   const txs=allTxs.filter(t=>t.data===dateStr&&t.tipo!=='receita');
@@ -752,11 +753,13 @@ function getDayData(dateStr){
   const exames=(saude.exams||[]).filter(e=>(e.date||'').slice(0,10)===dateStr);
   const consultas=sortT((saude.consults||[]).filter(c=>(c.date||'').slice(0,10)===dateStr),'time');
   const todosHabitos=loadHabitos();
-  const habitosFeitos=todosHabitos.filter(h=>h.logs&&h.logs[dateStr]);
+  const archivedIds=getArchivedHabits();
+  const habitosFeitos=todosHabitos.filter(h=>!archivedIds.has(h.id)&&h.logs&&h.logs[dateStr]);
+  const habitosAtivos=todosHabitos.filter(h=>!archivedIds.has(h.id));
   const refeicoes=sortT(loadAlimentacao().filter(m=>m.date===dateStr),'time');
   const planSlots=getMealPlanForDate(dateStr);
   const gcalEvents=sortT(loadGoogleEvents().filter(e=>e.date===dateStr),'time');
-  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,planSlots,gcalEvents};
+  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosAtivos,refeicoes,planSlots,gcalEvents};
 }
 
 let calFilter='todos';
@@ -795,7 +798,7 @@ function rendCal(){
     }
     if((f==='todos'||f==='cas')&&day.tarefas.length){dots.push(`<div class="cal-dot cas">${_ci('assets/Casinha.png')} ${day.tarefas.length} tarefa${day.tarefas.length!==1?'s':''}</div>`);}
     if((f==='todos'||f==='sau')&&(day.pesos.length||day.consultas.length||day.exames.length)){const parts=[];if(day.pesos.length)parts.push(day.pesos[0].weight?`<span class="sensitive">${day.pesos[0].weight}kg</span>`:'Peso');if(day.consultas.length)parts.push(`${day.consultas.length} consulta${day.consultas.length!==1?'s':''}`);dots.push(`<div class="cal-dot sau">${_ci('assets/Saúde.png')} ${parts.join(' · ')}</div>`);}
-    if((f==='todos'||f==='hab')&&day.habitosFeitos.length){dots.push(`<div class="cal-dot hab">${_ci('assets/Hábitos.png')} ${day.habitosFeitos.length}/${day.todosHabitos.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
+    if((f==='todos'||f==='hab')&&day.habitosFeitos.length){dots.push(`<div class="cal-dot hab">${_ci('assets/Hábitos.png')} ${day.habitosFeitos.length}/${day.habitosAtivos.length} hábito${day.habitosFeitos.length!==1?'s':''}</div>`);}
     if((f==='todos'||f==='ali')&&day.refeicoes.length){const kcal=day.refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);dots.push(`<div class="cal-dot ali">${_ci('assets/Alimentação.png')} ${day.refeicoes.length} ref${kcal?` · ${fmtNum(kcal)} kcal`:''}</div>`);}
     if((f==='todos'||f==='gcal')&&day.gcalEvents.length){dots.push(`<div class="cal-dot gcal">📅 ${day.gcalEvents.length} evento${day.gcalEvents.length!==1?'s':''}</div>`);}
     const hasData=dots.length>0;
@@ -805,7 +808,7 @@ function rendCal(){
 }
 
 function openDay(dateStr){
-  const{receitas,despesas,parcelados,treinos,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,gcalEvents}=getDayData(dateStr);
+  const{receitas,despesas,parcelados,treinos,tarefas,pesos,exames,consultas,habitosFeitos,habitosAtivos,refeicoes,gcalEvents}=getDayData(dateStr);
   const hasAny=receitas.length||despesas.length||parcelados.length||treinos.length||tarefas.length||pesos.length||exames.length||consultas.length||habitosFeitos.length||refeicoes.length||gcalEvents.length;
   const[y,mo,d]=dateStr.split('-'); const dateObj=new Date(Number(y),Number(mo)-1,Number(d)); const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   document.getElementById('popup-title').textContent=DIAS[dateObj.getDay()]+', '+Number(d)+' de '+MESES[Number(mo)-1];
@@ -818,7 +821,7 @@ function openDay(dateStr){
   if(treinos.length) chips.push(`<div class="popup-sum-chip ex">${_ci(_MI.ex)}${treinos.length} treino${treinos.length!==1?'s':''}</div>`);
   if(tarefas.length) chips.push(`<div class="popup-sum-chip cas">${_ci(_MI.cas)}${tarefas.length} tarefa${tarefas.length!==1?'s':''}</div>`);
   if(pesos.length||consultas.length||exames.length){ const p=[];if(pesos.length&&pesos[0].weight)p.push(`<span class="sensitive">${pesos[0].weight}kg</span>`);if(consultas.length)p.push(`${consultas.length} consulta${consultas.length!==1?'s':''}`); chips.push(`<div class="popup-sum-chip sau">${_ci(_MI.sau)}${p.join(' · ')||'Saúde'}</div>`); }
-  if(habitosFeitos.length) chips.push(`<div class="popup-sum-chip hab">${_ci(_MI.hab)}${habitosFeitos.length}/${todosHabitos.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
+  if(habitosFeitos.length) chips.push(`<div class="popup-sum-chip hab">${_ci(_MI.hab)}${habitosFeitos.length}/${habitosAtivos.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
   if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); chips.push(`<div class="popup-sum-chip ali">${_ci(_MI.ali)}${refeicoes.length} refeição${refeicoes.length!==1?'ões':''} · ${fmtNum(kcal)} kcal</div>`); }
   if(gcalEvents.length) chips.push(`<div class="popup-sum-chip" style="background:var(--gcal-bg);color:var(--gcal-c);border:1px solid var(--gcal-border);">📅 ${gcalEvents.length} evento${gcalEvents.length!==1?'s':''}</div>`);
   let html=`<div class="popup-summary">${chips.join('')}</div>`;
@@ -838,12 +841,16 @@ function openDay(dateStr){
     POP_GROUPS.forEach(g=>{
       const gh=habitosFeitos.filter(g.filter);
       if(!gh.length) return;
-      habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}</div><div class="popup-item-val blue">✓ feito</div></div>`).join('')}`;
+      if(g.label==='Controle'){
+        habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>{const val=h.logs[dateStr]||'';const esc=String(val||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');return`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}${h.unit?` <span style="color:var(--hint);font-size:10px;">(${String(h.unit).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')})</span>`:''}</div><div class="popup-item-val blue">${esc||'—'}</div></div>`;}).join('')}`;
+      } else {
+        habPopHtml+=`<div class="popup-item-group-label">${g.label}</div>${gh.map(h=>`<div class="popup-item"><div class="popup-item-name">${hIcon(h.icon)} ${h.name||'Hábito'}</div><div class="popup-item-val blue">✓ feito</div></div>`).join('')}`;
+      }
     });
     habPopHtml+='</div>';
     html+=habPopHtml;
   }
-  if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); html+=`<div class="popup-section"><div class="popup-section-title ali">${_ci(_MI.ali,12)}Alimentação · ${fmtNum(kcal)} kcal</div>${refeicoes.map(r=>`<div class="popup-item"><div class="popup-item-name">${r.name||'Refeição'}</div><div class="popup-item-val amber">${r.calories?fmtNum(r.calories)+' kcal':''}</div></div>`).join('')}</div>`; }
+  if(refeicoes.length){ const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0); html+=`<div class="popup-section"><div class="popup-section-title ali">${_ci(_MI.ali,12)}Alimentação · ${fmtNum(kcal)} kcal</div>${refeicoes.map(r=>`<div class="popup-item"><div class="popup-item-name">${r.time?`<span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;">${r.time}</span>`:''}${r.name||'Refeição'}</div><div class="popup-item-val amber">${r.calories?fmtNum(r.calories)+' kcal':''}</div></div>`).join('')}</div>`; }
   if(gcalEvents.length){ html+=`<div class="popup-section"><div class="popup-section-title" style="color:var(--gcal-c);">📅 Google Calendar</div>${gcalEvents.map(e=>{const timeStr=e.time?`${e.time}${e.endTime?' – '+e.endTime:''}`:e.allDay?'Dia inteiro':'';const meetLink=e.meetUrl?`<a href="${e.meetUrl}" target="_blank" rel="noopener" style="color:var(--gcal-c);font-size:10px;text-decoration:none;margin-left:6px;">🔗 Meet</a>`:'';return`<div class="popup-item"><div class="popup-item-name">${e.title}${meetLink}</div><div class="popup-item-val muted">${timeStr}</div></div>`;}).join('')}</div>`; }
   document.getElementById('popup-body').innerHTML=html; document.getElementById('ov-day').classList.add('open');
 }
@@ -978,8 +985,9 @@ function hubCheckTreino(id){
     const cur=JSON.parse(snapshot);
     const t=cur.find(x=>x.id===id);
     if(!t) return;
-    // 3. Update otimista
+    // 3. Update otimista — strip [PLAN] prefix from obs so bootstrap doesn't re-mark as planned
     t.planejado=false; t.naoFeito=false;
+    if(t.obs && t.obs.startsWith('[PLAN]')) t.obs=t.obs.slice(6);
     _lsSet('saude_treinos_v1',JSON.stringify(cur));
     rendTodaySummary(); rendCal();
     // 4. API com await obrigatório — lança em qualquer falha
@@ -1036,7 +1044,7 @@ function rendTodaySummary(){
   const todayStr=ds(new Date());
   const cardStr=ds(cardDate);
   const isToday=cardStr===todayStr;
-  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,todosHabitos,refeicoes,planSlots,gcalEvents}=getDayData(cardStr);
+  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosAtivos,refeicoes,planSlots,gcalEvents}=getDayData(cardStr);
   const f=calFilter;
   const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   const el=document.getElementById('today-summary');
@@ -1046,8 +1054,8 @@ function rendTodaySummary(){
 
   // ── Hábitos: só ícones no topo ──
   let habHtml='';
-  if((f==='todos'||f==='hab')&&todosHabitos.length){
-    const habList=f==='hab'?todosHabitos:todosHabitos;
+  if((f==='todos'||f==='hab')&&habitosAtivos.length){
+    const habList=habitosAtivos;
     const HAB_GROUPS=[
       {key:'manual',     label:'Manual',     filter:h=>!h.autoType&&h.tipo!=='controle'},
       {key:'automatico', label:'Automático',  filter:h=>!!h.autoType},
