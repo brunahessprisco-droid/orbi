@@ -706,7 +706,7 @@
       await apiReqRetry('/health/weights',{method:'POST',body:JSON.stringify({
         client_id:w.id,
         date:w.date,weight:w.weight,height:w.height,fat:w.fat,note:w.note||null,
-        extraJson:{muscle:w.muscle,goal:w.goal,waist:w.waist,hip:w.hip,chest:w.chest},
+        extraJson:{muscle:w.muscle,goal:w.goal,waist:w.waist,hip:w.hip,chest:w.chest,time:w.time||null},
       })});
       clearDirty('weights',w.id);
     }
@@ -825,6 +825,7 @@
           height:r.height!=null?Number(r.height):null,
           fat:r.fat!=null?Number(r.fat):null,
           note:r.note||'',
+          time:r.extraJson?.time||'',
           muscle:r.extraJson?.muscle||null,goal:r.extraJson?.goal||null,
           waist:r.extraJson?.waist||null,hip:r.extraJson?.hip||null,chest:r.extraJson?.chest||null,
         })).filter(r=>!deleted.weights.has(r.id)) : null;

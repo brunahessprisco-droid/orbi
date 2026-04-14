@@ -192,7 +192,9 @@ apiRouter.get("/health/weights", requireAuth, async (req: AuthedRequest, res) =>
     where: { userId: req.userId },
     orderBy: { date: "desc" },
   });
-  return res.json({ data: items });
+  // Expose client_id (snake_case) so frontend r.client_id resolves correctly.
+  // Prisma field is clientId (camelCase) due to @map, so res.json() would emit clientId.
+  return res.json({ data: items.map(i => ({ ...i, client_id: i.clientId })) });
 });
 
 apiRouter.post("/health/weights", requireAuth, async (req: AuthedRequest, res) => {
