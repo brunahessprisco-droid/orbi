@@ -694,7 +694,8 @@
 
     function saudeHasPendingSync(){
       try{
-        const dirtySets=['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1'].map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
+        const dirtyKeys=['saude_dirty_v1','saude_remedios_dirty_v1','saude_consumos_dirty_v1','habitos_dirty_v1'];
+        const dirtySets=dirtyKeys.map(k=>{try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch{return new Set();}});
         if(dirtySets.some(s=>s.size>0))return true;
         const deletedRaw=(()=>{try{return JSON.parse(lsGet('saude_deleted_ids_v1')||'{}');}catch{return {};}})();
         return Object.values(deletedRaw).some(arr=>Array.isArray(arr)&&arr.length>0);
@@ -971,6 +972,11 @@
       let weightCols=loadWeightCols();
 
       const KEY_HAB_HABITS='habitos_app_v5';
+      const KEY_HAB_DIRTY='habitos_dirty_v1';
+      function _habGetSetSaude(k){try{return new Set(JSON.parse(lsGet(k)||'[]'));}catch(_){return new Set();}}
+      function _habSetSetSaude(k,s){lsSet(k,JSON.stringify([...s]));}
+      function markHabDirtySaude(id){const s=_habGetSetSaude(KEY_HAB_DIRTY);s.add(id);_habSetSetSaude(KEY_HAB_DIRTY,s);}
+      function clearHabDirtySaude(id){const s=_habGetSetSaude(KEY_HAB_DIRTY);s.delete(id);_habSetSetSaude(KEY_HAB_DIRTY,s);}
 
       applyTheme(localStorage.getItem('app_theme')||state.settings.theme||'dark');
       applyPrivacy();
@@ -1246,36 +1252,71 @@
         return toDateInput(d);
       }
 
-      function createHabitoForRemedio(r){
+      async function createHabitoForRemedio(r){
+        const habitos=JSON.parse(lsGet(KEY_HAB_HABITS)||'[]');
+        const hid=uid();
+        const rec=r.intakeRecurrence||'diario';
+        let freq='diario',weekdays=[],monthDay=null;
+        if(rec==='semanal'){ freq='semanal'; weekdays=[...(r.intakeWeekdays||[])]; }
+        else if(rec==='mensal'){ freq='mensal'; monthDay=Math.max(1,Math.min(31,Number(r.intakeMonthDay)||1)); }
+        const newHabit={
+          id:hid,
+          name:`Tomar ${r.name}`,
+          icon:'💊',
+          cat:'saude',
+          freq,
+          tipo:'check',
+          unit:'',
+          weekdays,
+          monthDay,
+          startDate:todayStr(),
+          note:r.dose||'',
+          autoType:'',
+          autoKeyword:'',
+          logs:{},
+          linkedRemedioId:r.id
+        };
+        habitos.push(newHabit);
+        lsSet(KEY_HAB_HABITS,JSON.stringify(habitos));
+        const idx=remedios.findIndex(x=>x.id===r.id);
+        if(idx>=0){
+          remedios[idx].habitId=hid;
+          saveRemedios();
+          markDirty(KEY_DIRTY_REM,remedios[idx].id);
+        }
+        markHabDirtySaude(hid);
+        if(!canUseApi()){
+          console.warn('[Saúde] Hábito do remédio guardado só em cache — após login sincronize em Hábitos.');
+          return;
+        }
         try{
-          const habitos=JSON.parse(lsGet(KEY_HAB_HABITS)||'[]');
-          const hid=uid();
-          const rec=r.intakeRecurrence||'diario';
-          let freq='diario',weekdays=[],monthDay=null;
-          if(rec==='semanal'){ freq='semanal'; weekdays=[...(r.intakeWeekdays||[])]; }
-          else if(rec==='mensal'){ freq='mensal'; monthDay=Math.max(1,Math.min(31,Number(r.intakeMonthDay)||1)); }
-          habitos.push({
-            id:hid,
-            name:`Tomar ${r.name}`,
-            icon:'💊',
-            cat:'saude',
-            freq,
-            tipo:'check',
-            unit:'',
-            weekdays,
-            monthDay,
-            startDate:todayStr(),
-            note:r.dose||'',
-            autoType:'',
-            autoKeyword:'',
-            logs:{},
-            linkedRemedioId:r.id
-          });
-          lsSet(KEY_HAB_HABITS,JSON.stringify(habitos));
-          // store link back on the remédio
-          const idx=remedios.findIndex(x=>x.id===r.id);
-          if(idx>=0){ remedios[idx].habitId=hid; saveRemedios(); markDirty(KEY_DIRTY_REM,remedios[idx].id); syncRemedio(remedios[idx]).catch(e=>console.warn('[Saúde] Sync remédio falhou, será retentado:',e)); }
-        }catch(e){ console.error('createHabitoForRemedio',e); }
+          const row=await apiReqRetry('/habitos',{method:'POST',body:JSON.stringify({
+            usuario_id:API_USER_ID,client_id:newHabit.id,nome:newHabit.name,icone:newHabit.icon||null,
+            categoria:newHabit.cat||null,frequencia:newHabit.freq||null,weekdays:newHabit.weekdays||[],
+            monthDay:newHabit.freq==='mensal'?(Number(newHabit.monthDay)||1):null,
+            obs:newHabit.note||null,autoType:newHabit.autoType||null,autoKeyword:newHabit.autoKeyword||null,
+            tipo:newHabit.tipo||'check',unit:newHabit.unit||null,startDate:newHabit.startDate||null,
+            logs:newHabit.logs||{},
+          })});
+          const list=JSON.parse(lsGet(KEY_HAB_HABITS)||'[]');
+          const hix=list.findIndex(h=>h.id===hid);
+          if(row&&row.id&&hix>=0){
+            list[hix]._dbId=row.id;
+            lsSet(KEY_HAB_HABITS,JSON.stringify(list));
+          }
+          clearHabDirtySaude(hid);
+        }catch(e){
+          if(e.network){
+            console.warn('[Saúde] Rede ao criar hábito do remédio — mantido em fila dirty (Hábitos):',e);
+            return;
+          }
+          const list=JSON.parse(lsGet(KEY_HAB_HABITS)||'[]');
+          const hix=list.findIndex(h=>h.id===hid);
+          if(hix>=0){ list.splice(hix,1); lsSet(KEY_HAB_HABITS,JSON.stringify(list)); }
+          if(idx>=0){ remedios[idx].habitId=undefined; saveRemedios(); }
+          clearHabDirtySaude(hid);
+          throw e;
+        }
       }
 
       function saudeHabPlannedOnDate(h,dateStr){
@@ -1438,12 +1479,18 @@
         saveRemedios();
         closeOverlay('ov-remedio');
         renderRemedios();
-        // create linked habit if checkbox was checked
         if(isNew && document.getElementById('rm-criar-habito').checked){
-          createHabitoForRemedio(item);
-          renderRemedios();
+          try{
+            await createHabitoForRemedio(item);
+            renderRemedios();
+          }catch(e){
+            if(!e.network) alert('Remédio foi guardado, mas o hábito não foi criado na API: '+(e.message||String(e)));
+            else console.warn('[Saúde] Rede ao criar hábito com remédio — o remédio será sincronizado; o hábito fica pendente em Hábitos:',e);
+            renderRemedios();
+          }
         }
-        try{ await syncRemedio(item); }catch(_){
+        const rowToSync=remedios.find(x=>x.id===item.id)||item;
+        try{ await syncRemedio(rowToSync); }catch(_){
           remedios=JSON.parse(snapshot);
           saveRemedios(); renderRemedios();
           alert('Erro ao salvar remédio. A alteração foi desfeita.');
@@ -1981,11 +2028,20 @@
           saveConsumos(); renderConsumos();
           if(c) deleteConsumoApi(c).catch(()=>{consumos.push(c);saveConsumos();renderConsumos();alert('Erro ao excluir. O item foi restaurado.');});
         },
-        vincularHabito:(id)=>{
+        vincularHabito:async(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r) return;
           const lab=REM_INTAKE_LABEL[r.intakeRecurrence]||REM_INTAKE_LABEL.diario;
           if(!confirm(`Criar hábito "Tomar ${r.name}" no módulo Hábitos (${lab})?`)) return;
-          createHabitoForRemedio(r); renderRemedios();
+          try{
+            await createHabitoForRemedio(r);
+            renderRemedios();
+            const row=remedios.find(x=>x.id===id);
+            if(row) await syncRemedio(row);
+          }catch(e){
+            if(!e.network) alert('Não foi possível criar o hábito: '+(e.message||String(e)));
+            else console.warn('[Saúde] Rede ao vincular hábito:',e);
+            renderRemedios();
+          }
         },
         desvincularHabito:async(id)=>{
           const r=remedios.find(x=>x.id===id); if(!r||!r.habitId) return;

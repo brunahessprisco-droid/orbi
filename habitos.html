@@ -1597,37 +1597,6 @@
       return fromLogs;
     }
 
-    function streak(h){
-      const allDoneDates=Object.keys(h.logs||{}).filter(k=>h.logs[k]).sort();
-      if(!allDoneDates.length) return {current:0,best:0};
-
-      let current=0;
-      let cursor=todayStr();
-
-      if(!isPlannedForDate(h,cursor)){
-        cursor=previousPlannedDate(h,cursor);
-      }
-
-      while(cursor && h.logs && h.logs[cursor]){
-        current++;
-        cursor=previousPlannedDate(h,cursor);
-      }
-
-      const plannedDates=buildPlannedDatesForHabit(h, minDateFromLogs(h), todayStr());
-      let best=0, seq=0;
-
-      for(const date of plannedDates){
-        if(h.logs && h.logs[date]){
-          seq++;
-          if(seq>best) best=seq;
-        }else{
-          seq=0;
-        }
-      }
-
-      return {current,best};
-    }
-
     function habitRate(h, fromDate=null, toDate=null){
       const start=fromDate || minDateFromLogs(h);
       const end=toDate || todayStr();
@@ -1647,7 +1616,6 @@
       let totalSlots=0;
       let done=0;
       let today=0;
-      let best=0;
       let auto=0;
 
       habits.forEach(h=>{
@@ -1660,12 +1628,10 @@
           }
         }
         if(h.logs && h.logs[t]) today++;
-        const s=streak(h);
-        if(s.best>best) best=s.best;
       });
 
       const rate=totalSlots?Math.round(done*100/totalSlots):0;
-      return {active:habits.length,today,best,rate,auto};
+      return {active:habits.length,today,rate,auto};
     }
 
     function renderSummary(){
@@ -1791,8 +1757,11 @@
       ];
 
       function habitRow(h){
-        const s=streak(h);
+        const pct=h.tipo==='controle' ? null : habitRate(h);
         const autoLabel = h.autoType ? ' · Auto' : '';
+        const sub=h.tipo==='controle'
+          ? `Controle${autoLabel}`
+          : `Consistência · ${pct}% nos dias previstos${autoLabel}`;
         let row=`
           <div class="hname" draggable="true" data-hid="${h.id}"
             ondragstart="habitDragStart(event,'${h.id}')"
@@ -1804,7 +1773,7 @@
             <div class="hicon">${hIcon(h.icon)}</div>
             <div class="hmeta">
               <div class="htitle">${escapeHtml(h.name)}</div>
-              <div class="hsub">🔥 ${s.current} · 🏆 ${s.best}${autoLabel}</div>
+              <div class="hsub">${sub}</div>
             </div>
           </div>
         `;
@@ -1862,24 +1831,32 @@
     }
 
     function renderRank(){
-      const ranked=[...habits]
-        .map(h=>({h,s:streak(h)}))
-        .sort((a,b)=>b.s.best-a.s.best || b.s.current-a.s.current || a.h.name.localeCompare(b.h.name));
+      const active=habits.filter(h=>!isArchived(h.id));
+      const rankable=active.filter(h=>h.tipo!=='controle');
+      const ranked=rankable
+        .map(h=>({h, rate:habitRate(h)}))
+        .sort((a,b)=>b.rate-a.rate || a.h.name.localeCompare(b.h.name));
 
       const rankEl=document.getElementById('rank-list');
-      if(rankEl) rankEl.innerHTML = ranked.length ? ranked.slice(0,8).map((x,i)=>`
+      const rankBody=rankable.length
+        ? ranked.slice(0,8).map((x,i)=>`
         <div class="rank-row">
           <div class="rank-num">${i+1}</div>
           <div class="rank-name">${hIcon(x.h.icon)} ${escapeHtml(x.h.name)}</div>
-          <div class="rank-val">🔥 ${x.s.current} · 🏆 ${x.s.best}</div>
+          <div class="rank-val">${x.rate}% nos dias previstos</div>
         </div>
-      `).join('') : `<div class="empty">Sem hábitos ainda.</div>`;
+      `).join('')
+        : (active.length
+          ? `<div class="empty">Ranking por taxa vale para hábitos de check; os de <strong>controle</strong> aparecem na lista e nas estatísticas.</div>`
+          : `<div class="empty">Sem hábitos ainda.</div>`);
+      if(rankEl) rankEl.innerHTML = rankBody;
 
+      const act=habits.filter(h=>!isArchived(h.id)&&h.tipo!=='controle');
       const quick = [
-        `${habits.filter(h=>streak(h).current>=7).length} hábitos com streak ≥ 7`,
-        `${habits.filter(h=>streak(h).best>=30).length} hábitos que já bateram 30`,
-        `${habits.filter(h=>(Object.keys(h.logs||{}).length===0)).length} hábitos ainda sem marcação`,
-        `${habits.filter(h=>h.autoType).length} hábitos com automação`,
+        `${act.filter(h=>habitRate(h)>=70).length} hábitos com taxa ≥ 70% (nos dias previstos)`,
+        `${act.filter(h=>{const r=habitRate(h);return r>0&&r<40;}).length} hábitos com taxa abaixo de 40% (oscila — sem meta de perfeição)`,
+        `${habits.filter(h=>!isArchived(h.id)&&(Object.keys(h.logs||{}).length===0)).length} hábitos ainda sem marcação`,
+        `${habits.filter(h=>!isArchived(h.id)&&h.autoType).length} hábitos com automação`,
       ];
 
       const quickEl=document.getElementById('quick-list');
@@ -1906,10 +1883,13 @@
       });
 
       const activeHtml = filtered.length ? filtered.map(h=>{
-        const s=streak(h);
         const weekdayText = h.freq==='semanal'
           ? 'Dias: ' + (h.weekdays||[]).map(dayLabelShort).join(', ')
           : (h.freq==='mensal' ? ('Dia ' + (h.monthDay||1) + ' de cada mês') : (h.freq==='diario'||!h.freq ? 'Diário' : 'Livre'));
+        const rateChip=h.tipo==='controle'
+          ? `<span class="chip">${Object.keys(h.logs||{}).length} registros</span>`
+          : `<span class="chip">${habitRate(h)}% nos dias previstos</span>
+             <span class="chip">${Object.keys(h.logs||{}).filter(k=>h.logs[k]).length} conclusões</span>`;
         return `
           <div class="item-card">
             <div class="item-top">
@@ -1928,10 +1908,7 @@
               ${h.autoType ? `<span class="chip auto">${autoLabel(h)}</span>` : ''}
             </div>
             <div class="item-stats">
-              <span class="chip">🔥 Atual ${s.current}</span>
-              <span class="chip">🏆 Melhor ${s.best}</span>
-              <span class="chip">${Object.keys(h.logs||{}).length} marcações</span>
-              <span class="chip">${habitRate(h)}% taxa</span>
+              ${rateChip}
             </div>
           </div>
         `;
@@ -2290,21 +2267,22 @@
 
       const rows=activeHabits.map(h=>{
         const isControle=h.tipo==='controle';
-        const logs=h.logs||{};
-        const logEntries=Object.entries(logs).filter(([,v])=>v).sort(([a],[b])=>b.localeCompare(a));
-        const total=logEntries.length;
-        const lastDate=logEntries[0]?.[0]||'';
-        const lastVal=logEntries[0]?.[1]||'';
         if(isControle){
+          const logs=h.logs||{};
+          const logEntries=Object.entries(logs).filter(([,v])=>v).sort(([a],[b])=>b.localeCompare(a));
+          const total=logEntries.length;
+          const lastDate=logEntries[0]?.[0]||'';
+          const lastVal=logEntries[0]?.[1]||'';
           return {h, isControle, total, lastDate, lastVal};
         }
-        const s=streak(h);
         const rate=habitRate(h);
         const barColor=rate>=70?'var(--green)':rate>=40?'var(--amber)':'var(--red)';
-        return {h, isControle, current:s.current, best:s.best, total, rate, barColor};
+        const plannedSlots=buildPlannedDatesForHabit(h,minDateFromLogs(h),todayStr());
+        const doneOnPlanned=plannedSlots.filter(d=>h.logs&&h.logs[d]).length;
+        return {h, isControle, rate, barColor, doneOnPlanned, planned:plannedSlots.length};
       }).sort((a,b)=>{
         if(a.isControle!==b.isControle) return a.isControle?1:-1;
-        return (b.rate||0)-(a.rate||0) || (b.best||0)-(a.best||0);
+        return (b.rate||0)-(a.rate||0) || a.h.name.localeCompare(b.h.name);
       });
 
       box.innerHTML=`<div class="stats-cards-grid">${rows.map(r=>{
@@ -2344,16 +2322,8 @@
           </div>
           <div class="stat-card-nums">
             <div class="stat-card-num">
-              <div class="stat-card-num-val" style="color:var(--green)">${r.current}</div>
-              <div class="stat-card-num-lbl">streak atual</div>
-            </div>
-            <div class="stat-card-num">
-              <div class="stat-card-num-val" style="color:var(--amber)">${r.best}</div>
-              <div class="stat-card-num-lbl">melhor streak</div>
-            </div>
-            <div class="stat-card-num">
-              <div class="stat-card-num-val">${r.total}</div>
-              <div class="stat-card-num-lbl">conclusões</div>
+              <div class="stat-card-num-val">${r.doneOnPlanned} / ${r.planned}</div>
+              <div class="stat-card-num-lbl">dias concluídos nos dias em que o hábito estava previsto</div>
             </div>
           </div>
         </div>`;
