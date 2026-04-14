@@ -1503,7 +1503,8 @@ async function addPlanejamento(){
   };
   treinos.push(obj);
   saveLocal_();
-  await syncTreino(obj).catch(e=>console.error(e));
+  markDirty(obj.id);
+  await syncTreino(obj).then(()=>clearDirty(obj.id)).catch(e=>console.warn('[Exercícios] Sync treino planejado falhou, será retentado:',e));
   document.getElementById('np-titulo').value='';
   document.getElementById('np-data').value='';
   document.getElementById('np-hora').value='';

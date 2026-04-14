@@ -481,7 +481,7 @@
         if(!canUseApi())return;
         await apiReq('/alimentacao/config',{method:'POST',body:JSON.stringify({
           usuario_id:API_USER_ID,goals,plan,
-        })}).catch(()=>null);
+        })});
       }
 
       const SK_LAST_USER='app_last_user_id';
@@ -512,8 +512,13 @@
           const naoSinc=localMeals.filter(m=>!apiIds.has(m.id)&&!m._dbId);
           meals=[...apiMeals,...naoSinc];
           for(const m of naoSinc)await syncRefeicao(m).catch(()=>{ markMealDirty(m.id); });
-          if(rCfg&&rCfg.goals)goals=rCfg.goals;
-          if(rCfg&&rCfg.plan)plan=rCfg.plan;
+          const _cfgDirty=_algGetSet(KEY_CONFIG_DIRTY).size>0;
+          if(rCfg&&!_cfgDirty){
+            if(rCfg.goals)goals=rCfg.goals;
+            if(rCfg.plan)plan=rCfg.plan;
+          } else if(_cfgDirty){
+            syncConfig().catch(e=>console.warn('[Alimentação] Sync config bootstrap falhou:',e));
+          }
           if(Array.isArray(rWater)){
             if(rWater.length){
               waterLogs=rWater.map(r=>({id:r.clientId||r.id,date:r.date,ml:r.ml,time:''}));

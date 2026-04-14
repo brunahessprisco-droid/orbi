@@ -2011,6 +2011,12 @@ async function bootstrapApi(){
       proximaData:r.proximaData||null,ativo:r.ativo,
     }));
 
+    // Retry pending DELETEs
+    for(const dbId of getDeleted(SK_DEL_T))apiReq(`/casinha/tarefas/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(SK_DEL_T,dbId)).catch(e=>console.warn('[Casinha] Retry delete tarefa:',dbId,e));
+    for(const dbId of getDeleted(SK_DEL_R))apiReq(`/casinha/rotinas/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(SK_DEL_R,dbId)).catch(e=>console.warn('[Casinha] Retry delete rotina:',dbId,e));
+    for(const dbId of getDeleted(SK_DEL_A))apiReq(`/casinha/ambientes/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(SK_DEL_A,dbId)).catch(e=>console.warn('[Casinha] Retry delete ambiente:',dbId,e));
+    for(const dbId of getDeleted(SK_DEL_P))apiReq(`/casinha/pessoas/${dbId}`,{method:'DELETE'}).then(()=>clearDeleted(SK_DEL_P,dbId)).catch(e=>console.warn('[Casinha] Retry delete pessoa:',dbId,e));
+
     // ── Migração: sobe dados do localStorage que não estão na API ──────────────
     const localAmb=JSON.parse(lsGet(SK_A)||'[]');
     const localPess=JSON.parse(lsGet(SK_P)||'[]');
