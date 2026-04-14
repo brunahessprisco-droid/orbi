@@ -1243,6 +1243,12 @@ function saveFXVDirty(id){markDirty(SK_DIRTY_FXV,id);saveFXV();}
 function savePRDirty(id){markDirty(SK_DIRTY_PR,id);scheduleProjExtrasSync();}
 
 function canUseApi(){return !!(authToken&&API_USER_ID);}
+function _showLastSync(){
+  const hm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  let el=document.getElementById('_last-sync');
+  if(!el){el=document.createElement('div');el.id='_last-sync';el.style.cssText='text-align:center;font-size:11px;color:var(--text3,#9ca3af);padding:6px 0 2px;';(document.getElementById('main')||document.querySelector('.app')||document.body).append(el);}
+  el.textContent='Sincronizado às '+hm;
+}
 let apiBase=localStorage.getItem(SK_API_BASE)||API_BASE;
 function getApiBase(){return (apiBase||API_BASE).replace(/\/+$/,'');}
 function setApiBase(v){
@@ -1862,6 +1868,7 @@ async function bootstrapApi(){
     savingGoal=Number(apiSaving?.saving_goal||0);
     poupanca={meta:Number(apiPoupanca?.meta||0),previsto:apiPoupanca?.previsto||{},realizado:apiPoupanca?.realizado||{}};
     receitasProj=(apiProjExtras||[]).map(projExtraFromApi);
+    _showLastSync();
   }catch(e){
     console.error('API indisponivel, verifique backend/banco:',e.message);
   }

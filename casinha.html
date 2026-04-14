@@ -1893,6 +1893,12 @@ function _showSyncWarn(){
   d.textContent='⚠ Alguns dados não carregaram. Exibindo cache local.';
   (document.getElementById('main')||document.body).prepend(d);
 }
+function _showLastSync(){
+  const hm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  let el=document.getElementById('_last-sync');
+  if(!el){el=document.createElement('div');el.id='_last-sync';el.style.cssText='text-align:center;font-size:11px;color:var(--text3,#9ca3af);padding:6px 0 2px;';(document.getElementById('main')||document.querySelector('.app')||document.body).append(el);}
+  el.textContent='Sincronizado às '+hm;
+}
 
 async function apiReq(path,opts={}){
   const headers={'Content-Type':'application/json',...(opts.headers||{})};
@@ -2055,6 +2061,7 @@ async function bootstrapApi(){
     autoStatus();
     checkRotinas();
     saveA();saveP();saveT();saveR();
+    _showLastSync();
   }catch(e){
     console.error('Erro bootstrap:',e);
   }

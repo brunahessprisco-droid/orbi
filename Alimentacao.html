@@ -380,6 +380,12 @@
     let API_USER_ID=null;
     function getApiBase(){return(apiBase||'https://orbi-api-b9ev.onrender.com/api').replace(/\/+$/,'');}
     function canUseApi(){return!!(authToken&&API_USER_ID);}
+    function _showLastSync(){
+      const hm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      let el=document.getElementById('_last-sync');
+      if(!el){el=document.createElement('div');el.id='_last-sync';el.style.cssText='text-align:center;font-size:11px;color:var(--text3,#9ca3af);padding:6px 0 2px;';(document.getElementById('main')||document.querySelector('.app')||document.body).append(el);}
+      el.textContent='Sincronizado às '+hm;
+    }
     async function apiReq(path,opts={}){
       const headers={'Content-Type':'application/json',...(opts.headers||{})};
       if(authToken)headers.Authorization='Bearer '+authToken;
@@ -522,6 +528,7 @@
           }
           saveMeals();saveGoalsStore();savePlan();
           renderAll();
+          _showLastSync();
         }catch(e){console.error('Bootstrap alimentação:',e);}
       }
       function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
