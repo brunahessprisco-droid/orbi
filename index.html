@@ -1075,7 +1075,9 @@ function rendTodaySummary(){
   if(f==='todos'||f==='sau'){
     consultas.forEach(c=>item(c.time,'var(--sau-c)',c.doctor||c.specialty||'Consulta',c.specialty&&c.doctor?c.specialty:'','consulta','muted',{module:'Saude.html'}));
     exames.forEach(e=>item(null,'var(--sau-c)',e.name||'Exame','','exame','muted',{module:'Saude.html'}));
-    pesos.forEach(w=>item(w.time||null,'var(--sau-c)','Peso registrado','',w.weight?`<span class="sensitive">${w.weight} kg</span>`:'','',{module:'Saude.html'}));
+    // Exibe apenas um registro de peso por dia (o mais recente) — view de resumo
+    const _pesoCard=pesos.length>1?[...pesos].sort((a,b)=>(b.time||'').localeCompare(a.time||''))[0]:pesos[0];
+    if(_pesoCard)item(_pesoCard.time||null,'var(--sau-c)','Peso registrado','',_pesoCard.weight?`<span class="sensitive">${_pesoCard.weight} kg</span>`:'','',{module:'Saude.html'});
   }
   if(f==='todos'||f==='ali'){
     refeicoes.forEach(r=>item(r.time,'var(--ali-c)',r.name||'Refeição','',r.calories?fmtNum(r.calories)+' kcal':'','sage',{module:'Alimentacao.html'}));
