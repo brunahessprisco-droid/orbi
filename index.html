@@ -782,6 +782,7 @@ function rendCal(){
     days.push({date:dt,dateStr,...data});
   }
   const body=document.getElementById('cal-body');
+  try{
   body.innerHTML=days.map(day=>{
     if(!day.date)return`<div></div>`;
     const isToday=day.dateStr===todayStr;
@@ -805,6 +806,7 @@ function rendCal(){
     const MAX=4; const visible=dots.slice(0,MAX); const extra=dots.length>MAX?`<div class="cal-more">+${dots.length-MAX} mais</div>`:'';
     return`<div class="cal-day${isToday?' today':''}${hasData?' has-data':''}" onclick="openDay('${day.dateStr}')"><div class="cal-day-num">${day.date.getDate()}</div><div class="cal-dots">${visible.join('')}${extra}</div></div>`;
   }).join('');
+  }catch(e){ console.error('[Hub] rendCal erro:',e); }
 }
 
 function openDay(dateStr){
@@ -1062,7 +1064,7 @@ function rendTodaySummary(){
       {key:'controle',   label:'Controle',   filter:h=>h.tipo==='controle'},
     ];
     habHtml='<div class="td-habits">'+HAB_GROUPS.map(g=>{
-      const gh=todosHabitos.filter(g.filter);
+      const gh=habList.filter(g.filter);
       if(!gh.length) return '';
       return `<div class="td-hab-group"><div class="td-hab-group-label">${g.label}</div><div class="td-hab-icons">${gh.map(h=>{const done=!!(h.logs&&h.logs[cardStr]);return`<div class="td-habit-icon ${done?'done':'undone'}" title="${h.name||'Hábito'}" onclick="hubToggleHabito('${h.id}','${cardStr}')">${hIcon(h.icon)}</div>`;}).join('')}</div></div>`;
     }).join('')+'</div>';
@@ -1139,8 +1141,8 @@ function rendTodaySummary(){
 
   const body=(habHtml||hasItems)
     ? habHtml+itemsHtml
-    : `<div style="text-align:center;padding:20px 0;color:var(--hint);font-size:13px;">Nenhum dado registrado${f!=='todos'?' neste módulo':''}.</div>`;
-  el.innerHTML=`<div class="today-card">${nav}${body}</div>`;
+    : `<div style="text-align:center;padding:20px 0;color:var(--hint);font-size:13px;">${f!=='todos'?'Nenhum dado registrado neste módulo.':'Nenhum dado registrado.'}</div>`;
+  try{ el.innerHTML=`<div class="today-card">${nav}${body}</div>`; }catch(e){ console.error('[Hub] rendTodaySummary erro:',e); }
 }
 
 // ── PROFILE ─────────────────────────────────────────────────────────────────
@@ -1285,7 +1287,7 @@ document.querySelector('#profile-overlay .profile-modal').addEventListener('inpu
   }catch(e){console.warn('GCal exchange error:',e);}
 })();
 
-if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { const _sn=localStorage.getItem('hub_user_nome'); if(_sn){profileData.nome=_sn;updateProfileUI();} fetchFinancas(); hubBootstrap().then(()=>loadProfileData()); }
+if(!localStorage.getItem(AUTH_KEY)){ document.getElementById('auth-overlay').classList.add('open'); } else { const _sn=localStorage.getItem('hub_user_nome'); if(_sn){profileData.nome=_sn;updateProfileUI();} fetchFinancas(); hubBootstrap().finally(()=>loadProfileData()); }
 </script>
 </body>
 </html>
