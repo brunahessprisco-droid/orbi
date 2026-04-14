@@ -418,6 +418,7 @@
       const KEY_DIRTY='alimentacao_dirty_v1';
       const KEY_WATER='alimentacao_water_v1';
       const KEY_WATER_DIRTY='alimentacao_water_dirty_v1';
+      const KEY_WATER_DELETED='alimentacao_water_deleted_v1';
       const KEY_CONFIG_DIRTY='alimentacao_config_dirty_v1';
       // storage helpers – isolamento por usuário
       const _uid=()=>localStorage.getItem('hub_user_id')||'anon';
@@ -432,6 +433,8 @@
       const getMealDirty=()=>_algGetSet(KEY_DIRTY);
       const markWaterDirty=id=>{const s=_algGetSet(KEY_WATER_DIRTY);s.add(id);_algSetSet(KEY_WATER_DIRTY,s);};
       const clearWaterDirty=id=>{const s=_algGetSet(KEY_WATER_DIRTY);s.delete(id);_algSetSet(KEY_WATER_DIRTY,s);};
+      const markWaterDeleted=id=>{const s=_algGetSet(KEY_WATER_DELETED);s.add(id);_algSetSet(KEY_WATER_DELETED,s);};
+      const clearWaterDeleted=id=>{const s=_algGetSet(KEY_WATER_DELETED);s.delete(id);_algSetSet(KEY_WATER_DELETED,s);};
       const markConfigDirty=()=>_algSetSet(KEY_CONFIG_DIRTY,new Set(['config']));
       const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
       const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -519,9 +522,25 @@
           } else if(_cfgDirty){
             syncConfig().catch(e=>console.warn('[Alimentação] Sync config bootstrap falhou:',e));
           }
+          // Retry pending water DELETEs before merging
+          for(const wid of _algGetSet(KEY_WATER_DELETED)){
+            apiReq(`/alimentacao/water/${wid}`,{method:'DELETE'}).then(()=>clearWaterDeleted(wid)).catch(e=>console.warn('[Alimentação] Retry DELETE água:',wid,e));
+          }
           if(Array.isArray(rWater)){
             if(rWater.length){
-              waterLogs=rWater.map(r=>({id:r.clientId||r.id,date:r.date,ml:r.ml,time:''}));
+              const deletedWaterIds=_algGetSet(KEY_WATER_DELETED);
+              const dirtyWaterIds=_algGetSet(KEY_WATER_DIRTY);
+              const localWaterById=Object.fromEntries((JSON.parse(lsGet(KEY_WATER)||'[]')).map(w=>[w.id,w]));
+              // Server items minus pending deletes
+              const serverLogs=rWater.map(r=>({id:r.clientId||r.id,date:r.date,ml:r.ml,time:''})).filter(w=>!deletedWaterIds.has(w.id));
+              // Local items pending sync (not yet on server)
+              const serverIds=new Set(serverLogs.map(w=>w.id));
+              const pendingLocal=Object.values(localWaterById).filter(w=>dirtyWaterIds.has(w.id)&&!serverIds.has(w.id));
+              waterLogs=[...serverLogs,...pendingLocal];
+              // Retry dirty water that isn't on server yet
+              for(const w of pendingLocal){
+                syncWaterLog(w);
+              }
             } else {
               // Migrar água local para API
               const localWater=JSON.parse(lsGet(KEY_WATER)||'[]');
@@ -818,7 +837,9 @@
       function closeWaterModal(){ $('ov-water').classList.remove('open'); _waterDirty=false; }
       async function syncWaterLog(log){
         if(!canUseApi())return;
-        await apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:log.date,ml:log.ml,client_id:log.id})}).catch(e=>console.warn('[Alimentação] Sync água falhou, será retentado:',e));
+        await apiReqRetry('/alimentacao/water',{method:'POST',body:JSON.stringify({usuario_id:API_USER_ID,date:log.date,ml:log.ml,client_id:log.id})})
+          .then(()=>clearWaterDirty(log.id))
+          .catch(e=>console.warn('[Alimentação] Sync água falhou, será retentado:',e));
       }
       function saveWater(){
         const ml=Number($('water-ml').value||0);
@@ -895,13 +916,13 @@
         }catch(e){msg.textContent=e.message||'Falha ao autenticar.';}
       }
       async function logoutUser(){
-        const hasPending = getMealDirty().size > 0 || _algGetSet(KEY_WATER_DIRTY).size > 0 || _algGetSet(KEY_CONFIG_DIRTY).size > 0 || deletedMealIds.length > 0;
+        const hasPending = getMealDirty().size > 0 || _algGetSet(KEY_WATER_DIRTY).size > 0 || _algGetSet(KEY_WATER_DELETED).size > 0 || _algGetSet(KEY_CONFIG_DIRTY).size > 0 || deletedMealIds.length > 0;
         if(hasPending){
           const proceed = confirm('Alguns dados de alimentação podem não ter sido sincronizados. Deseja sair mesmo assim?');
           if(!proceed) return;
         }
         try{if(authToken)await apiReq('/auth/logout',{method:'POST'});}catch(_){}
-        lsRem(KEY_DIRTY);lsRem(KEY_WATER_DIRTY);lsRem(KEY_CONFIG_DIRTY);lsRem(KEY_DELETED);
+        lsRem(KEY_DIRTY);lsRem(KEY_WATER_DIRTY);lsRem(KEY_WATER_DELETED);lsRem(KEY_CONFIG_DIRTY);lsRem(KEY_DELETED);
         authToken='';API_USER_ID=null;localStorage.removeItem(SK_AUTH);
         document.getElementById('auth-overlay').classList.add('open');
       }
@@ -952,7 +973,10 @@
         const {w,i}=sorted[0];
         waterLogs.splice(i,1);
         lsSet(KEY_WATER,JSON.stringify(waterLogs));
-        if(canUseApi()&&w.id)apiReq(`/alimentacao/water/${w.id}`,{method:'DELETE'}).catch(()=>null);
+        if(w.id){
+          markWaterDeleted(w.id);
+          if(canUseApi())apiReq(`/alimentacao/water/${w.id}`,{method:'DELETE'}).then(()=>clearWaterDeleted(w.id)).catch(e=>console.warn('[Alimentação] DELETE água falhou, será retentado:',e));
+        }
         renderDashboard();
       });
       $('sum-water-card').addEventListener('click',openWaterModal);
