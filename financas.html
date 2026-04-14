@@ -1544,8 +1544,8 @@ async function syncCategoriasToApi(){
   existentes.forEach(c=>{apiByCid[String(c.client_id)]=c;});
   for(const dbId of delSet){
     const apiC=apiByCid[dbId];
-    if(apiC){try{await apiReq(`/categorias/${apiC.id}`,{method:'DELETE'});}catch(_){}}
-    clearDeleted(SK_DEL_CAT,dbId);
+    if(apiC){try{await apiReq(`/categorias/${apiC.id}`,{method:'DELETE'});clearDeleted(SK_DEL_CAT,dbId);}catch(_){console.warn('[Finanças] DELETE categoria falhou, será retentado:',dbId);}}
+    else{clearDeleted(SK_DEL_CAT,dbId);}
   }
   // Importar categorias que existem na API mas não local (vieram de outro device)
   for(const[cid,apiC]of Object.entries(apiByCid)){
@@ -1570,8 +1570,8 @@ async function syncTxsToApi(){
   existentes.forEach(t=>{apiByCid[String(t.client_id)]=t;});
   for(const dbId of delSet){
     const apiT=apiByCid[dbId];
-    if(apiT){try{await apiReq(`/transacoes/${apiT.id}`,{method:'DELETE'});}catch(_){}}
-    clearDeleted(SK_DEL_TX,dbId);
+    if(apiT){try{await apiReq(`/transacoes/${apiT.id}`,{method:'DELETE'});clearDeleted(SK_DEL_TX,dbId);}catch(_){console.warn('[Finanças] DELETE transação falhou, será retentado:',dbId);}}
+    else{clearDeleted(SK_DEL_TX,dbId);}
   }
   // Importar transações que existem na API mas não local (vieram de outro device)
   for(const[cid,apiT]of Object.entries(apiByCid)){
@@ -1595,8 +1595,8 @@ async function syncContasToApi(){
   existentes.forEach(c=>{apiByCid[String(c.client_id)]=c;});
   for(const dbId of delSet){
     const apiC=apiByCid[dbId];
-    if(apiC){try{await apiReq(`/contas/${apiC.id}`,{method:'DELETE'});}catch(_){}}
-    clearDeleted(SK_DEL_C,dbId);
+    if(apiC){try{await apiReq(`/contas/${apiC.id}`,{method:'DELETE'});clearDeleted(SK_DEL_C,dbId);}catch(_){console.warn('[Finanças] DELETE conta falhou, será retentado:',dbId);}}
+    else{clearDeleted(SK_DEL_C,dbId);}
   }
   // Importar contas que existem na API mas não local
   for(const[cid,apiC]of Object.entries(apiByCid)){
@@ -1620,8 +1620,8 @@ async function syncFixasToApi(){
   existentes.forEach(f=>{apiByCid[String(f.client_id)]=f;});
   for(const dbId of delSet){
     const apiF=apiByCid[dbId];
-    if(apiF){try{await apiReq(`/contas-fixas/${apiF.id}`,{method:'DELETE'});}catch(_){}}
-    clearDeleted(SK_DEL_FX,dbId);
+    if(apiF){try{await apiReq(`/contas-fixas/${apiF.id}`,{method:'DELETE'});clearDeleted(SK_DEL_FX,dbId);}catch(_){console.warn('[Finanças] DELETE conta fixa falhou, será retentado:',dbId);}}
+    else{clearDeleted(SK_DEL_FX,dbId);}
   }
   // Importar contas fixas que existem na API mas não local
   for(const[cid,apiF]of Object.entries(apiByCid)){
@@ -1689,8 +1689,8 @@ async function syncProjExtrasToApi(){
   existentes.forEach(r=>{apiByCid[String(r.client_id)]=r;});
   for(const dbId of delSet){
     const apiR=apiByCid[dbId];
-    if(apiR){try{await apiReq(`/projecao-extras/${apiR.id}`,{method:'DELETE'});}catch(_){}}
-    clearDeleted(SK_DEL_PR,dbId);
+    if(apiR){try{await apiReq(`/projecao-extras/${apiR.id}`,{method:'DELETE'});clearDeleted(SK_DEL_PR,dbId);}catch(_){console.warn('[Finanças] DELETE projeção falhou, será retentado:',dbId);}}
+    else{clearDeleted(SK_DEL_PR,dbId);}
   }
   // Importar projeções extras que existem na API mas não local
   for(const[cid,apiR]of Object.entries(apiByCid)){

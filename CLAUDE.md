@@ -134,15 +134,18 @@ This is a factual audit of the codebase. Verified against source files.
 
 - **Bootstrap retries pending DELETEs:**
   - ✅ `casinha.html` (all 4 entity types), `Alimentacao.html` (water), `exercicios.html`
-  - ❌ `habitos.html`, `financas.html`, `Saude.html` — deleted queue exists but is not retried in bootstrap
+  - ❌ `habitos.html`, `Saude.html` — deleted queue exists but is not retried in bootstrap
+  - ✅ `financas.html` — all 5 sync functions retry pending DELETEs. `clearDeleted` only called on confirmed success or when item is already absent from server.
 
 - **`beforeunload` checks all queues (including deleted):**
-  - ✅ Most modules
-  - ❌ `Alimentacao.html` — `beforeunload` does not check `KEY_WATER_DELETED` (though `logoutUser` does)
+  - ✅ All modules — including `Alimentacao.html` which covers `KEY_WATER_DELETED`
 
-### ❌ Known bugs — not yet fixed
+### ⚠️ Known issues — lower severity, not yet fixed
 
-- **`financas.html` — transaction deletes do not reach the server.** `txFromApi()` does not set `_dbId` on the returned object. The guard `if(tx&&tx._dbId)` in `delTx` evaluates false, so `markDeleted` is never called. The deleted transaction is removed from local state but stays in the database. On the next `syncTxsToApi`, the import loop sees the transaction in the API response but not in local state and re-adds it. **Deleted transactions reappear on next sync.** Same issue applies to categories and accounts (`contaFromApi`, the cats map — none set `_dbId`).
+- **`Alimentacao.html` bootstrap uses `Promise.all`** — a single endpoint failure aborts the entire bootstrap. No partial-failure recovery or `_showSyncWarn()`.
+- **`habitos.html` bootstrap uses sequential `await`** — same single-point-of-failure effect.
+- **Hub cache not filtered for casinha/habitos/saúde pending deletes** — items deleted in those modules may reappear in the hub until the next bootstrap. `alimentacao_meals_v3_light` is correctly filtered; the others are not.
+- **`_showSyncWarn()` missing in `financas.html`, `habitos.html`, `Alimentacao.html`** — no banner shown to the user on partial bootstrap failure.
 
 ---
 
