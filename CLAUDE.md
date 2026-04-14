@@ -101,22 +101,22 @@ Do not assume a rule in "Rules for New Code" is already implemented everywhere. 
 
 ## Current State — What Is and Isn't Implemented
 
-This is a factual audit of the codebase. Verified against source files. Last audited: 2026-04-14.
+This is a factual audit of the codebase. Verified against source files. Last audited: 2026-04-14 (hub reliability pass: `fetchFinancas` delete filter, gated `hub_lastsync`, hub actions `e.network`).
 
 ### ✅ Implemented consistently across all modules
 
 - **Dirty queue pattern** — all modules (`financas`, `exercicios`, `casinha`, `habitos`, `Alimentacao`, `Saude`) implement `markDirty` / `clearDirty` before and after API calls on write paths
 - **Deleted queue pattern** — all modules implement `markDeleted` / `clearDeleted` for delete operations
-- **Bootstrap uses `Promise.allSettled`** — all 6 modules. `index.html` (hub) uses `Promise.all` with per-fetch `.catch(()=>null)`, which is acceptable (read-only, null-guarded).
+- **Bootstrap uses `Promise.allSettled`** — all 6 modules. `index.html` (hub) uses `Promise.all` with per-fetch `.catch(()=>null)`, which is acceptable (read-only, null-guarded). Hub only updates `hub_lastsync_v1` when **all** core module fetches in that bootstrap return non-`null`; otherwise the sync label shows a partial-failure state.
 - **Bootstrap retries dirty items** — all modules recover local-only items on bootstrap and retry sync
 - **Bootstrap retries pending DELETEs** — all modules. `financas` retries all 5 entity types; `casinha` all 4; `Alimentacao` retries meals and water; `Saude` retries weights, exams, consults; `habitos` retries habits; `exercicios` retries treinos, locais, tipos.
 - **`_showSyncWarn()` on partial bootstrap failure** — all 6 modules. `exercicios` uses `setStatus(...)` (different UI element, same intent).
 - **`_showLastSync()` only on full success** — all 6 modules call `_showLastSync()` conditionally (only when all endpoints succeeded).
 - **`logoutUser` checks all queues** — all modules check both dirty and deleted queues and show `confirm()` before clearing state
 - **`beforeunload` warning** — all modules set `e.returnValue` if queues are non-empty (best-effort browser warning only, no sync)
-- **No `.catch(()=>null)` on write paths** — eliminated from all modules. The only remaining `.catch(()=>null)` is in `index.html:589`, the hub bootstrap read helper, which is read-only and null-guards all results
-- **Hub cache filtered for all pending module deletes** — all 5 hub cache keys filter pending-delete IDs before writing: `saude_treinos_v1` (by `_dbId`), `casinha_tarefas` (by `_dbId`), `habitos_app_v5` (by `_dbId`), `alimentacao_meals_v3_light` (by `id`), `saude_app_v1` (weights/exams/consults by `id`)
-- **`e.network` distinction in write paths with rollback** — modules with rollback code in catch blocks (`casinha`, `habitos`, `Alimentacao`, `Saude`) all check `e.network` before rolling back. Modules without rollback (`financas`, `exercicios` treino save) leave items dirty and log — no rollback needed.
+- **No `.catch(()=>null)` on write paths** — eliminated from all modules. The only remaining `.catch(()=>null)` is in `index.html` (`hubBootstrap` read helper `h(url)`), which is read-only and null-guards all results
+- **Hub cache filtered for all pending module deletes** — all module-backed hub cache keys filter pending-delete IDs before writing: `hub_fin_cache` (via `fetchFinancas`, by `client_id` vs `fin_deleted_v1`), `saude_treinos_v1` (by `_dbId`), `casinha_tarefas` (by `_dbId`), `habitos_app_v5` (by `_dbId`), `alimentacao_meals_v3_light` (by `id`), `saude_app_v1` (weights/exams/consults by `id`)
+- **`e.network` distinction in write paths with rollback** — modules with rollback code in catch blocks (`casinha`, `habitos`, `Alimentacao`, `Saude`) all check `e.network` before rolling back. Modules without rollback (`financas`, `exercicios` treino save) leave items dirty and log — no rollback needed. **`index.html` hub quick actions** (`_hubPost` / hábito, treino, tarefa): on `fetch` throw, error has `network=true` — no optimistic rollback; marks the corresponding module dirty queue for retry on next module bootstrap.
 - **`assertUserMatchesQuery`** — implemented on all backend GET routes that accept `usuario_id` query param
 
 ### ℹ️ No known open issues

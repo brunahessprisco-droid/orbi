@@ -595,6 +595,7 @@ async function hubBootstrap(){
   const uid=localStorage.getItem('hub_user_id');
   const base=getApiBase();
   if(!token||!uid)return;
+  let skipGcalIndicatorUpdate=false;
   const h=url=>fetch(`${base}${url}`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.ok?r.json():null).catch(()=>null);
   try{
     const[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC]=await Promise.all([
@@ -647,18 +648,31 @@ async function hubBootstrap(){
       }));
     }
     rendTodaySummary(); rendCal();
-    localStorage.setItem('u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1', String(Date.now()));
-    updateHubSyncIndicator();
+    const hubFetchAllOk=[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC].every(function(v){return v!==null;});
+    const _hubLsid='u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1';
+    const _hubLbl=document.getElementById('hub-sync-label');
+    if(hubFetchAllOk){
+      localStorage.setItem(_hubLsid, String(Date.now()));
+      updateHubSyncIndicator();
+    }else{
+      skipGcalIndicatorUpdate=true;
+      if(_hubLbl){
+        _hubLbl.textContent='Sincronização parcial — alguns dados podem estar desatualizados';
+        _hubLbl.style.color='var(--amber)';
+      }
+    }
   }catch(e){console.warn('Hub bootstrap:',e);
+    skipGcalIndicatorUpdate=true;
     // Mesmo com erro, renderiza com cache local para não travar a UI
     rendTodaySummary(); rendCal();
     const label=document.getElementById('hub-sync-label');
     if(label){label.textContent='Erro na sincronização — mostrando dados em cache';label.style.color='var(--amber)';}
   }
-  hubBootstrapGcal();
+  hubBootstrapGcal({skipIndicatorUpdate:skipGcalIndicatorUpdate});
 }
 
-async function hubBootstrapGcal(){
+async function hubBootstrapGcal(opts){
+  opts=opts||{};
   const token=localStorage.getItem(AUTH_KEY);
   if(!token)return;
   try{
@@ -668,7 +682,7 @@ async function hubBootstrapGcal(){
     if(Array.isArray(events)){
       _lsSet('hub_gcal_events',JSON.stringify(events));
       rendTodaySummary(); rendCal();
-      updateHubSyncIndicator();
+      if(!opts.skipIndicatorUpdate)updateHubSyncIndicator();
     }
   }catch(e){console.warn('GCal bootstrap:',e);}
 }
@@ -740,7 +754,10 @@ async function fetchFinancas(){
     const r=await fetch(`${base}/transacoes?usuario_id=${getUserId()}`,{headers:{Authorization:'Bearer '+token}});
     if(!r.ok)return;
     const data=await r.json();
-    const txs=(data.data||data||[]).map(t=>({
+    const uid=getUserId();
+    const _delFin=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_fin_deleted_v1')||'[]'));
+    const rows=(data.data||data||[]).filter(t=>!_delFin.has(String(t.client_id)));
+    const txs=rows.map(t=>({
       data:(t.data_lancamento||'').slice(0,10),
       valor:Number(t.valor)||0,
       valorParcela:t.valor_parcela!=null?Number(t.valor_parcela):null,
@@ -891,7 +908,7 @@ function closeOv(){document.getElementById('ov-day').classList.remove('open');}
 // Fila serializa todas as ações: sem race conditions entre cliques rápidos.
 // Snapshot é lido como string bruta do localStorage na hora da execução.
 // Rollback restaura a string exata — nenhuma mutação por referência possível.
-// _hubPost lança exceção em qualquer falha de rede ou status HTTP não-ok.
+// _hubPost: em falha de fetch, lança erro com .network=true (não fazer rollback otimista).
 let _hubActionQueue=Promise.resolve();
 let _hubPending=0;
 function _hubRun(fn){
@@ -900,42 +917,50 @@ function _hubRun(fn){
     .then(()=>Promise.resolve().then(()=>fn()).catch(e=>console.error('[Hub] erro não tratado na fila:',e)))
     .finally(()=>{_hubPending--;});
 }
+function _hubMarkModuleDirty(queueKey,id){
+  if(!id)return;
+  const u=localStorage.getItem('hub_user_id')||'anon';
+  const storageKey='u_'+u+'_'+queueKey;
+  try{
+    const s=new Set(JSON.parse(localStorage.getItem(storageKey)||'[]'));
+    s.add(String(id));
+    localStorage.setItem(storageKey,JSON.stringify([...s]));
+  }catch(e){console.warn('[Hub] fila dirty:',queueKey,id,e);}
+}
 async function _hubPost(path,body){
   const token=localStorage.getItem(AUTH_KEY);
   const uid=localStorage.getItem('hub_user_id');
   if(!token) throw new Error('[Hub] _hubPost: sem token de autenticação');
   if(!uid)   throw new Error('[Hub] _hubPost: sem hub_user_id');
-  const r=await fetch(getApiBase()+path,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify(body),
-  });
+  let r;
+  try{
+    r=await fetch(getApiBase()+path,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify(body),
+    });
+  }catch(_e){
+    const err=new Error('[Hub] Falha de rede em '+path);
+    err.network=true;
+    throw err;
+  }
   if(!r.ok){
     const detail=await r.text().catch(()=>'');
     throw new Error(`[Hub] _hubPost: HTTP ${r.status} em ${path} — ${detail}`);
   }
 }
 
-// hubSyncHabito mantido para uso por _clearControleModal e _saveControleModal
+// hubSyncHabito — usa _hubPost (mesma semântica de rede / HTTP)
 async function hubSyncHabito(h){
-  const token=localStorage.getItem(AUTH_KEY);
   const uid=localStorage.getItem('hub_user_id');
-  if(!token||!uid) throw new Error('[Hub] hubSyncHabito: sem autenticação');
-  const r=await fetch(`${getApiBase()}/habitos`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-    body:JSON.stringify({
-      usuario_id:uid,client_id:h.id,nome:h.name,icone:h.icon||null,
-      categoria:h.cat||null,frequencia:h.freq||null,weekdays:h.weekdays||[],
-      obs:h.note||null,autoType:h.autoType||null,autoKeyword:h.autoKeyword||null,
-      tipo:h.tipo||'check',unit:h.unit||null,startDate:h.startDate||null,
-      logs:h.logs||{},
-    }),
+  if(!localStorage.getItem(AUTH_KEY)||!uid) throw new Error('[Hub] hubSyncHabito: sem autenticação');
+  await _hubPost('/habitos',{
+    usuario_id:uid,client_id:h.id,nome:h.name,icone:h.icon||null,
+    categoria:h.cat||null,frequencia:h.freq||null,weekdays:h.weekdays||[],
+    obs:h.note||null,autoType:h.autoType||null,autoKeyword:h.autoKeyword||null,
+    tipo:h.tipo||'check',unit:h.unit||null,startDate:h.startDate||null,
+    logs:h.logs||{},
   });
-  if(!r.ok){
-    const detail=await r.text().catch(()=>'');
-    throw new Error(`[Hub] hubSyncHabito: HTTP ${r.status} — ${detail}`);
-  }
 }
 
 let _controleState={id:null,dateStr:null};
@@ -968,10 +993,14 @@ function hubToggleHabito(id,dateStr){
         logs:hab.logs||{},
       });
     }catch(err){
-      // 5. Rollback: restaura string exata capturada antes de qualquer mudança
-      console.error('[Hub] hubToggleHabito — rollback:',err.message);
-      _lsSet('habitos_app_v5',snapshot);
-      rendTodaySummary(); rendCal();
+      if(err.network){
+        console.warn('[Hub] hubToggleHabito — falha de rede, estado local mantido; retentará no módulo:',hab.id,err);
+        _hubMarkModuleDirty('habitos_dirty_v1',hab.id);
+      }else{
+        console.error('[Hub] hubToggleHabito — rollback:',err.message);
+        _lsSet('habitos_app_v5',snapshot);
+        rendTodaySummary(); rendCal();
+      }
     }
   });
 }
@@ -993,9 +1022,14 @@ async function _clearControleModal(){
   if(h.logs)delete h.logs[dateStr];
   _lsSet('habitos_app_v5',JSON.stringify(arr));
   _closeControleModal(); rendTodaySummary(); rendCal();
-  try{ await hubSyncHabito(h); }catch(_){
-    _lsSet('habitos_app_v5',snapshot);
-    rendTodaySummary(); rendCal();
+  try{ await hubSyncHabito(h); }catch(err){
+    if(err.network){
+      console.warn('[Hub] controle clear — rede, mantendo estado; retentará:',id,err);
+      _hubMarkModuleDirty('habitos_dirty_v1',id);
+    }else{
+      _lsSet('habitos_app_v5',snapshot);
+      rendTodaySummary(); rendCal();
+    }
   }
 }
 async function _saveControleModal(){
@@ -1007,9 +1041,14 @@ async function _saveControleModal(){
   if(val)h.logs[dateStr]=val; else delete h.logs[dateStr];
   _lsSet('habitos_app_v5',JSON.stringify(arr));
   _closeControleModal(); rendTodaySummary(); rendCal();
-  try{ await hubSyncHabito(h); }catch(_){
-    _lsSet('habitos_app_v5',snapshot);
-    rendTodaySummary(); rendCal();
+  try{ await hubSyncHabito(h); }catch(err){
+    if(err.network){
+      console.warn('[Hub] controle save — rede, mantendo estado; retentará:',id,err);
+      _hubMarkModuleDirty('habitos_dirty_v1',id);
+    }else{
+      _lsSet('habitos_app_v5',snapshot);
+      rendTodaySummary(); rendCal();
+    }
   }
 }
 function hubCheckTreino(id){
@@ -1034,10 +1073,14 @@ function hubCheckTreino(id){
         tipo_cat:t.tipo_cat||'cardio',local_nome:t.local||null,obs:t.obs||null,
       });
     }catch(err){
-      // 5. Rollback: string exata anterior
-      console.error('[Hub] hubCheckTreino — rollback:',err.message);
-      _lsSet('saude_treinos_v1',snapshot);
-      rendTodaySummary(); rendCal();
+      if(err.network){
+        console.warn('[Hub] hubCheckTreino — falha de rede, estado local mantido; retentará:',t.id,err);
+        _hubMarkModuleDirty('saude_treinos_dirty_v1',t.id);
+      }else{
+        console.error('[Hub] hubCheckTreino — rollback:',err.message);
+        _lsSet('saude_treinos_v1',snapshot);
+        rendTodaySummary(); rendCal();
+      }
     }
   });
 }
@@ -1063,10 +1106,14 @@ function hubCheckTarefa(id){
         ambiente:t.ambiente||null,dataVenc:t.dataVenc||null,horario:t.horario||null,
       });
     }catch(err){
-      // 5. Rollback: string exata anterior
-      console.error('[Hub] hubCheckTarefa — rollback:',err.message);
-      _lsSet('casinha_tarefas',snapshot);
-      rendTodaySummary(); rendCal();
+      if(err.network){
+        console.warn('[Hub] hubCheckTarefa — falha de rede, estado local mantido; retentará:',t.id,err);
+        _hubMarkModuleDirty('casinha_tarefas_dirty_v1',t.id);
+      }else{
+        console.error('[Hub] hubCheckTarefa — rollback:',err.message);
+        _lsSet('casinha_tarefas',snapshot);
+        rendTodaySummary(); rendCal();
+      }
     }
   });
 }
