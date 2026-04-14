@@ -226,8 +226,21 @@ tbody tr:hover .row-actions{opacity:1;}
 .matrix-table .row-cur td:first-child{color:var(--text);font-weight:600;}
 
 /* CONTAS FIXAS */
-.fixas-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.fixas-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap;}
 .fixas-list{display:flex;flex-direction:column;gap:10px;}
+.fixas-group{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+.fixas-group:last-child{margin-bottom:0;}
+.fixas-group-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:4px 2px 8px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.fixas-group-left{display:flex;align-items:center;gap:10px;min-width:0;}
+.fixas-group-right{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;text-align:right;}
+.fixas-group-swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.fixas-group-title{font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--muted);text-transform:uppercase;}
+.fixas-group-count{font-size:11px;color:var(--hint);white-space:nowrap;}
+.fixas-group-sums{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.fixas-group-subtotal{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--red);white-space:nowrap;}
+.fixas-group-sublanc{font-family:var(--mono);font-size:11px;color:var(--hint);white-space:nowrap;}
+.fixas-group-toggle{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none;}
+.fixas-group-toggle input{accent-color:var(--accent,#7b9cff);width:15px;height:15px;cursor:pointer;flex-shrink:0;}
 .fixa-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;gap:16px;}
 .fixa-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .fixa-info{flex:1;}
@@ -808,7 +821,10 @@ html.privacy .fin-cal-tx-val{filter:blur(8px);user-select:none;pointer-events:no
 <!-- CONTAS FIXAS -->
 <div class="page" id="page-fixas">
   <div class="fixas-header">
-    <div style="font-size:16px;font-weight:600;">Contas fixas</div>
+    <div>
+      <div style="font-size:16px;font-weight:600;">Contas fixas</div>
+      <label class="fixas-group-toggle"><input type="checkbox" id="fixas-group-by-cat" onchange="setFixasGroupByCat(this.checked)"> Agrupar por categoria</label>
+    </div>
     <div style="display:flex;gap:10px;align-items:center;">
       <div class="fat-nav">
         <button class="btn-nav" onclick="changeFatura(-1)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -2558,14 +2574,32 @@ function getFixaValor(fixaId,k){
 function isFixaLancada(fixaId,k){
   return txs.some(t=>t.fixaId===fixaId&&t.fatura===k);
 }
+function fixaMetrics(f,k){
+  const lancada=isFixaLancada(f.id,k);
+  const valOverride=getFixaValor(f.id,k);
+  const val=valOverride!==null?valOverride:f.valor;
+  return{val,lancada};
+}
+function fixasGroupByCatStorageKey(){return'u_'+(API_USER_ID||'anon')+'_fin_fixas_group_by_cat_v1';}
+function getFixasGroupByCat(){
+  const v=localStorage.getItem(fixasGroupByCatStorageKey());
+  if(v===null||v===undefined)return true;
+  return v!=='0';
+}
+function setFixasGroupByCat(on){
+  try{localStorage.setItem(fixasGroupByCatStorageKey(),on?'1':'0');}catch(_){}
+  rendFixas();
+}
 function rendFixas(){
   const k=curK();
   const activeFixas=fixas.filter(f=>!f.encerradoApos||f.encerradoApos>=k);
   let total=0,totalGeral=0;
-  document.getElementById('fixas-list').innerHTML=activeFixas.map(f=>{
-    const lancada=isFixaLancada(f.id,k);
-    const valOverride=getFixaValor(f.id,k);
-    const val=valOverride!==null?valOverride:f.valor;
+  const groupOn=getFixasGroupByCat();
+  const gcb=document.getElementById('fixas-group-by-cat');
+  if(gcb)gcb.checked=groupOn;
+
+  function fixaRowHtml(f,mode){
+    const{val,lancada}=fixaMetrics(f,k);
     totalGeral+=val;
     if(lancada)total+=val;
     const statusBadge=lancada
@@ -2579,11 +2613,16 @@ function rendFixas(){
         </button>`;
     const catObj=cats.find(c=>c.nome===f.categoria);
     const corDot=catObj?.cor||'#7b9cff';
+    const metaParts=[];
+    if(mode==='flat'&&f.categoria&&String(f.categoria).trim())metaParts.push(String(f.categoria).trim());
+    if(f.conta&&String(f.conta).trim())metaParts.push(String(f.conta).trim());
+    if(f.dia)metaParts.push('vence dia '+f.dia);
+    const metaLine=metaParts.length?metaParts.join(' · '):'—';
     return `<div class="fixa-row">
       <div class="fixa-dot" style="background:${corDot}"></div>
       <div class="fixa-info">
         <div class="fixa-name">${f.nome}</div>
-        <div class="fixa-meta">${f.categoria}${f.dia?' · vence dia '+f.dia:''}</div>
+        <div class="fixa-meta">${metaLine}</div>
       </div>
       <div class="fixa-valor">- ${fmt(val)}</div>
       ${statusBadge}
@@ -2593,7 +2632,74 @@ function rendFixas(){
         <button class="btn-icon del" onclick="encerrarFixa('${f.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></button>
       </div>
     </div>`;
-  }).join('')||'<div style="color:var(--hint);padding:32px;text-align:center">Nenhuma conta fixa cadastrada</div>';
+  }
+
+  let listHtml='';
+  if(activeFixas.length===0){
+    listHtml='<div style="color:var(--hint);padding:32px;text-align:center">Nenhuma conta fixa cadastrada</div>';
+  }else if(!groupOn){
+    const catOrder=cats.map(c=>c.nome);
+    const flatSorted=[...activeFixas].sort((a,b)=>{
+      const ca=(a.categoria&&String(a.categoria).trim())?String(a.categoria).trim():'Outros';
+      const cb=(b.categoria&&String(b.categoria).trim())?String(b.categoria).trim():'Outros';
+      const ia=catOrder.indexOf(ca),ib=catOrder.indexOf(cb);
+      if(ia!==ib){
+        if(ia===-1)return 1;
+        if(ib===-1)return -1;
+        return ia-ib;
+      }
+      return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR');
+    });
+    listHtml=flatSorted.map(f=>fixaRowHtml(f,'flat')).join('');
+  }else{
+    const byCat=new Map();
+    for(const f of activeFixas){
+      const key=(f.categoria&&String(f.categoria).trim())?String(f.categoria).trim():'Outros';
+      if(!byCat.has(key))byCat.set(key,[]);
+      byCat.get(key).push(f);
+    }
+    const catOrder=cats.map(c=>c.nome);
+    const sortedKeys=[...byCat.keys()].sort((a,b)=>{
+      const ia=catOrder.indexOf(a),ib=catOrder.indexOf(b);
+      if(ia===-1&&ib===-1)return a.localeCompare(b,'pt-BR');
+      if(ia===-1)return 1;
+      if(ib===-1)return -1;
+      return ia-ib;
+    });
+    for(const catNome of sortedKeys){
+      const rows=byCat.get(catNome);
+      rows.sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+      let subGeral=0,subLanc=0;
+      for(const f of rows){
+        const m=fixaMetrics(f,k);
+        subGeral+=m.val;
+        if(m.lancada)subLanc+=m.val;
+      }
+      const sw=catColor(catNome);
+      const escCat=String(catNome).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const subLancLine=subLanc<subGeral
+        ?`<div class="fixas-group-sublanc">Lançado nesta fatura · − ${fmt(subLanc)}</div>`
+        :'';
+      listHtml+=`<div class="fixas-group">
+        <div class="fixas-group-header">
+          <div class="fixas-group-left">
+            <span class="fixas-group-swatch" style="background:${sw}"></span>
+            <span class="fixas-group-title">${escCat}</span>
+          </div>
+          <div class="fixas-group-right">
+            <span class="fixas-group-count">${rows.length} conta${rows.length!==1?'s':''}</span>
+            <div class="fixas-group-sums">
+              <div class="fixas-group-subtotal">Subtotal · − ${fmt(subGeral)}</div>
+              ${subLancLine}
+            </div>
+          </div>
+        </div>
+        ${rows.map(f=>fixaRowHtml(f,'group')).join('')}
+      </div>`;
+    }
+  }
+
+  document.getElementById('fixas-list').innerHTML=listHtml;
   document.getElementById('fixas-total').textContent=fmt(total);
   document.getElementById('fixas-total-geral').textContent=fmt(totalGeral);
 }
