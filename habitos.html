@@ -120,7 +120,7 @@
 
     .summary{
       display:grid;
-      grid-template-columns:repeat(5,1fr);
+      grid-template-columns:repeat(4,1fr);
       gap:12px;
       margin-bottom:20px;
     }
@@ -437,10 +437,10 @@
       background:var(--surface2);
       position:relative;
     }
-    .heat-cell.l1{background:rgba(59,130,246,.16)}
-    .heat-cell.l2{background:rgba(59,130,246,.30)}
-    .heat-cell.l3{background:rgba(59,130,246,.48)}
-    .heat-cell.l4{background:rgba(59,130,246,.72)}
+    .heat-cell.l1{background:rgba(62,74,89,.18)}
+    .heat-cell.l2{background:rgba(62,74,89,.32)}
+    .heat-cell.l3{background:rgba(62,74,89,.52)}
+    .heat-cell.l4{background:rgba(62,74,89,.75)}
     .heat-legend{
       display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--muted)
     }
@@ -703,11 +703,6 @@
           <div class="card-label">Hoje concluídos</div>
           <div class="card-value green" id="sum-today">0</div>
           <div class="card-sub">marcados hoje</div>
-        </div>
-        <div class="card">
-          <div class="card-label">Melhor streak</div>
-          <div class="card-value amber" id="sum-best">0</div>
-          <div class="card-sub">entre todos</div>
         </div>
         <div class="card">
           <div class="card-label">Consistência mês</div>
@@ -1622,7 +1617,6 @@
       const s=monthStats();
       document.getElementById('sum-active').textContent=s.active;
       document.getElementById('sum-today').textContent=s.today;
-      document.getElementById('sum-best').textContent=s.best;
       document.getElementById('sum-rate').textContent=s.rate+'%';
       document.getElementById('sum-auto').textContent=s.auto;
       renderAutoSyncBanner();
@@ -2128,10 +2122,10 @@
         <div class="heat-legend">
           <span>Menos</span>
           <div class="heat-dot"></div>
-          <div class="heat-dot" style="background:rgba(59,130,246,.16)"></div>
-          <div class="heat-dot" style="background:rgba(59,130,246,.30)"></div>
-          <div class="heat-dot" style="background:rgba(59,130,246,.48)"></div>
-          <div class="heat-dot" style="background:rgba(59,130,246,.72)"></div>
+          <div class="heat-dot" style="background:rgba(62,74,89,.18)"></div>
+          <div class="heat-dot" style="background:rgba(62,74,89,.32)"></div>
+          <div class="heat-dot" style="background:rgba(62,74,89,.52)"></div>
+          <div class="heat-dot" style="background:rgba(62,74,89,.75)"></div>
           <span>Mais</span>
         </div>
       `;
@@ -2275,7 +2269,7 @@
         }
         return`<div class="stat-card">
           <div class="stat-card-head">
-            <div class="stat-card-icon">${escapeHtml(r.h.icon||'✨')}</div>
+            <div class="stat-card-icon">${hIcon(r.h.icon)}</div>
             <div>
               <div class="stat-card-name">${escapeHtml(r.h.name)}</div>
               <div class="stat-card-cat">${catLabel(r.h.cat)}</div>
@@ -2386,7 +2380,7 @@
           </div>`;
         }
         return`<div class="cal-habit-row ${done?'done':'undone'}${isFuture?' future-day':''}" onclick="toggleCalHabit('${h.id}','${dateStr}')">
-          <div class="cal-habit-row-icon">${escapeHtml(h.icon||'✨')}</div>
+          <div class="cal-habit-row-icon">${hIcon(h.icon)}</div>
           <div class="cal-habit-row-name">${escapeHtml(h.name)}</div>
           <div class="cal-habit-row-check">${done?'<i class="bi bi-check-lg"></i>':'<i class="bi bi-circle"></i>'}</div>
         </div>`;
