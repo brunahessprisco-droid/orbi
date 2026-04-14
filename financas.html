@@ -1848,30 +1848,42 @@ async function bootstrapApi(){
     }
 
     // Sempre espelha do banco para o estado local (apenas se o endpoint respondeu)
-    if(apiCats!==null) cats=apiCats.map(c=>({id:String(c.client_id||c.id),_dbId:String(c.client_id||c.id),nome:c.nome,cor:c.cor||'#7b9cff'}));
+    // Filtra itens pendentes de delete antes de escrever no estado local
+    const _delTx=getDeleted(SK_DEL_TX);
+    const _delCat=getDeleted(SK_DEL_CAT);
+    const _delC=getDeleted(SK_DEL_C);
+    const _delFX=getDeleted(SK_DEL_FX);
+    const _delPR=getDeleted(SK_DEL_PR);
+    if(apiCats!==null) cats=apiCats.filter(c=>!_delCat.has(String(c.client_id||c.id))).map(c=>({id:String(c.client_id||c.id),_dbId:String(c.client_id||c.id),nome:c.nome,cor:c.cor||'#7b9cff'}));
     if(apiTxs!==null){
-      txs=apiTxs.map(txFromApi);
+      txs=apiTxs.filter(t=>!_delTx.has(String(t.client_id))).map(txFromApi);
       // Resgata transações criadas localmente antes do debounce disparar (tab fechada rapidamente)
       try{
         const localRaw=localStorage.getItem('u_'+API_USER_ID+'_'+SK);
         if(localRaw){
           const localTxs=JSON.parse(localRaw);
           const apiClientIds=new Set(apiTxs.map(t=>String(t.client_id)));
-          const pendentes=localTxs.filter(t=>t.id&&!apiClientIds.has(String(t.id)));
+          const pendentes=localTxs.filter(t=>t.id&&!apiClientIds.has(String(t.id))&&!_delTx.has(String(t.id)));
           if(pendentes.length){txs=[...txs,...pendentes];scheduleTxSync();}
         }
       }catch(_){}
       // Cache para o hub
       try{{const _fuid=localStorage.getItem('hub_user_id')||'anon';localStorage.setItem('u_'+_fuid+'_hub_fin_cache',JSON.stringify(txs.map(t=>({data:t.data,valor:t.valor,valorParcela:t.valorParcela,descricao:t.descricao,categoria:t.categoria,tipo:t.tipo}))));}localStorage.setItem('hub_user_id',API_USER_ID);}catch(e){}
     }
-    if(apiContas!==null) cartoes=apiContas.map(contaFromApi);
-    if(apiFixas!==null) fixas=apiFixas.map(fixaFromApi);
+    if(apiContas!==null) cartoes=apiContas.filter(c=>!_delC.has(String(c.client_id||c.id))).map(contaFromApi);
+    if(apiFixas!==null) fixas=apiFixas.filter(f=>!_delFX.has(String(f.client_id||f.id))).map(fixaFromApi);
     if(apiFixaVals!==null) fixaVals=fixaValsFromApiRows(apiFixaVals);
     budgets={};
     (apiBudgets||[]).forEach(b=>{budgets[b.categoria_nome]={limite:Number(b.limite_valor)||0};});
     savingGoal=Number(apiSaving?.saving_goal||0);
     poupanca={meta:Number(apiPoupanca?.meta||0),previsto:apiPoupanca?.previsto||{},realizado:apiPoupanca?.realizado||{}};
-    receitasProj=(apiProjExtras||[]).map(projExtraFromApi);
+    receitasProj=(apiProjExtras||[]).filter(r=>!_delPR.has(String(r.client_id||r.id))).map(projExtraFromApi);
+    // Dispara retry de DELETEs pendentes que não foram enviados antes do fechamento da aba
+    if(_delTx.size>0) scheduleTxSync();
+    if(_delCat.size>0) scheduleCatSync();
+    if(_delC.size>0) scheduleContaSync();
+    if(_delFX.size>0) scheduleFixaSync();
+    if(_delPR.size>0) scheduleProjExtrasSync();
     _showLastSync();
   }catch(e){
     console.error('API indisponivel, verifique backend/banco:',e.message);
