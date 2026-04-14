@@ -1054,6 +1054,7 @@ apiRouter.post("/habitos", requireAuth, async (req: AuthedRequest, res) => {
     usuario_id: z.string().min(1), client_id: z.string().min(1), nome: z.string().min(1),
     icone: z.string().nullable().optional(), categoria: z.string().nullable().optional(),
     frequencia: z.string().nullable().optional(), weekdays: z.any().optional(),
+    monthDay: z.coerce.number().int().min(1).max(31).nullable().optional(),
     obs: z.string().nullable().optional(), autoType: z.string().nullable().optional(),
     autoKeyword: z.string().nullable().optional(),
     tipo: z.string().nullable().optional(),
@@ -1063,8 +1064,13 @@ apiRouter.post("/habitos", requireAuth, async (req: AuthedRequest, res) => {
   });
   const input = schema.parse(req.body);
   if (input.usuario_id !== req.userId) return res.status(403).json({ error: "FORBIDDEN" });
-  const data = { nome: input.nome, icone: input.icone ?? null, categoria: input.categoria ?? null, frequencia: input.frequencia ?? null, weekdays: input.weekdays ?? null, obs: input.obs ?? null, autoType: input.autoType ?? null, autoKeyword: input.autoKeyword ?? null, tipo: input.tipo ?? null, unit: input.unit ?? null, startDate: input.startDate ?? null, logs: input.logs ?? null };
-  const row = await prisma.habito.upsert({ where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } }, update: data, create: { userId: req.userId!, client_id: input.client_id, ...data } });
+  const base = { nome: input.nome, icone: input.icone ?? null, categoria: input.categoria ?? null, frequencia: input.frequencia ?? null, weekdays: input.weekdays ?? null, obs: input.obs ?? null, autoType: input.autoType ?? null, autoKeyword: input.autoKeyword ?? null, tipo: input.tipo ?? null, unit: input.unit ?? null, startDate: input.startDate ?? null, logs: input.logs ?? null };
+  const monthPatch = input.monthDay !== undefined ? { monthDay: input.monthDay } : {};
+  const row = await prisma.habito.upsert({
+    where: { userId_client_id: { userId: req.userId!, client_id: input.client_id } },
+    update: { ...base, ...monthPatch },
+    create: { userId: req.userId!, client_id: input.client_id, ...base, monthDay: input.monthDay ?? null },
+  });
   res.status(201).json(row);
 });
 apiRouter.delete("/habitos/:id", requireAuth, async (req: AuthedRequest, res) => {
@@ -1165,12 +1171,26 @@ apiRouter.post("/saude/remedios", requireAuth, async (req: AuthedRequest, res) =
     lastBuy: z.string().nullable().optional(),
     note: z.string().nullable().optional(),
     habitId: z.string().nullable().optional(),
+    intake_recurrence: z.enum(["diario", "semanal", "mensal"]).nullable().optional(),
+    intake_weekdays: z.any().optional(),
+    intake_month_day: z.coerce.number().int().min(1).max(31).nullable().optional(),
   });
   const input = schema.parse(req.body);
+  const baseRem = { name: input.name, cat: input.cat ?? null, dose: input.dose ?? null, stock: input.stock ?? null, qty: input.qty ?? null, days: input.days ?? null, lastBuy: input.lastBuy ?? null, note: input.note ?? null, habitId: input.habitId ?? null };
+  const intakePatch = {
+    ...(input.intake_recurrence !== undefined ? { intakeRecurrence: input.intake_recurrence } : {}),
+    ...(input.intake_weekdays !== undefined ? { intakeWeekdays: input.intake_weekdays } : {}),
+    ...(input.intake_month_day !== undefined ? { intakeMonthDay: input.intake_month_day } : {}),
+  };
   const row = await prisma.saudeRemedio.upsert({
     where: { userId_clientId: { userId: req.userId!, clientId: input.client_id } },
-    update: { name: input.name, cat: input.cat ?? null, dose: input.dose ?? null, stock: input.stock ?? null, qty: input.qty ?? null, days: input.days ?? null, lastBuy: input.lastBuy ?? null, note: input.note ?? null, habitId: input.habitId ?? null },
-    create: { userId: req.userId!, clientId: input.client_id, name: input.name, cat: input.cat ?? null, dose: input.dose ?? null, stock: input.stock ?? null, qty: input.qty ?? null, days: input.days ?? null, lastBuy: input.lastBuy ?? null, note: input.note ?? null, habitId: input.habitId ?? null },
+    update: { ...baseRem, ...intakePatch },
+    create: {
+      userId: req.userId!, clientId: input.client_id, ...baseRem,
+      intakeRecurrence: input.intake_recurrence ?? null,
+      intakeWeekdays: input.intake_weekdays ?? null,
+      intakeMonthDay: input.intake_month_day ?? null,
+    },
   });
   res.status(201).json(row);
 });
