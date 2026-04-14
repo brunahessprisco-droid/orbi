@@ -646,11 +646,16 @@
         saveMeals();
         closeMealModal();
         renderAll();
-        try{ await syncRefeicao(data); }catch(_){
-          meals=JSON.parse(snapshotMeals);
-          deletedMealIds=JSON.parse(snapshotDeleted);
-          saveDeletedMeals(); saveMeals(); renderAll();
-          alert('Erro ao salvar refeição. A alteração foi desfeita.');
+        try{ await syncRefeicao(data); }catch(e){
+          if(e&&e.network){
+            console.warn('[Alimentação] Falha de rede ao salvar refeição, será retentado:',data.id,e);
+          } else {
+            clearMealDirty(data.id);
+            meals=JSON.parse(snapshotMeals);
+            deletedMealIds=JSON.parse(snapshotDeleted);
+            saveDeletedMeals(); saveMeals(); renderAll();
+            alert('Erro ao salvar refeição. A alteração foi desfeita.');
+          }
         }
       }
       function deleteMeal(id){ if(!confirm('Excluir refeição?')) return; const m=meals.find(x=>x.id===id); deletedMealIds=[...new Set([...deletedMealIds,id])]; saveDeletedMeals(); meals=meals.filter(x=>x.id!==id); saveMeals(); renderAll(); if(m)deleteRefeicaoApi(m).catch(()=>{meals.push(m);deletedMealIds=deletedMealIds.filter(x=>x!==id);saveDeletedMeals();saveMeals();renderAll();alert('Erro ao excluir. O item foi restaurado.');}); }
