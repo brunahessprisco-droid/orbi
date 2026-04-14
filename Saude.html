@@ -809,7 +809,7 @@
         const rC=_sC.status==='fulfilled'?_sC.value:null;
         const rRem=_sRem.status==='fulfilled'?_sRem.value:null;
         const rCon=_sCon.status==='fulfilled'?_sCon.value:null;
-        if([_sW,_sM,_sE,_sC,_sRem,_sCon].some(r=>r.status==='rejected'))_showSyncWarn();
+        if([_sW,_sM,_sE,_sC,_sRem,_sCon].some(r=>r.status==='rejected'))_showSyncWarn(); else _showLastSync();
         // HealthWeight usa modelo diferente — mapeamos via extraJson
         const _ds=window.saudeApp?.getDeletedState?.()||{};
         const deleted = {
@@ -888,7 +888,6 @@
         for(const c of nwCon)syncConsumo(c).catch(e=>console.warn('[Saúde] Sync consumo falhou, será retentado:',e));
 
         app.renderAll();
-        _showLastSync();
       }catch(e){console.error('Bootstrap saúde:',e);window.saudeApp?.renderAll?.();}
     }
 

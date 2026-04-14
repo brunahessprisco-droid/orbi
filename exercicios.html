@@ -910,7 +910,7 @@ async function bootstrapApi(){
     const apiTreinos=_sT.status==='fulfilled'?_sT.value:null;
     const apiLocais=_sL.status==='fulfilled'?_sL.value:null;
     const apiTipos=_sTp.status==='fulfilled'?_sTp.value:null;
-    if([_sT,_sL,_sTp].some(r=>r.status==='rejected'))setStatus('Alguns dados não carregaram. Exibindo cache local.');
+    if([_sT,_sL,_sTp].some(r=>r.status==='rejected'))setStatus('Alguns dados não carregaram. Exibindo cache local.'); else _showLastSync();
     // Seed tipos padrão se banco vazio
     let _delL=_getSet(SK_DEL_L);
     let _delTp=_getSet(SK_DEL_TP);
@@ -977,7 +977,6 @@ async function bootstrapApi(){
       });
     }
     saveLocal_();
-    _showLastSync();
     if([_sT,_sL,_sTp].every(r=>r.status==='fulfilled'))setStatus(null);
   }catch(e){
     console.error('Erro ao carregar da API:',e);

@@ -1991,7 +1991,7 @@ async function bootstrapApi(){
     const rPess=_sPess.status==='fulfilled'?_sPess.value:null;
     const rTar=_sTar.status==='fulfilled'?_sTar.value:null;
     const rRot=_sRot.status==='fulfilled'?_sRot.value:null;
-    if([_sAmb,_sPess,_sTar,_sRot].some(r=>r.status==='rejected'))_showSyncWarn();
+    if([_sAmb,_sPess,_sTar,_sRot].some(r=>r.status==='rejected'))_showSyncWarn(); else _showLastSync();
     if(rAmb!==null)ambientes=rAmb.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor,icone:r.icone}));
     if(rPess!==null)pessoas=rPess.map(r=>({id:r.client_id,_dbId:r.id,nome:r.nome,cor:r.cor}));
     if(rTar!==null)tarefas=rTar.map(r=>({
@@ -2067,7 +2067,6 @@ async function bootstrapApi(){
     autoStatus();
     checkRotinas();
     saveA();saveP();saveT();saveR();
-    _showLastSync();
   }catch(e){
     console.error('Erro bootstrap:',e);
   }
