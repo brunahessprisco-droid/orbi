@@ -101,51 +101,27 @@ Do not assume a rule in "Rules for New Code" is already implemented everywhere. 
 
 ## Current State — What Is and Isn't Implemented
 
-This is a factual audit of the codebase. Verified against source files.
+This is a factual audit of the codebase. Verified against source files. Last audited: 2026-04-14.
 
 ### ✅ Implemented consistently across all modules
 
 - **Dirty queue pattern** — all modules (`financas`, `exercicios`, `casinha`, `habitos`, `Alimentacao`, `Saude`) implement `markDirty` / `clearDirty` before and after API calls on write paths
 - **Deleted queue pattern** — all modules implement `markDeleted` / `clearDeleted` for delete operations
+- **Bootstrap uses `Promise.allSettled`** — all 6 modules. `index.html` (hub) uses `Promise.all` with per-fetch `.catch(()=>null)`, which is acceptable (read-only, null-guarded).
 - **Bootstrap retries dirty items** — all modules recover local-only items on bootstrap and retry sync
-- **`logoutUser` checks pending queues** — all modules check dirty/deleted queues and show `confirm()` before clearing state
+- **Bootstrap retries pending DELETEs** — all modules. `financas` retries all 5 entity types; `casinha` all 4; `Alimentacao` retries meals and water; `Saude` retries weights, exams, consults; `habitos` retries habits; `exercicios` retries treinos, locais, tipos.
+- **`_showSyncWarn()` on partial bootstrap failure** — all 6 modules. `exercicios` uses `setStatus(...)` (different UI element, same intent).
+- **`_showLastSync()` only on full success** — all 6 modules call `_showLastSync()` conditionally (only when all endpoints succeeded).
+- **`logoutUser` checks all queues** — all modules check both dirty and deleted queues and show `confirm()` before clearing state
 - **`beforeunload` warning** — all modules set `e.returnValue` if queues are non-empty (best-effort browser warning only, no sync)
 - **No `.catch(()=>null)` on write paths** — eliminated from all modules. The only remaining `.catch(()=>null)` is in `index.html:589`, the hub bootstrap read helper, which is read-only and null-guards all results
-- **`_showLastSync()`** — implemented in all 6 modules
+- **Hub cache filtered for all pending module deletes** — all 5 hub cache keys filter pending-delete IDs before writing: `saude_treinos_v1` (by `_dbId`), `casinha_tarefas` (by `_dbId`), `habitos_app_v5` (by `_dbId`), `alimentacao_meals_v3_light` (by `id`), `saude_app_v1` (weights/exams/consults by `id`)
+- **`e.network` distinction in write paths with rollback** — modules with rollback code in catch blocks (`casinha`, `habitos`, `Alimentacao`, `Saude`) all check `e.network` before rolling back. Modules without rollback (`financas`, `exercicios` treino save) leave items dirty and log — no rollback needed.
 - **`assertUserMatchesQuery`** — implemented on all backend GET routes that accept `usuario_id` query param
-- **Network vs server error distinction in `Saude.html`** — `upsert()` does not rollback on `e.network === true`; only rolls back on server errors (4xx/5xx)
 
-### ⚠️ Implemented in some modules, not all
+### ℹ️ No known open issues
 
-- **`Promise.allSettled` in bootstrap:**
-  - ✅ `casinha.html`, `Saude.html`, `financas.html`, `exercicios.html`
-  - ❌ `Alimentacao.html` — uses `Promise.all`. A single endpoint failure aborts the entire bootstrap and falls through to `catch`. No partial-failure recovery.
-  - ❌ `habitos.html` — uses sequential awaits, not parallel. Effectively single-point-of-failure per call.
-  - ⚠️ `index.html` (hub) — uses `Promise.all` but wraps each fetch in `.catch(()=>null)` so individual failures return null without aborting the array. Effectively tolerates partial failures but does not use `allSettled`.
-
-- **`_showSyncWarn()` banner on partial bootstrap failure:**
-  - ✅ `casinha.html`, `Saude.html`
-  - ❌ `financas.html`, `habitos.html`, `Alimentacao.html` — no banner on partial failure
-  - ⚠️ `exercicios.html` — uses `setStatus(...)` (different implementation, same intent)
-
-- **Hub cache filtered for pending module deletes:**
-  - ✅ `alimentacao_meals_v3_light` — filtered against `alimentacao_deleted_ids_v1`
-  - ❌ `casinha_tarefas`, `habitos_app_v5`, `saude_treinos_v1`, `saude_app_v1` — not filtered. If the user deletes from those modules and navigates to the hub before the API DELETE completes, the hub will show the deleted item.
-
-- **Bootstrap retries pending DELETEs:**
-  - ✅ `casinha.html` (all 4 entity types), `Alimentacao.html` (water), `exercicios.html`
-  - ❌ `habitos.html`, `Saude.html` — deleted queue exists but is not retried in bootstrap
-  - ✅ `financas.html` — all 5 sync functions retry pending DELETEs. `clearDeleted` only called on confirmed success or when item is already absent from server.
-
-- **`beforeunload` checks all queues (including deleted):**
-  - ✅ All modules — including `Alimentacao.html` which covers `KEY_WATER_DELETED`
-
-### ⚠️ Known issues — lower severity, not yet fixed
-
-- **`Alimentacao.html` bootstrap uses `Promise.all`** — a single endpoint failure aborts the entire bootstrap. No partial-failure recovery or `_showSyncWarn()`.
-- **`habitos.html` bootstrap uses sequential `await`** — same single-point-of-failure effect.
-- **Hub cache not filtered for casinha/habitos/saúde pending deletes** — items deleted in those modules may reappear in the hub until the next bootstrap. `alimentacao_meals_v3_light` is correctly filtered; the others are not.
-- **`_showSyncWarn()` missing in `financas.html`, `habitos.html`, `Alimentacao.html`** — no banner shown to the user on partial bootstrap failure.
+All reliability issues identified in prior audits have been resolved. The codebase is consistent across all modules.
 
 ---
 
