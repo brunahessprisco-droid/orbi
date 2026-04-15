@@ -267,9 +267,10 @@
             <div class="field"></div>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">O percentual de atingimento é calculado pela média do range (min + max) ÷ 2.</div>
-          <div class="modal-footer" style="justify-content:flex-start">
+          <div class="modal-footer" style="justify-content:flex-start;flex-wrap:wrap;align-items:center;gap:10px">
             <button class="btn-primary" id="save-goals-btn" type="button">Salvar metas</button>
             <button class="btn" id="default-goals-btn" type="button">Usar padrão</button>
+            <span id="metas-save-feedback" style="font-size:12px;min-height:18px;line-height:1.4" role="status" aria-live="polite"></span>
           </div>
         </div>
       </details>
@@ -763,6 +764,19 @@
         qsa('.delete-meal-btn').forEach(b=>b.addEventListener('click',()=>deleteMeal(b.dataset.id)));
       }
 
+      let _metasSaveFeedbackTimer=null;
+      function setMetasSaveFeedback(text,kind){
+        const el=$('metas-save-feedback');
+        if(!el)return;
+        if(_metasSaveFeedbackTimer){clearTimeout(_metasSaveFeedbackTimer);_metasSaveFeedbackTimer=null;}
+        el.textContent=text||'';
+        if(kind==='ok')el.style.color='var(--green)';
+        else if(kind==='err')el.style.color='var(--red)';
+        else if(kind==='warn')el.style.color='var(--amber)';
+        else{el.style.color='var(--muted)'}
+        if(text)_metasSaveFeedbackTimer=setTimeout(()=>{el.textContent='';el.style.color='';_metasSaveFeedbackTimer=null;},5000);
+      }
+
       function fillGoalsForm(){
         $('meta-cal-min').value=goals.caloriesMin||'';
         $('meta-cal-max').value=goals.caloriesMax||'';
@@ -770,14 +784,47 @@
         const hasRange=goals.caloriesMin&&goals.caloriesMax;
         $('metas-summary-line').textContent=hasRange?`${fmtNum(goals.caloriesMin)}–${fmtNum(goals.caloriesMax)} kcal · ${fmtNum(goals.water||0)} ml água`:'';
       }
-      function saveGoalsAction(){
+      async function saveGoalsAction(){
         const min=Number($('meta-cal-min').value||0);
         const max=Number($('meta-cal-max').value||0);
         if(min&&max&&min>max){alert('Mínimo de calorias não pode ser maior que o máximo.');return;}
         goals={caloriesMin:min,caloriesMax:max||min,water:Number($('meta-water').value||0)};
-        saveGoalsStore();syncConfig().catch(e=>console.warn('[Alimentação] Sync config falhou, será retentado:',e));fillGoalsForm();renderDashboard();
+        saveGoalsStore();
+        setMetasSaveFeedback('Salvando…','muted');
+        fillGoalsForm();
+        renderDashboard();
+        try{
+          if(canUseApi()){
+            await syncConfig();
+            setMetasSaveFeedback('Salvo com sucesso ✓','ok');
+          }else{
+            setMetasSaveFeedback('Salvo neste aparelho. Entre na conta para enviar à nuvem.','warn');
+          }
+        }catch(e){
+          console.warn('[Alimentação] Sync config falhou, será retentado:',e);
+          if(e&&e.network)setMetasSaveFeedback('Salvo localmente; enviaremos quando a conexão voltar.','warn');
+          else setMetasSaveFeedback(e.message||'Erro ao salvar na nuvem.','err');
+        }
       }
-      function resetGoals(){ goals={caloriesMin:1800,caloriesMax:2200,water:2500}; saveGoalsStore(); syncConfig().catch(e=>console.warn('[Alimentação] Sync config falhou, será retentado:',e)); fillGoalsForm(); renderDashboard(); }
+      async function resetGoals(){
+        goals={caloriesMin:1800,caloriesMax:2200,water:2500};
+        saveGoalsStore();
+        setMetasSaveFeedback('Salvando…','muted');
+        fillGoalsForm();
+        renderDashboard();
+        try{
+          if(canUseApi()){
+            await syncConfig();
+            setMetasSaveFeedback('Padrão aplicado e salvo ✓','ok');
+          }else{
+            setMetasSaveFeedback('Padrão aplicado neste aparelho. Entre na conta para enviar à nuvem.','warn');
+          }
+        }catch(e){
+          console.warn('[Alimentação] Sync config falhou, será retentado:',e);
+          if(e&&e.network)setMetasSaveFeedback('Padrão aplicado localmente; enviaremos quando a conexão voltar.','warn');
+          else setMetasSaveFeedback(e.message||'Erro ao salvar na nuvem.','err');
+        }
+      }
 
       function renderPlanning(){
         fillGoalsForm();
