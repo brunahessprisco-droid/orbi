@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import NodeCache from "node-cache";
+import { HttpError } from "./httpError";
 
 type AuthedRequest = express.Request & { userId?: string; sessionToken?: string };
 
@@ -31,8 +32,8 @@ function readRouteParam(req: express.Request, name: string): string | null {
 function assertUserMatchesQuery(req: AuthedRequest) {
   const q = readQueryParam(req, "usuario_id");
   if (!q) return;
-  if (!req.userId) throw Object.assign(new Error("UNAUTHORIZED"), { status: 401 });
-  if (String(q) !== String(req.userId)) throw Object.assign(new Error("FORBIDDEN"), { status: 403 });
+  if (!req.userId) throw new HttpError(401, "UNAUTHORIZED");
+  if (String(q) !== String(req.userId)) throw new HttpError(403, "FORBIDDEN");
 }
 
 // In-memory session cache with 5-minute TTL
@@ -84,7 +85,7 @@ function toDecimal(value: unknown) {
 export const apiRouter = express.Router();
 
 apiRouter.get("/admin/users", async (req, res) => {
-  const secret = (req.header("x-admin-secret") as string) || (req.query.secret as string);
+  const secret = req.header("x-admin-secret") as string | undefined;
   if (!secret || !process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: "FORBIDDEN" });
   }
@@ -97,7 +98,7 @@ apiRouter.get("/admin/users", async (req, res) => {
 
 apiRouter.post("/admin/create-invite", async (req, res) => {
   const body = req.body as Record<string, string>;
-  const secret = (req.header("x-admin-secret") as string) || body.adminSecret;
+  const secret = req.header("x-admin-secret") as string | undefined;
   if (!secret || !process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: "FORBIDDEN" });
   }
@@ -179,11 +180,8 @@ apiRouter.post("/auth/register", async (req, res) => {
       user: { id: user.id, nome: user.nome, email: user.email },
     });
   } catch (error) {
-    console.error("REGISTER ERROR:", (error as Error).message);
-    return res.status(500).json({
-      error: "INTERNAL_SERVER_ERROR",
-      detail: String(error),
-    });
+    console.error("REGISTER ERROR:", error);
+    return res.status(500).json({ error: "INTERNAL_SERVER_ERROR" });
   }
 });
 
@@ -1240,10 +1238,10 @@ const GOOGLE_REDIRECT_URI  = process.env.GOOGLE_REDIRECT_URI  || "https://orbi-t
 
 async function googleRefreshIfNeeded(userId: string) {
   let token = await prisma.googleToken.findUnique({ where: { userId } });
-  if (!token) throw Object.assign(new Error("NOT_CONNECTED"), { status: 400 });
+  if (!token) throw new HttpError(400, "NOT_CONNECTED");
   const now = new Date();
   if (token.expiresAt <= new Date(now.getTime() + 60_000)) {
-    if (!token.refreshToken) throw Object.assign(new Error("NO_REFRESH_TOKEN"), { status: 400 });
+    if (!token.refreshToken) throw new HttpError(400, "NO_REFRESH_TOKEN");
     const r = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1254,7 +1252,11 @@ async function googleRefreshIfNeeded(userId: string) {
         grant_type: "refresh_token",
       }).toString(),
     });
-    if (!r.ok) throw Object.assign(new Error("GOOGLE_REFRESH_ERROR"), { status: 400 });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      console.warn("[Google] refresh token failed:", r.status, t.slice(0, 200));
+      throw new HttpError(400, "GOOGLE_REFRESH_ERROR");
+    }
     const d = await r.json() as { access_token: string; expires_in: number; refresh_token?: string };
     const expiresAt = new Date(Date.now() + d.expires_in * 1000);
     token = await prisma.googleToken.update({
@@ -1283,7 +1285,11 @@ apiRouter.post("/google/exchange-token", requireAuth, async (req: AuthedRequest,
       grant_type: "authorization_code",
     }).toString(),
   });
-  if (!r.ok) return res.status(400).json({ error: "GOOGLE_ERROR", detail: await r.text() });
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    console.warn("[Google] exchange-token failed:", r.status, t.slice(0, 200));
+    return res.status(400).json({ error: "GOOGLE_ERROR" });
+  }
   const d = await r.json() as { access_token: string; refresh_token?: string; expires_in: number; token_type: string };
   const expiresAt = new Date(Date.now() + d.expires_in * 1000);
   await prisma.googleToken.upsert({
@@ -1314,7 +1320,11 @@ apiRouter.get("/google/calendars", requireAuth, async (req: AuthedRequest, res) 
   const gr = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50", {
     headers: { Authorization: `Bearer ${token.accessToken}` },
   });
-  if (!gr.ok) return res.status(400).json({ error: "GOOGLE_FETCH_ERROR", detail: await gr.text() });
+  if (!gr.ok) {
+    const t = await gr.text().catch(() => "");
+    console.warn("[Google] calendarList failed:", gr.status, t.slice(0, 200));
+    return res.status(400).json({ error: "GOOGLE_FETCH_ERROR" });
+  }
   const data = await gr.json() as { items?: Array<{ id: string; summary?: string; primary?: boolean; selected?: boolean; backgroundColor?: string }> };
   const calendars = (data.items || []).map(c => ({ id: c.id, name: c.summary || c.id, primary: !!c.primary, color: c.backgroundColor || null }));
   return res.json(calendars);
@@ -1372,14 +1382,18 @@ const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET || "";
 
 async function stravaRefreshIfNeeded(userId: string) {
   let token = await prisma.stravaToken.findUnique({ where: { userId } });
-  if (!token) throw Object.assign(new Error("NOT_CONNECTED"), { status: 400 });
+  if (!token) throw new HttpError(400, "NOT_CONNECTED");
   const now = Math.floor(Date.now() / 1000);
   if (token.expiresAt < now + 60) {
     const r = await fetch("https://www.strava.com/oauth/token", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET, refresh_token: token.refreshToken, grant_type: "refresh_token" }),
     });
-    if (!r.ok) throw Object.assign(new Error("STRAVA_REFRESH_ERROR"), { status: 400 });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      console.warn("[Strava] refresh failed:", r.status, t.slice(0, 200));
+      throw new HttpError(400, "STRAVA_REFRESH_ERROR");
+    }
     const d = await r.json() as { access_token: string; refresh_token: string; expires_at: number };
     token = await prisma.stravaToken.update({ where: { userId }, data: { accessToken: d.access_token, refreshToken: d.refresh_token, expiresAt: d.expires_at } });
   }
@@ -1393,7 +1407,11 @@ apiRouter.post("/strava/exchange-token", requireAuth, async (req: AuthedRequest,
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET, code, grant_type: "authorization_code" }),
   });
-  if (!r.ok) return res.status(400).json({ error: "STRAVA_ERROR", detail: await r.text() });
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    console.warn("[Strava] exchange-token failed:", r.status, t.slice(0, 200));
+    return res.status(400).json({ error: "STRAVA_ERROR" });
+  }
   const d = await r.json() as { access_token: string; refresh_token: string; expires_at: number; scope: string; athlete: { id: number; firstname: string; lastname: string } };
   await prisma.stravaToken.upsert({
     where: { userId: req.userId! },

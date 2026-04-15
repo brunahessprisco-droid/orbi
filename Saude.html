@@ -1034,7 +1034,8 @@
         rmToggleIntakeFields:()=>rmToggleIntakeFields(),
       };
       function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
-      function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+      function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+      function escapeJs(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'').replace(/\n/g,'\\n'); }
       function todayStr(){ return toDateInput(new Date()); }
       function toDateInput(d){ const dt=new Date(d); const m=String(dt.getMonth()+1).padStart(2,'0'); const day=String(dt.getDate()).padStart(2,'0'); return `${dt.getFullYear()}-${m}-${day}`; }
       function fmtDate(v){ if(!v) return '—'; const [y,m,d]=String(v).split('-'); return `${d}/${m}/${y}`; }
@@ -1405,10 +1406,10 @@
             </div>
             ${remedioHabitoStatus(r)}
             <div class="rem-card-actions">
-              <button class="btn btn-success" onclick="window.saudeApp.editRemedio('${r.id}')">Editar</button>
-              <button class="btn" onclick="window.saudeApp.remedioCompra('${r.id}')">Registrar compra</button>
-              ${r.habitId?`<button class="btn" onclick="window.saudeApp.desvincularHabito('${r.id}')" title="Desvincular do módulo Hábitos">💊 Hábito vinculado</button>`:`<button class="btn" onclick="window.saudeApp.vincularHabito('${r.id}')">+ Criar hábito</button>`}
-              <button class="btn btn-danger" onclick="window.saudeApp.deleteRemedio('${r.id}')">Excluir</button>
+              <button class="btn btn-success" onclick="window.saudeApp.editRemedio('${escapeJs(r.id)}')">Editar</button>
+              <button class="btn" onclick="window.saudeApp.remedioCompra('${escapeJs(r.id)}')">Registrar compra</button>
+              ${r.habitId?`<button class="btn" onclick="window.saudeApp.desvincularHabito('${escapeJs(r.id)}')" title="Desvincular do módulo Hábitos">💊 Hábito vinculado</button>`:`<button class="btn" onclick="window.saudeApp.vincularHabito('${escapeJs(r.id)}')">+ Criar hábito</button>`}
+              <button class="btn btn-danger" onclick="window.saudeApp.deleteRemedio('${escapeJs(r.id)}')">Excluir</button>
             </div>
           </div>`;
         }).join('')}</div>`;
@@ -1421,7 +1422,7 @@
           <td>${escapeHtml(c.name)}</td>
           <td>${escapeHtml(c.dose||'—')}</td>
           <td>${escapeHtml(c.reason||'—')}</td>
-          <td><div class="row-actions"><button class="btn btn-danger" onclick="window.saudeApp.deleteConsumo('${c.id}')">Excluir</button></div></td>
+          <td><div class="row-actions"><button class="btn btn-danger" onclick="window.saudeApp.deleteConsumo('${escapeJs(c.id)}')">Excluir</button></div></td>
         </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhum consumo registrado.</td></tr>`;
       }
 
@@ -1584,17 +1585,17 @@
 
         const alerts=buildAlerts();
         const alertsBox=document.getElementById('dashboard-alerts');
-        alertsBox.innerHTML=alerts.length?alerts.map(a=>`<div class="alert-card ${a.level}"><div class="alert-title">${a.title}</div><div class="alert-text">${a.text}</div></div>`).join(''):'<div class="empty">Tudo em dia por aqui.</div>';
+        alertsBox.innerHTML=alerts.length?alerts.map(a=>`<div class="alert-card ${a.level}"><div class="alert-title">${escapeHtml(a.title)}</div><div class="alert-text">${escapeHtml(a.text)}</div></div>`).join(''):'<div class="empty">Tudo em dia por aqui.</div>';
 
         const nextItems=futureItems();
-        document.getElementById('dashboard-next-items').innerHTML=nextItems.length?nextItems.map(i=>`<div class="stat-row"><div class="stat-row-main"><div class="stat-row-title">${i.title}</div><div class="stat-row-sub">${i.sub}</div></div><div class="stat-row-val">${fmtDate(i.date)}</div></div>`).join(''):'<div class="empty">Nenhum evento futuro.</div>';
+        document.getElementById('dashboard-next-items').innerHTML=nextItems.length?nextItems.map(i=>`<div class="stat-row"><div class="stat-row-main"><div class="stat-row-title">${escapeHtml(i.title)}</div><div class="stat-row-sub">${escapeHtml(i.sub)}</div></div><div class="stat-row-val">${fmtDate(i.date)}</div></div>`).join(''):'<div class="empty">Nenhum evento futuro.</div>';
 
         const follow=state.doctors.map(d=>({doctor:d,status:doctorStatus(d)})).sort((a,b)=>{
           const rank={critico:0,atencao:1,ok:2}; return rank[a.status.cls]-rank[b.status.cls];
         }).slice(0,6);
-        document.getElementById('dashboard-doctor-followup').innerHTML=follow.length?follow.map(({doctor,status})=>`<div class="stat-row"><div class="stat-row-main"><div class="stat-row-title">${doctor.name}</div><div class="stat-row-sub">${doctor.specialty}</div></div><div class="badge ${status.cls}">${status.label}</div></div>`).join(''):'<div class="empty">Nenhum médico cadastrado.</div>';
+        document.getElementById('dashboard-doctor-followup').innerHTML=follow.length?follow.map(({doctor,status})=>`<div class="stat-row"><div class="stat-row-main"><div class="stat-row-title">${escapeHtml(doctor.name)}</div><div class="stat-row-sub">${escapeHtml(doctor.specialty)}</div></div><div class="badge ${status.cls}">${escapeHtml(status.label)}</div></div>`).join(''):'<div class="empty">Nenhum médico cadastrado.</div>';
 
-        document.getElementById('integration-chips').innerHTML=integrationStats().map(c=>`<div class="chip ${c.active?'health':''}">${c.label}</div>`).join('');
+        document.getElementById('integration-chips').innerHTML=integrationStats().map(c=>`<div class="chip ${c.active?'health':''}">${escapeHtml(c.label)}</div>`).join('');
       }
       function buildAlerts(){
         const arr=[];
@@ -1706,11 +1707,11 @@
             return `<td>${v!=null?(m.key==='peso'?asKg(v):`${v}${m.unit?` ${m.unit}`:''}`):'—'}</td>`;
           }).join('');
           return `<tr>
-            <td>${fmtDate(w.date)}${w.time?`<div class="card-sub">${w.time}</div>`:''}</td>
+            <td>${fmtDate(w.date)}${w.time?`<div class="card-sub">${escapeHtml(w.time)}</div>`:''}</td>
             ${metricCells}
-            <td>${medidas}</td>
-            <td>${w.note||'—'}</td>
-            <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editWeight('${w.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteWeight('${w.id}')">Excluir</button></div></td>
+            <td>${escapeHtml(medidas)}</td>
+            <td>${escapeHtml(w.note||'—')}</td>
+            <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editWeight('${escapeJs(w.id)}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteWeight('${escapeJs(w.id)}')">Excluir</button></div></td>
           </tr>`;
         }).join(''):`<tr><td colspan="${colCount}" class="empty">Nenhum registro de peso.</td></tr>`;
 
@@ -1769,13 +1770,13 @@
         });
         document.getElementById('exam-body').innerHTML=rows.length?rows.map(e=>`<tr>
           <td>${fmtDate(e.date)}</td>
-          <td><div>${e.name}</div><div class="card-sub">${e.category||'—'} ${e.nextDate?`· repete ${fmtDate(e.nextDate)}`:''}</div></td>
+          <td><div>${escapeHtml(e.name)}</div><div class="card-sub">${escapeHtml(e.category||'—')} ${e.nextDate?`· repete ${fmtDate(e.nextDate)}`:''}</div></td>
           <td><span class="badge ${e.status||'agendado'}">${labelExamStatus(e.status)}</span></td>
           <td>${e.resultado?`<span class="badge ${e.resultado}">${labelExamResult(e.resultado)}</span>`:'<span class="card-sub">—</span>'}</td>
-          <td>${e.lab||'—'}</td>
-          <td>${getDoctorName(e.doctorId)||'—'}</td>
-          <td>${e.fileData?`<button class="btn btn-warning" onclick="window.saudeApp.openPdf('${e.id}')">Abrir PDF</button>`:'—'}</td>
-          <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editExam('${e.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteExam('${e.id}')">Excluir</button></div></td>
+          <td>${escapeHtml(e.lab||'—')}</td>
+          <td>${escapeHtml(getDoctorName(e.doctorId)||'—')}</td>
+          <td>${e.fileData?`<button class="btn btn-warning" onclick="window.saudeApp.openPdf('${escapeJs(e.id)}')">Abrir PDF</button>`:'—'}</td>
+          <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editExam('${escapeJs(e.id)}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteExam('${escapeJs(e.id)}')">Excluir</button></div></td>
         </tr>`).join(''):'<tr><td colspan="8" class="empty">Nenhum exame encontrado.</td></tr>';
       }
       function labelExamStatus(v){ return ({agendado:'Agendado',realizado:'Realizado',cancelado:'Cancelado'})[v]||'Agendado'; }
@@ -1821,13 +1822,13 @@
           return (!st || c.status===st) && [getDoctorName(c.doctorId),c.specialty,c.reason,c.summary].some(v=>text(v).includes(q));
         });
         document.getElementById('consult-body').innerHTML=rows.length?rows.map(c=>`<tr>
-          <td>${fmtDate(c.date)} ${c.time?`<span class="card-sub mono">${c.time}</span>`:''}</td>
-          <td>${getDoctorName(c.doctorId)||'—'}</td>
-          <td>${c.specialty||'—'}</td>
+          <td>${fmtDate(c.date)} ${c.time?`<span class="card-sub mono">${escapeHtml(c.time)}</span>`:''}</td>
+          <td>${escapeHtml(getDoctorName(c.doctorId)||'—')}</td>
+          <td>${escapeHtml(c.specialty||'—')}</td>
           <td><span class="badge ${c.status}">${labelConsultStatus(c.status)}</span></td>
           <td>${c.nextDate?fmtDate(c.nextDate):(c.returnDays?`${c.returnDays} dias`:'—')}</td>
-          <td>${c.summary||c.reason||'—'}</td>
-          <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editConsult('${c.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteConsult('${c.id}')">Excluir</button></div></td>
+          <td>${escapeHtml(c.summary||c.reason||'—')}</td>
+          <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editConsult('${escapeJs(c.id)}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteConsult('${escapeJs(c.id)}')">Excluir</button></div></td>
         </tr>`).join(''):'<tr><td colspan="7" class="empty">Nenhuma consulta encontrada.</td></tr>';
       }
       function labelConsultStatus(v){ return ({agendada:'Agendada',realizada:'Realizada',cancelada:'Cancelada'})[v]||v; }
@@ -1895,13 +1896,13 @@
           const atendLabel={plano:'Plano',particular:'Particular',ambos:'Plano + Particular'}[d.atendimento]||'—';
           const valorStr=d.atendimento&&d.atendimento!=='plano'&&d.valorConsulta?` · R$ ${Number(d.valorConsulta).toLocaleString('pt-BR',{minimumFractionDigits:2})}`:'';
           return `<tr>
-            <td><div>${d.name}</div><div class="card-sub">${d.address||'—'}</div></td>
-            <td>${d.specialty||'—'}</td>
-            <td>${[d.phone,d.whats,d.email].filter(Boolean).join(' · ')||'—'}</td>
-            <td>${d.clinic||'—'}</td>
+            <td><div>${escapeHtml(d.name)}</div><div class="card-sub">${escapeHtml(d.address||'—')}</div></td>
+            <td>${escapeHtml(d.specialty||'—')}</td>
+            <td>${escapeHtml([d.phone,d.whats,d.email].filter(Boolean).join(' · ')||'—')}</td>
+            <td>${escapeHtml(d.clinic||'—')}</td>
             <td><div>${atendLabel}${valorStr}</div><div class="card-sub">${last?fmtDate(last):'—'}</div></td>
-            <td><span class="badge ${st.cls}">${st.label}</span></td>
-            <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editDoctor('${d.id}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteDoctor('${d.id}')">Excluir</button></div></td>
+            <td><span class="badge ${st.cls}">${escapeHtml(st.label)}</span></td>
+            <td><div class="row-actions"><button class="btn btn-success" onclick="window.saudeApp.editDoctor('${escapeJs(d.id)}')">Editar</button><button class="btn btn-danger" onclick="window.saudeApp.deleteDoctor('${escapeJs(d.id)}')">Excluir</button></div></td>
           </tr>`;
         }).join(''):'<tr><td colspan="7" class="empty">Nenhum médico cadastrado.</td></tr>';
       }
@@ -1938,7 +1939,7 @@
       }
 
       function populateDoctorSelects(){
-        const opts=['<option value="">— Selecionar —</option>',...state.doctors.sort((a,b)=>a.name.localeCompare(b.name)).map(d=>`<option value="${d.id}">${d.name} · ${d.specialty||'Sem especialidade'}</option>`)].join('');
+        const opts=['<option value="">— Selecionar —</option>',...state.doctors.sort((a,b)=>a.name.localeCompare(b.name)).map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)} · ${escapeHtml(d.specialty||'Sem especialidade')}</option>`)].join('');
         ['e-doctor','c-doctor'].forEach(id=>document.getElementById(id).innerHTML=opts);
       }
 
@@ -1957,7 +1958,7 @@
           state.weights.filter(w=>w.date===key).forEach(w=>events.push({cls:'weight',label:`Peso ${Number(w.weight).toFixed(1)}kg`}));
           state.exams.forEach(e=>{ if(e.date===key || e.nextDate===key) events.push({cls:'exam',label:e.name}); });
           state.consults.forEach(c=>{ if(c.date===key || c.nextDate===key) events.push({cls:'consult',label:getDoctorName(c.doctorId)||c.specialty||'Consulta'}); });
-          day.innerHTML=`<div class="cal-num">${d.getDate()}</div>${events.slice(0,3).map(ev=>`<div class="cal-event ${ev.cls}">${ev.label}</div>`).join('')}${events.length>3?`<div class="card-sub">+${events.length-3} mais</div>`:''}`;
+          day.innerHTML=`<div class="cal-num">${d.getDate()}</div>${events.slice(0,3).map(ev=>`<div class="cal-event ${ev.cls}">${escapeHtml(ev.label)}</div>`).join('')}${events.length>3?`<div class="card-sub">+${events.length-3} mais</div>`:''}`;
           body.appendChild(day);
         }
       }

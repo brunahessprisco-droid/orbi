@@ -1214,6 +1214,10 @@ function hasPendingSync(){
     return [SK_DIRTY_TX,SK_DEL_TX,SK_DIRTY_CAT,SK_DEL_CAT,SK_DIRTY_C,SK_DEL_C,SK_DIRTY_FX,SK_DEL_FX,SK_DIRTY_FXV,SK_DEL_FXV,SK_DIRTY_PR,SK_DEL_PR].some(k=>_finGetSet(k).size>0);
   }catch(_){ return false; }
 }
+/** Texto inserido em HTML — evita XSS */
+function _escHtml(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+/** String dentro de onclick="...'...'..." */
+function _escJs(s){return String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'').replace(/\n/g,'\\n');}
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MESES_S=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const CARD_COLORS=['#2dd4a0','#7b9cff','#f06292','#fbbf24','#f97316','#a855f7','#06b6d4','#ec4899','#6366f1','#10b981','#84cc16','#ef4444'];
@@ -2024,8 +2028,8 @@ function sortCartoes(list){
     return String(a?.nome||'').localeCompare(String(b?.nome||''),'pt-BR',{sensitivity:'base'});
   });
 }
-function getContaOpts(sel){return sortCartoes(cartoes).map(c=>`<option value="${c.nome}"${c.nome===sel?' selected':''}>${c.nome}</option>`).join('');}
-function getCatOpts(sel){return cats.map(c=>`<option value="${c.nome}"${c.nome===sel?' selected':''}>${c.nome}</option>`).join('');}
+function getContaOpts(sel){return sortCartoes(cartoes).map(c=>`<option value="${_escHtml(c.nome)}"${c.nome===sel?' selected':''}>${_escHtml(c.nome)}</option>`).join('');}
+function getCatOpts(sel){return cats.map(c=>`<option value="${_escHtml(c.nome)}"${c.nome===sel?' selected':''}>${_escHtml(c.nome)}</option>`).join('');}
 
 function changeFatura(d){
   curFat.m+=d;
@@ -2151,12 +2155,12 @@ function rendDash(){
     {label:'Saldo projetado',data:lAcum,borderColor:'#c8820a',backgroundColor:'transparent',tension:.35,fill:false,pointRadius:3,pointBackgroundColor:lAcum.map(v=>v>=0?'#c8820a':'#f06292'),pointBorderColor:lAcum.map(v=>v>=0?'#c8820a':'#f06292'),borderWidth:2,borderDash:[2,4]}
   ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cMuted,font:{size:12},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.raw)}}},scales:{x:{grid:{color:cBorder},ticks:{color:cMuted}},y:{grid:{color:cBorder},ticks:{color:cMuted,callback:v=>'R$ '+v.toLocaleString('pt-BR')}}}}})
   const maxV=sc[0]?.[1]||1;
-  document.getElementById('cat-ranking').innerHTML=sc.slice(0,5).map(([c,v],i)=>`<div class="cat-row"><div class="cat-rank">${i+1}</div><div class="cat-label">${c}</div><div class="cat-bar-wrap"><div class="cat-bar" style="width:${(v/maxV*100).toFixed(1)}%;background:${catColor(c)}"></div></div><div class="cat-val">${fmt(v)}</div></div>`).join('');
+  document.getElementById('cat-ranking').innerHTML=sc.slice(0,5).map(([c,v],i)=>`<div class="cat-row"><div class="cat-rank">${i+1}</div><div class="cat-label">${_escHtml(c)}</div><div class="cat-bar-wrap"><div class="cat-bar" style="width:${(v/maxV*100).toFixed(1)}%;background:${catColor(c)}"></div></div><div class="cat-val">${fmt(v)}</div></div>`).join('');
   const top=[...gastos].sort((a,b)=>(b.valorParcela||b.valor)-(a.valorParcela||a.valor)).slice(0,6);
   document.getElementById('top-expenses').innerHTML=top.map(t=>{
     const dt=(t.data||'').split('-').reverse().join('/');
     const pInfo=(t.tipo==='parcela'&&t.parcelaAtual&&t.nParcelas)?` · ${t.parcelaAtual}/${t.nParcelas}`:'';
-    return `<div class="top-row"><div><div class="top-name">${t.descricao}</div><div class="top-sub">${t.categoria}${dt?` · ${dt}`:''}${pInfo}</div></div><div class="top-val">- ${fmt(t.valorParcela||t.valor)}</div></div>`;
+    return `<div class="top-row"><div><div class="top-name">${_escHtml(t.descricao)}</div><div class="top-sub">${_escHtml(t.categoria)}${dt?` · ${_escHtml(dt)}`:''}${pInfo}</div></div><div class="top-val">- ${fmt(t.valorParcela||t.valor)}</div></div>`;
   }).join('')||'<div style="color:var(--hint);font-size:13px;padding:12px 0">Sem gastos neste mês</div>';
 }
 
@@ -2233,16 +2237,16 @@ function rendTable(){
       const badge=isP?'<span class="badge parcela">parcelado</span>':isPos?'<span class="badge receita">receita</span>':'<span class="badge despesa">despesa</span>';
       const pi=isP?`<div class="parc-info">${t.parcelaAtual}/${t.nParcelas}</div>`:'';
       const delBtn=isP&&t.groupId
-        ? `<button class="btn-icon del" title="Excluir..." onclick="openDelPrompt('${t.id}','${t.groupId}','${t.nParcelas}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`
-        : `<button class="btn-icon del" title="Excluir" onclick="delTx('${t.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`;
+        ? `<button class="btn-icon del" title="Excluir..." onclick="openDelPrompt('${_escJs(t.id)}','${_escJs(t.groupId)}','${_escJs(String(t.nParcelas))}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`
+        : `<button class="btn-icon del" title="Excluir" onclick="delTx('${_escJs(t.id)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`;
       const isLastParc=isP&&t.parcelaAtual===t.nParcelas;
-      return `<tr onclick="editTx('${t.id}')" ${isLastParc?'style="background:rgba(240,98,146,.07);"':''}>
-        <td><div class="td-date">${(t.data||'—').split('-').reverse().join('/')}</div></td>
-        <td><div class="td-conta" style="margin-top:0">${t.conta}</div></td>
-        <td><div class="td-desc">${t.descricao}${t.projecao?'<span class="proj-badge">proj.</span>':''}</div>${pi}</td>
+      return `<tr onclick="editTx('${_escJs(t.id)}')" ${isLastParc?'style="background:rgba(240,98,146,.07);"':''}>
+        <td><div class="td-date">${_escHtml((t.data||'—').split('-').reverse().join('/'))}</div></td>
+        <td><div class="td-conta" style="margin-top:0">${_escHtml(t.conta)}</div></td>
+        <td><div class="td-desc">${_escHtml(t.descricao)}${t.projecao?'<span class="proj-badge">proj.</span>':''}</div>${pi}</td>
         <td>${badge}</td>
-        <td><span class="tag-cat"><span class="dot" style="background:${catColor(t.categoria)}"></span>${t.categoria}</span></td>
-        <td><span class="fat-badge">${fLabelS(t.fatura)}</span></td>
+        <td><span class="tag-cat"><span class="dot" style="background:${catColor(t.categoria)}"></span>${_escHtml(t.categoria)}</span></td>
+        <td><span class="fat-badge">${_escHtml(fLabelS(t.fatura))}</span></td>
         <td><div class="table-value-wrap"><div class="td-value ${isPos?'positive':'negative'}"><span class="sign">${isPos?'+':'-'}</span><span class="money">${fmt(val)}</span></div><div class="row-actions" onclick="event.stopPropagation()">${delBtn}</div></div></td>
       </tr>`;
     }).join('');
@@ -2264,23 +2268,23 @@ function rendTable(){
     const gD=gList.filter(t=>t.tipo==='despesa').reduce((a,t)=>a+t.valor,0);
     const gP=gList.filter(t=>t.tipo==='parcela').reduce((a,t)=>a+(t.valorParcela||t.valor),0);
     const label=gk==='—'?'—':fLabel(gk);
-    rows.push(`<tr class="month-group-row" onclick="toggleMonthGroup('${gk}')" title="${collapsed?'Expandir':'Recolher'} grupo"><td colspan="7"><div class="month-group-label"><span class="month-group-arrow ${collapsed?'':'open'}" aria-hidden="true">▶</span><span>${label}</span><span class="expand-group-meta">${gList.length} lançamento${gList.length!==1?'s':''}</span><div class="month-group-chips">${gR?`<span class="total-chip green">↑ ${fmt(gR)}</span>`:''}${gD?`<span class="total-chip red">↓ ${fmt(gD)}</span>`:''}${gP?`<span class="total-chip blue">⊕ ${fmt(gP)}</span>`:''}</div></div></td></tr>`);
+    rows.push(`<tr class="month-group-row" onclick="toggleMonthGroup('${_escJs(gk)}')" title="${collapsed?'Expandir':'Recolher'} grupo"><td colspan="7"><div class="month-group-label"><span class="month-group-arrow ${collapsed?'':'open'}" aria-hidden="true">▶</span><span>${_escHtml(label)}</span><span class="expand-group-meta">${gList.length} lançamento${gList.length!==1?'s':''}</span><div class="month-group-chips">${gR?`<span class="total-chip green">↑ ${fmt(gR)}</span>`:''}${gD?`<span class="total-chip red">↓ ${fmt(gD)}</span>`:''}${gP?`<span class="total-chip blue">⊕ ${fmt(gP)}</span>`:''}</div></div></td></tr>`);
     if(!collapsed){
       gList.forEach(t=>{
         const isPos=t.tipo==='receita',isP=t.tipo==='parcela',val=isP?(t.valorParcela||t.valor):t.valor;
         const badge=isP?'<span class="badge parcela">parcelado</span>':isPos?'<span class="badge receita">receita</span>':'<span class="badge despesa">despesa</span>';
         const pi=isP?`<div class="parc-info">${t.parcelaAtual}/${t.nParcelas}</div>`:'';
         const delBtn=isP&&t.groupId
-          ? `<button class="btn-icon del" title="Excluir..." onclick="openDelPrompt('${t.id}','${t.groupId}','${t.nParcelas}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`
-          : `<button class="btn-icon del" title="Excluir" onclick="delTx('${t.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`;
+          ? `<button class="btn-icon del" title="Excluir..." onclick="openDelPrompt('${_escJs(t.id)}','${_escJs(t.groupId)}','${_escJs(String(t.nParcelas))}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`
+          : `<button class="btn-icon del" title="Excluir" onclick="delTx('${_escJs(t.id)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`;
         const isLastParc=isP&&t.parcelaAtual===t.nParcelas;
-        rows.push(`<tr onclick="editTx('${t.id}')" ${isLastParc?'style="background:rgba(240,98,146,.07);"':''}>
-          <td><div class="td-date">${(t.data||'—').split('-').reverse().join('/')}</div></td>
-          <td><div class="td-conta" style="margin-top:0">${t.conta}</div></td>
-          <td><div class="td-desc">${t.descricao}${t.projecao?'<span class="proj-badge">proj.</span>':''}</div>${pi}</td>
+        rows.push(`<tr onclick="editTx('${_escJs(t.id)}')" ${isLastParc?'style="background:rgba(240,98,146,.07);"':''}>
+          <td><div class="td-date">${_escHtml((t.data||'—').split('-').reverse().join('/'))}</div></td>
+          <td><div class="td-conta" style="margin-top:0">${_escHtml(t.conta)}</div></td>
+          <td><div class="td-desc">${_escHtml(t.descricao)}${t.projecao?'<span class="proj-badge">proj.</span>':''}</div>${pi}</td>
           <td>${badge}</td>
-          <td><span class="tag-cat"><span class="dot" style="background:${catColor(t.categoria)}"></span>${t.categoria}</span></td>
-          <td><span class="fat-badge">${fLabelS(t.fatura)}</span></td>
+          <td><span class="tag-cat"><span class="dot" style="background:${catColor(t.categoria)}"></span>${_escHtml(t.categoria)}</span></td>
+          <td><span class="fat-badge">${_escHtml(fLabelS(t.fatura))}</span></td>
           <td><div class="table-value-wrap"><div class="td-value ${isPos?'positive':'negative'}"><span class="sign">${isPos?'+':'-'}</span><span class="money">${fmt(val)}</span></div><div class="row-actions" onclick="event.stopPropagation()">${delBtn}</div></div></td>
         </tr>`);
       });
@@ -2355,7 +2359,7 @@ function cartaoCard(c,k){
 
   return `<div class="cartao-card">
     <div class="cartao-top">
-      <div><div class="cartao-name">${c.nome}</div><div class="cartao-bank">${c.banco}</div></div>
+      <div><div class="cartao-name">${_escHtml(c.nome)}</div><div class="cartao-bank">${_escHtml(c.banco)}</div></div>
       <div class="cartao-top-right">
         ${fatPill}
         <div class="cartao-dot" style="background:${c.cor}"></div>
@@ -2371,9 +2375,9 @@ function cartaoCard(c,k){
     </div>
     ${lb}
     <div class="cartao-actions">
-      ${!isDebito?`<button class="btn-sm" onclick="openFaturaPopup('${c.id}')">Ver fatura</button>`:''}
-      <button class="btn-sm" onclick="editCartao('${c.id}')">Editar</button>
-      <button class="btn-sm danger" onclick="delCartao('${c.id}')">Excluir</button>
+      ${!isDebito?`<button class="btn-sm" onclick="openFaturaPopup('${_escJs(c.id)}')">Ver fatura</button>`:''}
+      <button class="btn-sm" onclick="editCartao('${_escJs(c.id)}')">Editar</button>
+      <button class="btn-sm danger" onclick="delCartao('${_escJs(c.id)}')">Excluir</button>
     </div>
   </div>`;
 }
@@ -2402,7 +2406,7 @@ function rendCartoesMatrix(){
   months.push(k);
   for(let i=1;i<=4;i++)months.push(addM(k,i));
   const cols=sortCartoes(cartoes.filter(c=>c.tipo!=='debito'));
-  const head=`<thead><tr><th>Mês</th>${cols.map(c=>`<th title="${c.banco}">${c.nome}</th>`).join('')}<th>Total</th></tr></thead>`;
+  const head=`<thead><tr><th>Mês</th>${cols.map(c=>`<th title="${_escHtml(c.banco)}">${_escHtml(c.nome)}</th>`).join('')}<th>Total</th></tr></thead>`;
   const body=months.map(m=>{
     const rowCls=m===k?'row-cur':'';
     let rowTotal=0;
@@ -2445,17 +2449,17 @@ function renderFaturaPopup(cartaoId){
   document.getElementById('fat-popup-total').textContent=totalAll>0?fmt(totalAll):'Sem lançamentos';
 
   document.getElementById('fat-popup-summary').innerHTML=`
-    <div class="popup-sum-item all${faturaPopupFilter==='todos'?' active':''}" onclick="setFaturaFilter('${cartaoId}','todos')">
+    <div class="popup-sum-item all${faturaPopupFilter==='todos'?' active':''}" onclick="setFaturaFilter('${_escJs(cartaoId)}','todos')">
       <div class="popup-sum-label">Total fatura</div>
       <div class="popup-sum-val">${fmt(totalAll)}</div>
       <div class="popup-sum-count">${all.length} lançamento${all.length!==1?'s':''}</div>
     </div>
-    <div class="popup-sum-item parc${faturaPopupFilter==='parcela'?' active':''}" onclick="setFaturaFilter('${cartaoId}','parcela')">
+    <div class="popup-sum-item parc${faturaPopupFilter==='parcela'?' active':''}" onclick="setFaturaFilter('${_escJs(cartaoId)}','parcela')">
       <div class="popup-sum-label">Parcelado</div>
       <div class="popup-sum-val" style="color:var(--blue)">${fmt(totalParc)}</div>
       <div class="popup-sum-count">${parcelas.length} parcela${parcelas.length!==1?'s':''}</div>
     </div>
-    <div class="popup-sum-item vista${faturaPopupFilter==='despesa'?' active':''}" onclick="setFaturaFilter('${cartaoId}','despesa')">
+    <div class="popup-sum-item vista${faturaPopupFilter==='despesa'?' active':''}" onclick="setFaturaFilter('${_escJs(cartaoId)}','despesa')">
       <div class="popup-sum-label">À vista</div>
       <div class="popup-sum-val" style="color:var(--red)">${fmt(totalVista)}</div>
       <div class="popup-sum-count">${avista.length} compra${avista.length!==1?'s':''}</div>
@@ -2467,10 +2471,10 @@ function renderFaturaPopup(cartaoId){
   document.getElementById('fat-popup-body').innerHTML=list.length?list.map(t=>{
     const val=t.valorParcela||t.valor;
     const parcBadge=t.tipo==='parcela'?`<span class="popup-tx-badge parc">${t.parcelaAtual}/${t.nParcelas}</span>`:'';
-    return `<div class="popup-tx-row" onclick="goToTx('${t.id}')">
+    return `<div class="popup-tx-row" onclick="goToTx('${_escJs(t.id)}')">
       <div>
-        <div class="popup-tx-name">${t.descricao}${parcBadge}</div>
-        <div class="popup-tx-sub">${t.categoria} · ${(t.data||'').split('-').reverse().join('/')}</div>
+        <div class="popup-tx-name">${_escHtml(t.descricao)}${parcBadge}</div>
+        <div class="popup-tx-sub">${_escHtml(t.categoria)} · ${_escHtml((t.data||'').split('-').reverse().join('/'))}</div>
       </div>
       <div class="popup-tx-val">${fmt(val)}</div>
     </div>`;
@@ -2574,10 +2578,10 @@ function rendCats(){
     const pct=(total/maxV*100).toFixed(1);
     return `<div class="cat-card">
       <div class="cat-card-top">
-        <div class="cat-card-name"><div class="cat-card-swatch" style="background:${c.cor}"></div>${c.nome}</div>
+        <div class="cat-card-name"><div class="cat-card-swatch" style="background:${c.cor}"></div>${_escHtml(c.nome)}</div>
         <div class="cat-card-actions">
-          <button class="btn-icon" onclick="editCat('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-          <button class="btn-icon del" onclick="delCat('${c.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+          <button class="btn-icon" onclick="editCat('${_escJs(c.id)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="btn-icon del" onclick="delCat('${_escJs(c.id)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
         </div>
       </div>
       <div class="cat-total">${total>0?fmt(total):'—'}</div>
@@ -2658,8 +2662,8 @@ function rendFixas(){
       ?`<span class="fixa-badge-ok">✓ Lançada</span>`
       :`<span class="fixa-badge-pend">● Pendente</span>`;
     const btnLancar=lancada
-      ?`<button class="btn-sm" onclick="openFixaValModal('${f.id}')">Editar lançamento</button>`
-      :`<button class="btn-primary" style="font-size:12px;padding:7px 13px;" onclick="openFixaValModal('${f.id}')">
+      ?`<button class="btn-sm" onclick="openFixaValModal('${_escJs(f.id)}')">Editar lançamento</button>`
+      :`<button class="btn-primary" style="font-size:12px;padding:7px 13px;" onclick="openFixaValModal('${_escJs(f.id)}')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:12px;height:12px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Lançar
         </button>`;
@@ -2673,15 +2677,15 @@ function rendFixas(){
     return `<div class="fixa-row">
       <div class="fixa-dot" style="background:${corDot}"></div>
       <div class="fixa-info">
-        <div class="fixa-name">${f.nome}</div>
-        <div class="fixa-meta">${metaLine}</div>
+        <div class="fixa-name">${_escHtml(f.nome)}</div>
+        <div class="fixa-meta">${_escHtml(metaLine)}</div>
       </div>
       <div class="fixa-valor">- ${fmt(val)}</div>
       ${statusBadge}
       ${btnLancar}
       <div class="fixa-actions">
-        <button class="btn-icon" onclick="editFixa('${f.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="btn-icon del" onclick="encerrarFixa('${f.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></button>
+        <button class="btn-icon" onclick="editFixa('${_escJs(f.id)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="btn-icon del" onclick="encerrarFixa('${_escJs(f.id)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></button>
       </div>
     </div>`;
   }
@@ -2729,7 +2733,7 @@ function rendFixas(){
         if(m.lancada)subLanc+=m.val;
       }
       const sw=catColor(catNome);
-      const escCat=String(catNome).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const escCat=_escHtml(catNome);
       const subLancLine=subLanc<subGeral
         ?`<div class="fixas-group-sublanc">Lançado nesta fatura · − ${fmt(subLanc)}</div>`
         :'';
@@ -2805,8 +2809,8 @@ function openCalDayPopup(ds){
     const sign=isRec?'+':'-';
     const parcBadge=isPar?`<span class="popup-tx-badge parc">${t.nParcelas}x</span>`:'';
     const sub=[t.categoria,t.conta,isPar?`Total: ${fmt(val)}, ${fmt(t.valorParcela||t.valor)}/parcela`:''].filter(Boolean).join(' · ');
-    return`<div class="popup-tx-row" onclick="editTx('${t.id}');closeOv('ov-cal-day')">
-      <div><div class="popup-tx-name">${t.descricao}${parcBadge}</div><div class="popup-tx-sub">${sub}</div></div>
+    return`<div class="popup-tx-row" onclick="editTx('${_escJs(t.id)}');closeOv('ov-cal-day')">
+      <div><div class="popup-tx-name">${_escHtml(t.descricao)}${parcBadge}</div><div class="popup-tx-sub">${_escHtml(sub)}</div></div>
       <div class="popup-tx-val" style="color:${cor}">${sign} ${fmt(val)}</div>
     </div>`;
   }).join(''):`<div style="padding:32px;text-align:center;color:var(--hint);">Nenhuma transação neste dia</div>`;
@@ -2871,7 +2875,7 @@ function rendCalendarioFin(){
       const parcTag=isBuy?`<span style="font-size:9px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:3px;padding:0 3px;flex-shrink:0;">${t.nParcelas}x</span>`:'';
       return`<div class="fin-cal-tx">
         <div class="fin-cal-tx-dot" style="background:${cor}"></div>
-        <span class="fin-cal-tx-desc">${t.descricao}</span>
+        <span class="fin-cal-tx-desc">${_escHtml(t.descricao)}</span>
         ${parcTag}
         <span class="fin-cal-tx-val" style="color:${cor}">${sign}${fmt(val)}</span>
       </div>`;
@@ -2886,7 +2890,7 @@ function rendCalendarioFin(){
       totalHtml=`<div class="fin-cal-total ${cls}">${sign} ${fmt(Math.abs(total))}</div>`;
     }
 
-    cells+=`<div class="fin-cal-cell${!inMonth?' other-month':''}${isToday?' today':''}" onclick="openCalDayPopup('${ds}')" style="cursor:pointer;">
+    cells+=`<div class="fin-cal-cell${!inMonth?' other-month':''}${isToday?' today':''}" onclick="openCalDayPopup('${_escJs(ds)}')" style="cursor:pointer;">
       <div class="fin-cal-cell-num">${d.getDate()}</div>
       ${chips}${more}${totalHtml}
     </div>`;
@@ -3349,11 +3353,11 @@ function rendPoupanca(){
               <td style="font-family:var(--mono);color:var(--red)">${r.despGastos>0?fmt(r.despGastos):'—'}</td>
               <td><div class="poupc-input-cell">
                 <span style="font-size:11px;color:var(--hint);margin-right:3px">R$</span>
-                <input class="poupc-input" type="number" step="0.01" min="0" value="${r.prev||''}" placeholder="0,00" onchange="updPoupanca('previsto','${r.mes}',this.value)">
+                <input class="poupc-input" type="number" step="0.01" min="0" value="${r.prev||''}" placeholder="0,00" onchange="updPoupanca('previsto','${_escJs(r.mes)}',this.value)">
               </div></td>
               <td><div class="poupc-input-cell">
                 <span style="font-size:11px;color:var(--hint);margin-right:3px">R$</span>
-                <input class="poupc-input" type="number" step="0.01" min="0" value="${r.real||''}" placeholder="0,00" onchange="updPoupanca('realizado','${r.mes}',this.value)">
+                <input class="poupc-input" type="number" step="0.01" min="0" value="${r.real||''}" placeholder="0,00" onchange="updPoupanca('realizado','${_escJs(r.mes)}',this.value)">
                 ${r.prev>0&&r.real>0?`<span style="font-size:10px;margin-left:5px;color:${diff>=0?'var(--green)':'var(--red)'}">${diff>=0?'▲':'▼'}${fmt(Math.abs(diff))}</span>`:''}
               </div></td>
               <td style="font-family:var(--mono);font-weight:500;color:${saldoColor}">${semDados?'—':fmt(r.saldoFinal)}</td>
@@ -3415,12 +3419,12 @@ function rendBudget(){
     const restante=b.limite-gasto;
     html+=`<div class="budget-card">
       <div class="budget-card-top">
-        <div class="budget-cat-name"><div class="budget-cat-dot" style="background:${c.cor}"></div>${c.nome}</div>
+        <div class="budget-cat-name"><div class="budget-cat-dot" style="background:${c.cor}"></div>${_escHtml(c.nome)}</div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="budget-status ${status}">${statusLabel}</span>
           <div class="budget-cat-actions">
-            <button class="btn-icon" onclick="openBudgetModal('${c.nome}')" title="Editar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-            <button class="btn-icon del" onclick="delBudget('${c.nome}')" title="Remover"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+            <button class="btn-icon" onclick="openBudgetModal('${_escJs(c.nome)}')" title="Editar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="btn-icon del" onclick="delBudget('${_escJs(c.nome)}')" title="Remover"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
           </div>
         </div>
       </div>
@@ -3438,12 +3442,12 @@ function rendBudget(){
   withoutBudget.filter(c=>gastosCat[c.nome]).forEach(c=>{
     html+=`<div class="budget-card" style="border-style:dashed;">
       <div class="budget-card-top">
-        <div class="budget-cat-name"><div class="budget-cat-dot" style="background:${c.cor}"></div>${c.nome}</div>
+        <div class="budget-cat-name"><div class="budget-cat-dot" style="background:${c.cor}"></div>${_escHtml(c.nome)}</div>
         <span style="font-size:11px;color:var(--hint)">Sem orçamento</span>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">Gasto nesta fatura</div><div style="font-family:var(--mono);font-size:18px;color:var(--red)">${fmt(gastosCat[c.nome])}</div></div>
-        <button class="btn-sm" onclick="openBudgetModal('${c.nome}')">+ Definir limite</button>
+        <button class="btn-sm" onclick="openBudgetModal('${_escJs(c.nome)}')">+ Definir limite</button>
       </div>
     </div>`;
   });
@@ -3508,7 +3512,7 @@ function rendDespesasList(){
   }
   list.innerHTML=receitasProj.map((r,i)=>`
     <div class="proj-receita-row">
-      <input class="proj-receita-input" value="${r.nome}" placeholder="Ex: Viagem, Presente, Consulta..." oninput="updDespesaProj(${i},'nome',this.value)">
+      <input class="proj-receita-input" value="${_escHtml(r.nome)}" placeholder="Ex: Viagem, Presente, Consulta..." oninput="updDespesaProj(${i},'nome',this.value)">
       <input class="proj-receita-input valor" value="${r.valor||''}" type="number" step="0.01" min="0" placeholder="0,00" oninput="updDespesaProj(${i},'valor',this.value)">
       <label class="proj-receita-toggle">
         <input type="checkbox" ${r.ativo?'checked':''} onchange="updDespesaProj(${i},'ativo',this.checked)"> Incluir
@@ -3590,7 +3594,7 @@ function rendProjecaoChart(){
   if(alertEl){
     const alertas=projs.filter(p=>p.saldo<0);
     alertEl.innerHTML=alertas.map(p=>`
-      <div class="proj-alert">⚠️ <strong>${fLabel(p.f)}</strong>: saldo projetado negativo de ${fmt(Math.abs(p.saldo))} (fixas ${fmt(p.fixasV)} + parcelas ${fmt(p.parcelas)}${p.extras>0?' + extras '+fmt(p.extras):''})</div>
+      <div class="proj-alert">⚠️ <strong>${_escHtml(fLabel(p.f))}</strong>: saldo projetado negativo de ${fmt(Math.abs(p.saldo))} (fixas ${fmt(p.fixasV)} + parcelas ${fmt(p.parcelas)}${p.extras>0?' + extras '+fmt(p.extras):''})</div>
     `).join('');
   }
 
@@ -3705,8 +3709,8 @@ function rendAnalises(){
   const avgR=totaisPorFat.filter(t=>t.r>0).reduce((a,t)=>a+t.r,0)/totaisPorFat.filter(t=>t.r>0).length||0;
 
   document.getElementById('analise-resumo').innerHTML=`
-    <div class="analise-stat"><div><div class="analise-stat-label">Mês mais caro</div><div class="analise-stat-sub">${fLabel(maxDespesa.f)}</div></div><div class="analise-stat-val" style="color:var(--red)">${fmt(maxDespesa.d)}</div></div>
-    <div class="analise-stat"><div><div class="analise-stat-label">Mês mais barato</div><div class="analise-stat-sub">${fLabel(minDespesa.f)}</div></div><div class="analise-stat-val" style="color:var(--green)">${fmt(minDespesa.d)}</div></div>
+    <div class="analise-stat"><div><div class="analise-stat-label">Mês mais caro</div><div class="analise-stat-sub">${_escHtml(fLabel(maxDespesa.f))}</div></div><div class="analise-stat-val" style="color:var(--red)">${fmt(maxDespesa.d)}</div></div>
+    <div class="analise-stat"><div><div class="analise-stat-label">Mês mais barato</div><div class="analise-stat-sub">${_escHtml(fLabel(minDespesa.f))}</div></div><div class="analise-stat-val" style="color:var(--green)">${fmt(minDespesa.d)}</div></div>
     <div class="analise-stat"><div><div class="analise-stat-label">Média de gastos</div><div class="analise-stat-sub">por mês</div></div><div class="analise-stat-val">${fmt(avgD)}</div></div>
     <div class="analise-stat"><div><div class="analise-stat-label">Média de receitas</div><div class="analise-stat-sub">por mês</div></div><div class="analise-stat-val" style="color:var(--green)">${fmt(avgR)}</div></div>
     <div class="analise-stat"><div><div class="analise-stat-label">Faturas analisadas</div></div><div class="analise-stat-val">${fatComDados.length}</div></div>
@@ -3721,7 +3725,7 @@ function rendAnalises(){
     const pct=prev.d>0?((delta/prev.d)*100):0;
     const pos=delta<=0;
     varHtml+=`<div class="analise-stat">
-      <div><div class="analise-stat-label">${fLabelS(cur.f)}</div><div class="analise-stat-sub">vs ${fLabelS(prev.f)}</div></div>
+      <div><div class="analise-stat-label">${_escHtml(fLabelS(cur.f))}</div><div class="analise-stat-sub">vs ${_escHtml(fLabelS(prev.f))}</div></div>
       <div style="text-align:right">
         <div class="analise-stat-val ${pos?'delta-pos':'delta-neg'}">${pos?'▼':'▲'} ${fmt(Math.abs(delta))}</div>
         <div class="analise-stat-sub ${pos?'delta-pos':'delta-neg'}">${pos?'-':'+'}${Math.abs(pct).toFixed(1)}%</div>
@@ -3744,7 +3748,7 @@ function rendAnalises(){
     .sort((a,b)=>b.media-a.media);
   const tableRows=rows.map(r=>{
     const cor=catColor(r.nome);
-    return `<tr><td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:${cor};flex-shrink:0;display:inline-block"></span>${r.nome}</span></td><td style="color:var(--muted)">${fmt(r.total)}</td><td style="color:var(--red)">${fmt(r.media)}</td></tr>`;
+    return `<tr><td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:${cor};flex-shrink:0;display:inline-block"></span>${_escHtml(r.nome)}</span></td><td style="color:var(--muted)">${fmt(r.total)}</td><td style="color:var(--red)">${fmt(r.media)}</td></tr>`;
   }).join('');
   document.getElementById('analise-medias').innerHTML=rows.length?`
     <table class="avg-table">
@@ -3833,8 +3837,8 @@ function openRevisarParcelas(){
       +'</tr></thead><tbody>';
     problemas.forEach(({ref,n,faltando})=>{
       html+=`<tr>
-        <td style="padding:8px;border-bottom:1px solid var(--border2);">${ref.descricao}</td>
-        <td style="padding:8px;border-bottom:1px solid var(--border2);color:var(--muted);">${ref.conta}</td>
+        <td style="padding:8px;border-bottom:1px solid var(--border2);">${_escHtml(ref.descricao)}</td>
+        <td style="padding:8px;border-bottom:1px solid var(--border2);color:var(--muted);">${_escHtml(ref.conta)}</td>
         <td style="padding:8px;text-align:center;border-bottom:1px solid var(--border2);">${n}x</td>
         <td style="padding:8px;text-align:center;border-bottom:1px solid var(--border2);color:#ff6b8a;">parcela${faltando.length>1?'s':''} ${faltando.join(', ')}</td>
       </tr>`;

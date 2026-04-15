@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { apiRouter } from "./api";
+import { getHttpErrorStatus } from "./httpError";
 
 dotenv.config();
 
@@ -35,6 +36,20 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2025") return res.status(404).json({ error: "NOT_FOUND" });
     if (err.code === "P2002") return res.status(409).json({ error: "CONFLICT" });
+  }
+  const httpStatus = getHttpErrorStatus(err);
+  if (httpStatus != null) {
+    const msg = err instanceof Error ? err.message : "ERROR";
+    const allowed = new Set([
+      "FORBIDDEN",
+      "UNAUTHORIZED",
+      "NOT_CONNECTED",
+      "NO_REFRESH_TOKEN",
+      "GOOGLE_REFRESH_ERROR",
+      "STRAVA_REFRESH_ERROR",
+    ]);
+    const error = allowed.has(msg) ? msg : httpStatus === 401 ? "UNAUTHORIZED" : httpStatus === 403 ? "FORBIDDEN" : "BAD_REQUEST";
+    return res.status(httpStatus).json({ error });
   }
   console.error(err);
   return res.status(500).json({ error: "INTERNAL_SERVER_ERROR" });
