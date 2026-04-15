@@ -105,8 +105,10 @@ body{font-family:"Comfortaa",sans-serif;background:var(--body-bg);color:var(--te
 .month-group-row td{padding:7px 16px;border-bottom:1px solid var(--border);border-top:1px solid var(--border);}
 .month-group-row:hover td{background:var(--surface3);}
 .month-group-label{font-size:11px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.4px;}
-.month-group-arrow{font-size:9px;color:var(--hint);transition:transform .18s;display:inline-block;line-height:1;}
+/* Seta compartilhada: expandir/recolher (transações por mês · contas fixas por categoria) */
+.month-group-arrow{font-size:9px;color:var(--hint);transition:transform .18s;display:inline-block;line-height:1;width:14px;text-align:center;flex-shrink:0;vertical-align:middle;}
 .month-group-arrow.open{transform:rotate(90deg);}
+.expand-group-meta{font-size:11px;font-weight:400;color:var(--hint);}
 .month-group-chips{display:flex;gap:5px;margin-left:auto;}
 .filter-btn:hover:not(.active){color:var(--text);}
 .search{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;color:var(--text);font-family:inherit;font-size:13px;outline:none;}
@@ -232,23 +234,22 @@ tbody tr:hover .row-actions{opacity:1;}
 .fixas-group:last-child{margin-bottom:0;}
 .fixas-group-left{display:flex;align-items:center;gap:10px;min-width:0;}
 .fixas-group-right{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;text-align:right;}
+/* Linha do cabeçalho (mesmo fluxo visual que .month-group-label em transações) */
+.expand-group-header-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;}
+.expand-group-header-row .fixas-group-title{flex:0 1 auto;}
+.expand-group-header-row .fixas-group-sums.month-group-chips{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
 .fixas-group-swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.fixas-group-title{font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--muted);text-transform:uppercase;}
-.fixas-group-count{font-size:11px;color:var(--hint);white-space:nowrap;}
+.fixas-group-title{font-size:16px;font-weight:700;letter-spacing:.02em;color:var(--text);text-transform:none;}
+.fixas-group-count{white-space:nowrap;}
 .fixas-group-sums{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
 .fixas-group-subtotal{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--red);white-space:nowrap;}
 .fixas-group-sublanc{font-family:var(--mono);font-size:11px;color:var(--hint);white-space:nowrap;}
-.fixas-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;max-width:min(100%,520px);}
-.fixas-view-switch{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px;gap:0;flex-shrink:0;}
-.fixas-view-opt{border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;transition:color .15s,background .15s,box-shadow .15s;font-family:inherit;}
-.fixas-view-opt:hover{color:var(--text);}
-.fixas-view-opt.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12);}
-.fixas-view-opt:focus-visible{outline:2px solid var(--accent,#7b9cff);outline-offset:2px;}
-.fixas-group-header{width:100%;text-align:left;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;margin:0;border:none;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border);cursor:pointer;font:inherit;box-sizing:border-box;transition:background .15s,border-color .15s;flex-wrap:wrap;}
-.fixas-group-header:hover{background:rgba(123,156,255,.08);border-color:rgba(123,156,255,.25);}
+.fixas-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex:1;min-width:0;}
+.fixas-header .filter-group{flex-shrink:0;}
+.fixas-group-header{width:100%;text-align:left;display:flex;align-items:center;padding:7px 16px;margin:0;border:none;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);cursor:pointer;font:inherit;box-sizing:border-box;transition:background .1s,border-color .1s;}
+.fixas-group-header:hover{background:var(--surface3);}
 .fixas-group-header:focus-visible{outline:2px solid var(--accent,#7b9cff);outline-offset:1px;}
-.fixas-group-chevron{font-size:10px;color:var(--hint);transition:transform .2s ease;display:inline-block;width:16px;text-align:center;line-height:1;flex-shrink:0;margin-top:3px;}
-.fixas-group:not(.is-collapsed) .fixas-group-chevron{transform:rotate(90deg);}
+.expand-group-header-row .month-group-arrow{margin-top:2px;}
 .fixas-group-body{display:flex;flex-direction:column;gap:8px;padding-top:8px;}
 .fixas-group.is-collapsed .fixas-group-body{display:none;}
 .fixa-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;gap:16px;}
@@ -833,9 +834,9 @@ html.privacy .fin-cal-tx-val{filter:blur(8px);user-select:none;pointer-events:no
   <div class="fixas-header">
     <div class="fixas-title-row">
       <div style="font-size:16px;font-weight:600;">Contas fixas</div>
-      <div class="fixas-view-switch" role="tablist" aria-label="Exibição das contas fixas">
-        <button type="button" role="tab" class="fixas-view-opt" id="fixas-view-flat" onclick="setFixasGroupByCat(false)">Lista</button>
-        <button type="button" role="tab" class="fixas-view-opt" id="fixas-view-group" onclick="setFixasGroupByCat(true)">Por categoria</button>
+      <div class="filter-group" role="tablist" aria-label="Exibição das contas fixas">
+        <button type="button" role="tab" class="filter-btn" id="fixas-view-flat" onclick="setFixasGroupByCat(false)">Lista</button>
+        <button type="button" role="tab" class="filter-btn" id="fixas-view-group" onclick="setFixasGroupByCat(true)">Por categoria</button>
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
@@ -2049,8 +2050,14 @@ function updFatLabels(){
   setHTML('budget-nav-label',spans);
   set('budget-fat-label','Orçamento de '+l);
 }
-function setFilter(t,btn){filterType=t;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderAll();}
-function setViewMode(m){viewMode=m;document.querySelectorAll('.view-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));renderAll();}
+function setFilter(t,btn){
+  filterType=t;
+  const tipoGroup=document.querySelector('#toolbar-filters > .filter-group');
+  if(tipoGroup)tipoGroup.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+function setViewMode(m){viewMode=m;document.querySelectorAll('#toolbar-filters .view-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));renderAll();}
 
 function updCatFilter(){
   const sel=document.getElementById('cat-filter');const cur=sel.value;
@@ -2257,7 +2264,7 @@ function rendTable(){
     const gD=gList.filter(t=>t.tipo==='despesa').reduce((a,t)=>a+t.valor,0);
     const gP=gList.filter(t=>t.tipo==='parcela').reduce((a,t)=>a+(t.valorParcela||t.valor),0);
     const label=gk==='—'?'—':fLabel(gk);
-    rows.push(`<tr class="month-group-row" onclick="toggleMonthGroup('${gk}')"><td colspan="7"><div class="month-group-label"><span class="month-group-arrow ${collapsed?'':'open'}">▶</span><span>${label}</span><span style="color:var(--hint);font-weight:400;font-size:11px;">${gList.length} lançamento${gList.length!==1?'s':''}</span><div class="month-group-chips">${gR?`<span class="total-chip green">↑ ${fmt(gR)}</span>`:''}${gD?`<span class="total-chip red">↓ ${fmt(gD)}</span>`:''}${gP?`<span class="total-chip blue">⊕ ${fmt(gP)}</span>`:''}</div></div></td></tr>`);
+    rows.push(`<tr class="month-group-row" onclick="toggleMonthGroup('${gk}')" title="${collapsed?'Expandir':'Recolher'} grupo"><td colspan="7"><div class="month-group-label"><span class="month-group-arrow ${collapsed?'':'open'}" aria-hidden="true">▶</span><span>${label}</span><span class="expand-group-meta">${gList.length} lançamento${gList.length!==1?'s':''}</span><div class="month-group-chips">${gR?`<span class="total-chip green">↑ ${fmt(gR)}</span>`:''}${gD?`<span class="total-chip red">↓ ${fmt(gD)}</span>`:''}${gP?`<span class="total-chip blue">⊕ ${fmt(gP)}</span>`:''}</div></div></td></tr>`);
     if(!collapsed){
       gList.forEach(t=>{
         const isPos=t.tipo==='receita',isP=t.tipo==='parcela',val=isP?(t.valorParcela||t.valor):t.valor;
@@ -2639,7 +2646,7 @@ function rendFixas(){
   if(btnF&&btnG){
     btnF.classList.toggle('active',!groupOn);
     btnG.classList.toggle('active',groupOn);
-    btnF.setAttribute('aria-selected',groupOn?'false':'true');
+    btnF.setAttribute('aria-selected',!groupOn?'true':'false');
     btnG.setAttribute('aria-selected',groupOn?'true':'false');
   }
 
@@ -2729,15 +2736,13 @@ function rendFixas(){
       const isCollapsed=collapsedCats.has(catNome);
       const encCat=encodeURIComponent(catNome);
       listHtml+=`<div class="fixas-group${isCollapsed?' is-collapsed':''}">
-        <button type="button" class="fixas-group-header" data-fixa-cat="${encCat}" aria-expanded="${isCollapsed?'false':'true'}" title="${isCollapsed?'Expandir':'Encolher'} categoria">
-          <div class="fixas-group-left">
-            <span class="fixas-group-chevron" aria-hidden="true">▶</span>
+        <button type="button" class="fixas-group-header" data-fixa-cat="${encCat}" aria-expanded="${isCollapsed?'false':'true'}" title="${isCollapsed?'Expandir':'Recolher'} categoria">
+          <div class="expand-group-header-row">
+            <span class="month-group-arrow ${isCollapsed?'':'open'}" aria-hidden="true">▶</span>
             <span class="fixas-group-swatch" style="background:${sw}"></span>
             <span class="fixas-group-title">${escCat}</span>
-          </div>
-          <div class="fixas-group-right">
-            <span class="fixas-group-count">${rows.length} conta${rows.length!==1?'s':''}</span>
-            <div class="fixas-group-sums">
+            <span class="expand-group-meta fixas-group-count">${rows.length} conta${rows.length!==1?'s':''}</span>
+            <div class="fixas-group-sums month-group-chips">
               <div class="fixas-group-subtotal">Subtotal · − ${fmt(subGeral)}</div>
               ${subLancLine}
             </div>
