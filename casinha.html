@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="icon" type="image/png" href="assets/Casinha.png">
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -368,6 +369,8 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
 .tqa-btn{flex:1;padding:11px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;transition:background .15s;}
 .tqa-btn:hover{background:var(--surface3);}
 .tqa-btn.danger{color:var(--red);}
+[data-theme="dark"] .bi-sun-fill{display:none;}
+[data-theme="light"] .bi-moon-stars-fill{display:none;}
 </style>
 </head>
 <body>
@@ -384,10 +387,10 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
     <button class="nav-tab" onclick="showPage('rotinas')"><span class="nav-label"> Rotinas</span></button>
     <button class="nav-tab" onclick="showPage('cadastros')"><span class="nav-label"> Cadastros</span></button>
   </div>
-  <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu">☰</button>
+  <button class="btn-hamburger" id="btn-hamburger" onclick="toggleNavMenu()" aria-label="Menu"><i class="bi bi-list"></i></button>
   <div class="nav-actions">
-    <button class="btn-new-task" onclick="openTarefaModal()">＋ <span>Nova Tarefa</span></button>
-    <button class="btn-theme" id="btn-theme" onclick="toggleTheme()">☀️</button>
+    <button class="btn-new-task" onclick="openTarefaModal()"><i class="bi bi-plus-lg"></i> <span>Nova Tarefa</span></button>
+    <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Tema"><i class="bi bi-sun-fill"></i><i class="bi bi-moon-stars-fill"></i></button>
   </div>
 </nav>
 <div class="nav-menu" id="nav-menu">
@@ -415,11 +418,11 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
     </div>
     <div class="cards-row cols-2">
       <div class="list-card">
-        <div class="list-card-header"><div class="list-card-title">📅 Tarefas Pendentes Hoje</div></div>
+        <div class="list-card-header"><div class="list-card-title"><i class="bi bi-calendar-check"></i> Tarefas Pendentes Hoje</div></div>
         <div id="dash-proximas"></div>
       </div>
       <div class="list-card">
-        <div class="list-card-header"><div class="list-card-title">✅ Concluídas Recentemente</div></div>
+        <div class="list-card-header"><div class="list-card-title"><i class="bi bi-check-circle-fill"></i> Concluídas Recentemente</div></div>
         <div id="dash-recentes"></div>
       </div>
     </div>
@@ -433,8 +436,8 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
         <div class="sec-sub" id="tarefas-subinfo">Organize e priorize o que precisa ser feito</div>
       </div>
       <div class="view-toggle">
-        <button class="view-btn active" id="btn-view-lista" onclick="setTarefasView('lista')">≡ Lista</button>
-        <button class="view-btn" id="btn-view-cards" onclick="setTarefasView('cards')">⊞ Cards</button>
+        <button class="view-btn active" id="btn-view-lista" onclick="setTarefasView('lista')"><i class="bi bi-list-ul"></i> Lista</button>
+        <button class="view-btn" id="btn-view-cards" onclick="setTarefasView('cards')"><i class="bi bi-grid"></i> Cards</button>
       </div>
     </div>
 
@@ -447,7 +450,7 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
     </div>
 
     <div class="filter-bar tarefas-filter-bar">
-      <input class="search-input" id="fil-search" placeholder="🔍 Buscar por título, descrição, ambiente, responsável ou tipo..." oninput="renderTarefas()">
+      <input class="search-input" id="fil-search" placeholder="Buscar por título, descrição, ambiente, responsável ou tipo..." oninput="renderTarefas()">
       <select class="filter-select" id="fil-status" onchange="renderTarefas()">
         <option value="">Todos status</option>
         <option value="pendente">Planejada</option>
@@ -481,7 +484,7 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
         <input type="checkbox" id="fil-hide-concluidas" onchange="renderTarefas()" checked>
         Ocultar concluídas
       </label>
-      <button class="btn btn-sm" onclick="limparFiltrosTarefas()">Limpar filtros</button>
+      <button class="btn btn-sm" onclick="limparFiltrosTarefas()"><i class="bi bi-x-circle"></i> Limpar filtros</button>
     </div>
 
     <div class="task-summary-strip" id="tarefas-summary"></div>
@@ -492,9 +495,9 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
   <div id="page-calendario" class="page">
     <div class="sec-header"><div class="sec-title">Calendário</div></div>
     <div class="cal-nav">
-      <button class="btn" onclick="calNavPrev()">‹</button>
+      <button class="btn" onclick="calNavPrev()"><i class="bi bi-chevron-left"></i></button>
       <div class="cal-nav-label" id="cal-label"></div>
-      <button class="btn" onclick="calNavNext()">›</button>
+      <button class="btn" onclick="calNavNext()"><i class="bi bi-chevron-right"></i></button>
       <button class="btn" onclick="calRef=new Date();renderCalendario();" style="font-size:12px;padding:4px 10px;">Hoje</button>
       <div class="cal-view-toggle">
         <button class="cal-view-btn active" id="btn-cal-semana" onclick="setCalView('semana')">Semana</button>
@@ -511,7 +514,7 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
         <div class="sec-title">Rotinas</div>
         <div class="sec-sub">Tarefas recorrentes geradas automaticamente</div>
       </div>
-      <button class="btn btn-primary" onclick="openRotinaModal()">＋ Nova Rotina</button>
+      <button class="btn btn-primary" onclick="openRotinaModal()"><i class="bi bi-plus-lg"></i> Nova Rotina</button>
     </div>
     <div id="rotinas-list"></div>
   </div>
@@ -530,9 +533,9 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
       <div class="chart-card"><div class="chart-card-title">Tarefas por Responsável</div><div class="chart-wrap"><canvas id="chart-cad-pessoa"></canvas></div></div>
     </div>
     <div class="cad-tabs">
-      <button class="cad-tab active" id="cad-tab-amb" onclick="setCadTab('ambientes')">🏠 Ambientes</button>
-      <button class="cad-tab" id="cad-tab-pess" onclick="setCadTab('pessoas')">👥 Pessoas</button>
-      <button class="cad-tab" id="cad-tab-tipo" onclick="setCadTab('tipos')">🏷️ Tipos</button>
+      <button class="cad-tab active" id="cad-tab-amb" onclick="setCadTab('ambientes')"><i class="bi bi-house-fill"></i> Ambientes</button>
+      <button class="cad-tab" id="cad-tab-pess" onclick="setCadTab('pessoas')"><i class="bi bi-people-fill"></i> Pessoas</button>
+      <button class="cad-tab" id="cad-tab-tipo" onclick="setCadTab('tipos')"><i class="bi bi-tags-fill"></i> Tipos</button>
     </div>
     <div id="cad-body"></div>
   </div>
@@ -559,7 +562,7 @@ body{background:var(--body-bg);color:var(--text);min-height:100vh;}
   <div id="modal-box">
     <div class="modal-header">
       <div class="modal-title" id="modal-title"></div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="modal-close" onclick="closeModal()"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="modal-body" id="modal-body"></div>
     <div class="modal-footer" id="modal-footer"></div>
@@ -719,7 +722,6 @@ function autoStatus(){
 let curTheme=localStorage.getItem('app_theme')||'dark';
 function applyTheme(){
   document.documentElement.setAttribute('data-theme',curTheme);
-  document.getElementById('btn-theme').textContent=curTheme==='dark'?'☀️':'🌙';
 }
 function toggleTheme(){
   curTheme=curTheme==='dark'?'light':'dark';
@@ -946,8 +948,8 @@ function buildTaskTable(tasks){
     <tbody>${tasks.map(t=>`<tr class="${t.status==='atrasada'?'row-alert':''}">
       <td class="col-line-click" onclick="openTarefaModal('${t.id}')"><div class="col-title">${esc(t.titulo)}</div><div class="col-sub">${[
         t.descricao?esc(t.descricao).slice(0,60)+(t.descricao.length>60?'…':''):'',
-        t.recorrencia?'🔄 '+RECOR_L[t.recorrencia.tipo]:'',
-        t.tempoEst?'⏱ '+t.tempoEst+'min':''
+        t.recorrencia?'<i class="bi bi-arrow-repeat"></i> '+RECOR_L[t.recorrencia.tipo]:'',
+        t.tempoEst?'<i class="bi bi-stopwatch"></i> '+t.tempoEst+'min':''
       ].filter(Boolean).join(' · ')||'Sem detalhes'}</div></td>
       <td>${t.tipo?`<span class="tag">${tipoInfo(t.tipo).l}</span>`:'—'}</td>
       <td>${t.ambiente?`<span class="tag" style="border-left:2px solid ${ambienteColor(t.ambiente)}">${ambienteIcone(t.ambiente)} ${esc(t.ambiente)}</span>`:'—'}</td>
@@ -955,10 +957,10 @@ function buildTaskTable(tasks){
       <td><span class="badge badge-${t.status}">${STATUS_L[t.status]}</span></td>
       <td style="${t.status==='atrasada'?'color:var(--red);font-weight:700':''}">${fmtDate(t.dataVenc)||'—'}${t.horario?`<div class="col-sub">${t.horario}</div>`:''}</td>
       <td><div class="task-actions">
-        ${t.status!=='concluida'?`<button class="btn btn-sm btn-success" title="Concluir" onclick="completarTarefa('${t.id}')">✓</button>`:''}
-        <button class="btn btn-sm" title="Editar" onclick="openTarefaModal('${t.id}')">✏️</button>
-        ${t.status!=='concluida'&&t.status!=='adiada'?`<button class="btn btn-sm" title="Adiar 1 dia" onclick="adiarTarefa('${t.id}')">⏰</button>`:''}
-        <button class="btn btn-sm btn-danger" title="Excluir" onclick="deletarTarefa('${t.id}')">🗑</button>
+        ${t.status!=='concluida'?`<button class="btn btn-sm btn-success" title="Concluir" onclick="completarTarefa('${t.id}')"><i class="bi bi-check-lg"></i></button>`:''}
+        <button class="btn btn-sm" title="Editar" onclick="openTarefaModal('${t.id}')"><i class="bi bi-pencil"></i></button>
+        ${t.status!=='concluida'&&t.status!=='adiada'?`<button class="btn btn-sm" title="Adiar 1 dia" onclick="adiarTarefa('${t.id}')"><i class="bi bi-hourglass-split"></i></button>`:''}
+        <button class="btn btn-sm btn-danger" title="Excluir" onclick="deletarTarefa('${t.id}')"><i class="bi bi-trash"></i></button>
       </div></td>
     </tr>`).join('')}</tbody>
   </table></div>`;
@@ -990,7 +992,7 @@ function renderTarefas(){
 
   const container=document.getElementById('tarefas-result');
   if(!filtered.length){
-    container.innerHTML=`<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">Nenhuma tarefa encontrada.<br>Ajuste os filtros ou crie uma nova tarefa.</div></div>`;
+    container.innerHTML=`<div class="empty-state"><div class="empty-state-icon"><i class="bi bi-clipboard-check" style="font-size:2rem;"></i></div><div class="empty-state-text">Nenhuma tarefa encontrada.<br>Ajuste os filtros ou crie uma nova tarefa.</div></div>`;
     return;
   }
 
@@ -1010,12 +1012,12 @@ function renderTarefas(){
         const visíveis=[...urgentes,...pendentes.slice(0,1)];
         const ocultas=pendentes.length-1;
         const recLabel=r?.recorrencia?RECOR_L[r.recorrencia.tipo]||'':'';
-        html+=`<div class="group-header">🔄 ${esc(r?.nome||'Rotina')}${recLabel?` <span style="font-size:10px;font-weight:500;color:var(--hint);text-transform:none;letter-spacing:0;">${recLabel}</span>`:''} <span class="group-count">${allTasks.length}</span></div>`;
+        html+=`<div class="group-header"><i class="bi bi-arrow-repeat"></i> ${esc(r?.nome||'Rotina')}${recLabel?` <span style="font-size:10px;font-weight:500;color:var(--hint);text-transform:none;letter-spacing:0;">${recLabel}</span>`:''} <span class="group-count">${allTasks.length}</span></div>`;
         html+=buildTaskTable(visíveis);
         if(ocultas>0)html+=`<div style="font-size:11px;color:var(--hint);padding:4px 6px 10px;">↳ mais ${ocultas} ocorrência${ocultas!==1?'s':''} futura${ocultas!==1?'s':''} no calendário</div>`;
       });
       if(singles.length){
-        if(rotinaIds.length)html+=`<div class="group-header">📋 Tarefas Únicas <span class="group-count">${singles.length}</span></div>`;
+        if(rotinaIds.length)html+=`<div class="group-header"><i class="bi bi-clipboard-check"></i> Tarefas Únicas <span class="group-count">${singles.length}</span></div>`;
         html+=buildTaskTable(singles);
       }
     } else if(agrupamento){
@@ -1054,13 +1056,13 @@ function renderTarefas(){
         const ocultas=pendentes.length-1;
         const recLabel=r?.recorrencia?RECOR_L[r.recorrencia.tipo]||'':'';
         cardGroups.push({
-          t:`🔄 ${r?.nome||'Rotina'}${recLabel?' · '+recLabel:''}`,
+          t:`<i class="bi bi-arrow-repeat"></i> ${r?.nome||'Rotina'}${recLabel?' · '+recLabel:''}`,
           count:allTasks.length,
           items:visíveis,
           extra:ocultas>0?`↳ mais ${ocultas} ocorrência${ocultas!==1?'s':''} futura${ocultas!==1?'s':''} no calendário`:''
         });
       });
-      if(singles.length)cardGroups.push({t:rotinaIds.length?'📋 Tarefas Únicas':'',items:singles});
+      if(singles.length)cardGroups.push({t:rotinaIds.length?'<i class="bi bi-clipboard-check"></i> Tarefas Únicas':'',items:singles});
     } else if(agrupamento){
       const key=agrupamento;
       const groups={};
@@ -1101,14 +1103,14 @@ function taskCardHtml(t){
     ${t.descricao?`<div class="task-desc">${esc(t.descricao)}</div>`:''}
     <div class="task-card-footer">
       <div class="task-card-date" style="${t.status==='atrasada'?'color:var(--red);font-weight:700;':''}">
-        📅 ${fmtDate(t.dataVenc)||'Sem data'}${t.horario?' · ⏰ '+t.horario:''}${t.recorrencia?' · 🔄 '+RECOR_L[t.recorrencia.tipo]:''}
-        ${t.tempoEst?` · ⏱ ${t.tempoEst}min`:''}
+        <i class="bi bi-calendar3"></i> ${fmtDate(t.dataVenc)||'Sem data'}${t.horario?' · <i class="bi bi-clock"></i> '+t.horario:''}${t.recorrencia?' · <i class="bi bi-arrow-repeat"></i> '+RECOR_L[t.recorrencia.tipo]:''}
+        ${t.tempoEst?` · <i class="bi bi-stopwatch"></i> ${t.tempoEst}min`:''}
       </div>
       <div class="task-card-actions">
-        ${t.status!=='concluida'?`<button class="btn btn-sm btn-success" onclick="completarTarefa('${t.id}')">✓</button>`:''}
-        <button class="btn btn-sm" onclick="openTarefaModal('${t.id}')">✏️</button>
-        ${t.status!=='concluida'&&t.status!=='adiada'?`<button class="btn btn-sm" onclick="adiarTarefa('${t.id}')">⏰</button>`:''}
-        <button class="btn btn-sm btn-danger" onclick="deletarTarefa('${t.id}')">🗑</button>
+        ${t.status!=='concluida'?`<button class="btn btn-sm btn-success" title="Concluir" onclick="completarTarefa('${t.id}')"><i class="bi bi-check-lg"></i></button>`:''}
+        <button class="btn btn-sm" title="Editar" onclick="openTarefaModal('${t.id}')"><i class="bi bi-pencil"></i></button>
+        ${t.status!=='concluida'&&t.status!=='adiada'?`<button class="btn btn-sm" title="Adiar 1 dia" onclick="adiarTarefa('${t.id}')"><i class="bi bi-hourglass-split"></i></button>`:''}
+        <button class="btn btn-sm btn-danger" title="Excluir" onclick="deletarTarefa('${t.id}')"><i class="bi bi-trash"></i></button>
       </div>
     </div>
   </div>`;
@@ -1274,8 +1276,8 @@ function calEvFull(t){
   return`<div class="cal-ev-full" draggable="true" ondragstart="onDragStartTarefa(event,'${t.id}')" style="border-left-color:${statusColor(t.status)}" onclick="taskQuickAction('${t.id}')">
     <div class="cal-ev-full-title">${esc(t.titulo)}</div>
     <div class="cal-ev-full-meta">
-      ${t.horario?`<span>⏰ ${t.horario}</span>`:''}
-      ${t.responsavel?`<span>👤 ${t.responsavel}</span>`:''}
+      ${t.horario?`<span><i class="bi bi-clock"></i> ${t.horario}</span>`:''}
+      ${t.responsavel?`<span><i class="bi bi-person"></i> ${t.responsavel}</span>`:''}
       ${t.ambiente?`<span>${ambienteIcone(t.ambiente)} ${t.ambiente}</span>`:''}
       <span class="badge badge-${t.status}" style="margin-top:3px;">${STATUS_L[t.status]}</span>
     </div>
@@ -1285,7 +1287,7 @@ function calEvFull(t){
 // ===== ROTINAS =====
 function renderRotinas(){
   const c=document.getElementById('rotinas-list');
-  if(!rotinas.length){c.innerHTML=`<div class="empty-state"><div class="empty-state-icon">🔄</div><div class="empty-state-text">Nenhuma rotina cadastrada.<br>Crie rotinas para gerar tarefas recorrentes automaticamente.</div></div>`;return;}
+  if(!rotinas.length){c.innerHTML=`<div class="empty-state"><div class="empty-state-icon"><i class="bi bi-arrow-repeat" style="font-size:2rem;"></i></div><div class="empty-state-text">Nenhuma rotina cadastrada.<br>Crie rotinas para gerar tarefas recorrentes automaticamente.</div></div>`;return;}
   c.innerHTML=`<div class="rotina-list">${rotinas.map(r=>{
     const prox=r.proximaData?`Próxima: ${fmtDate(r.proximaData)}`:'';
     const recLabel=RECOR_L[r.recorrencia?.tipo]||'';
@@ -1297,8 +1299,8 @@ function renderRotinas(){
         <div class="rotina-sub">${[r.ambiente,r.responsavel,recLabel+diasLabel,prox].filter(Boolean).join(' · ')}</div>
       </div>
       <button class="toggle-btn ${r.ativo?'on':'off'}" onclick="toggleRotina('${r.id}')" title="${r.ativo?'Desativar':'Ativar'}"></button>
-      <button class="btn btn-sm" onclick="openRotinaModal('${r.id}')">✏️</button>
-      <button class="btn btn-sm btn-danger" onclick="deletarRotina('${r.id}')">🗑</button>
+      <button class="btn btn-sm" title="Editar" onclick="openRotinaModal('${r.id}')"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-danger" title="Excluir" onclick="deletarRotina('${r.id}')"><i class="bi bi-trash"></i></button>
     </div>`;
   }).join('')}</div>`;
 }
@@ -1393,9 +1395,9 @@ function renderCadastros(){
   // add button
   const addBtn=document.getElementById('cad-add-btn');
   if(addBtn){
-    if(curCadastroTab==='ambientes')addBtn.innerHTML=`<button class="btn btn-primary" onclick="openAmbienteModal()">＋ Novo Ambiente</button>`;
-    else if(curCadastroTab==='pessoas')addBtn.innerHTML=`<button class="btn btn-primary" onclick="openPessoaModal()">＋ Nova Pessoa</button>`;
-    else addBtn.innerHTML=`<button class="btn btn-primary" onclick="openTipoModal()">＋ Novo Tipo</button>`;
+    if(curCadastroTab==='ambientes')addBtn.innerHTML=`<button class="btn btn-primary" onclick="openAmbienteModal()"><i class="bi bi-plus-lg"></i> Novo Ambiente</button>`;
+    else if(curCadastroTab==='pessoas')addBtn.innerHTML=`<button class="btn btn-primary" onclick="openPessoaModal()"><i class="bi bi-plus-lg"></i> Nova Pessoa</button>`;
+    else addBtn.innerHTML=`<button class="btn btn-primary" onclick="openTipoModal()"><i class="bi bi-plus-lg"></i> Novo Tipo</button>`;
   }
   renderCadBody();
 }
