@@ -230,7 +230,6 @@ tbody tr:hover .row-actions{opacity:1;}
 .fixas-list{display:flex;flex-direction:column;gap:10px;}
 .fixas-group{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
 .fixas-group:last-child{margin-bottom:0;}
-.fixas-group-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:4px 2px 8px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
 .fixas-group-left{display:flex;align-items:center;gap:10px;min-width:0;}
 .fixas-group-right{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;text-align:right;}
 .fixas-group-swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
@@ -239,8 +238,19 @@ tbody tr:hover .row-actions{opacity:1;}
 .fixas-group-sums{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
 .fixas-group-subtotal{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--red);white-space:nowrap;}
 .fixas-group-sublanc{font-family:var(--mono);font-size:11px;color:var(--hint);white-space:nowrap;}
-.fixas-group-toggle{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none;}
-.fixas-group-toggle input{accent-color:var(--accent,#7b9cff);width:15px;height:15px;cursor:pointer;flex-shrink:0;}
+.fixas-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;max-width:min(100%,520px);}
+.fixas-view-switch{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px;gap:0;flex-shrink:0;}
+.fixas-view-opt{border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;transition:color .15s,background .15s,box-shadow .15s;font-family:inherit;}
+.fixas-view-opt:hover{color:var(--text);}
+.fixas-view-opt.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12);}
+.fixas-view-opt:focus-visible{outline:2px solid var(--accent,#7b9cff);outline-offset:2px;}
+.fixas-group-header{width:100%;text-align:left;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;margin:0;border:none;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border);cursor:pointer;font:inherit;box-sizing:border-box;transition:background .15s,border-color .15s;flex-wrap:wrap;}
+.fixas-group-header:hover{background:rgba(123,156,255,.08);border-color:rgba(123,156,255,.25);}
+.fixas-group-header:focus-visible{outline:2px solid var(--accent,#7b9cff);outline-offset:1px;}
+.fixas-group-chevron{font-size:10px;color:var(--hint);transition:transform .2s ease;display:inline-block;width:16px;text-align:center;line-height:1;flex-shrink:0;margin-top:3px;}
+.fixas-group:not(.is-collapsed) .fixas-group-chevron{transform:rotate(90deg);}
+.fixas-group-body{display:flex;flex-direction:column;gap:8px;padding-top:8px;}
+.fixas-group.is-collapsed .fixas-group-body{display:none;}
 .fixa-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;gap:16px;}
 .fixa-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .fixa-info{flex:1;}
@@ -821,9 +831,12 @@ html.privacy .fin-cal-tx-val{filter:blur(8px);user-select:none;pointer-events:no
 <!-- CONTAS FIXAS -->
 <div class="page" id="page-fixas">
   <div class="fixas-header">
-    <div>
+    <div class="fixas-title-row">
       <div style="font-size:16px;font-weight:600;">Contas fixas</div>
-      <label class="fixas-group-toggle"><input type="checkbox" id="fixas-group-by-cat" onchange="setFixasGroupByCat(this.checked)"> Agrupar por categoria</label>
+      <div class="fixas-view-switch" role="tablist" aria-label="Exibição das contas fixas">
+        <button type="button" role="tab" class="fixas-view-opt" id="fixas-view-flat" onclick="setFixasGroupByCat(false)">Lista</button>
+        <button type="button" role="tab" class="fixas-view-opt" id="fixas-view-group" onclick="setFixasGroupByCat(true)">Por categoria</button>
+      </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
       <div class="fat-nav">
@@ -2590,13 +2603,45 @@ function setFixasGroupByCat(on){
   try{localStorage.setItem(fixasGroupByCatStorageKey(),on?'1':'0');}catch(_){}
   rendFixas();
 }
+function fixasCollapsedCatsKey(){return'u_'+(API_USER_ID||'anon')+'_fin_fixas_collapsed_cats_v1';}
+function getFixasCollapsedCatsSet(){
+  try{return new Set(JSON.parse(localStorage.getItem(fixasCollapsedCatsKey())||'[]'));}
+  catch(_){return new Set();}
+}
+function toggleFixasCatCollapse(enc){
+  let catNome='';
+  try{catNome=decodeURIComponent(enc);}catch(_){return;}
+  const s=getFixasCollapsedCatsSet();
+  if(s.has(catNome))s.delete(catNome);else s.add(catNome);
+  try{localStorage.setItem(fixasCollapsedCatsKey(),JSON.stringify([...s]));}catch(_){}
+  rendFixas();
+}
+(function initFixasCategoryHeaderToggle(){
+  const root=document.getElementById('fixas-list');
+  if(!root||root._finFixaCatHdr)return;
+  root._finFixaCatHdr=true;
+  root.addEventListener('click',function(ev){
+    const hdr=ev.target.closest('.fixas-group-header');
+    if(!hdr||!root.contains(hdr))return;
+    const enc=hdr.getAttribute('data-fixa-cat');
+    if(enc===null||enc==='')return;
+    ev.preventDefault();
+    toggleFixasCatCollapse(enc);
+  });
+})();
 function rendFixas(){
   const k=curK();
   const activeFixas=fixas.filter(f=>!f.encerradoApos||f.encerradoApos>=k);
   let total=0,totalGeral=0;
   const groupOn=getFixasGroupByCat();
-  const gcb=document.getElementById('fixas-group-by-cat');
-  if(gcb)gcb.checked=groupOn;
+  const btnF=document.getElementById('fixas-view-flat');
+  const btnG=document.getElementById('fixas-view-group');
+  if(btnF&&btnG){
+    btnF.classList.toggle('active',!groupOn);
+    btnG.classList.toggle('active',groupOn);
+    btnF.setAttribute('aria-selected',groupOn?'false':'true');
+    btnG.setAttribute('aria-selected',groupOn?'true':'false');
+  }
 
   function fixaRowHtml(f,mode){
     const{val,lancada}=fixaMetrics(f,k);
@@ -2652,6 +2697,7 @@ function rendFixas(){
     });
     listHtml=flatSorted.map(f=>fixaRowHtml(f,'flat')).join('');
   }else{
+    const collapsedCats=getFixasCollapsedCatsSet();
     const byCat=new Map();
     for(const f of activeFixas){
       const key=(f.categoria&&String(f.categoria).trim())?String(f.categoria).trim():'Outros';
@@ -2680,9 +2726,12 @@ function rendFixas(){
       const subLancLine=subLanc<subGeral
         ?`<div class="fixas-group-sublanc">Lançado nesta fatura · − ${fmt(subLanc)}</div>`
         :'';
-      listHtml+=`<div class="fixas-group">
-        <div class="fixas-group-header">
+      const isCollapsed=collapsedCats.has(catNome);
+      const encCat=encodeURIComponent(catNome);
+      listHtml+=`<div class="fixas-group${isCollapsed?' is-collapsed':''}">
+        <button type="button" class="fixas-group-header" data-fixa-cat="${encCat}" aria-expanded="${isCollapsed?'false':'true'}" title="${isCollapsed?'Expandir':'Encolher'} categoria">
           <div class="fixas-group-left">
+            <span class="fixas-group-chevron" aria-hidden="true">▶</span>
             <span class="fixas-group-swatch" style="background:${sw}"></span>
             <span class="fixas-group-title">${escCat}</span>
           </div>
@@ -2693,8 +2742,10 @@ function rendFixas(){
               ${subLancLine}
             </div>
           </div>
+        </button>
+        <div class="fixas-group-body">
+          ${rows.map(f=>fixaRowHtml(f,'group')).join('')}
         </div>
-        ${rows.map(f=>fixaRowHtml(f,'group')).join('')}
       </div>`;
     }
   }
