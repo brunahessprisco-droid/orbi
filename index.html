@@ -243,6 +243,24 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
 .btn-eye{border:1px solid var(--border);background:none;color:var(--muted);width:32px;height:32px;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s;flex-shrink:0;}
 .btn-eye:hover{color:var(--text);}
 .hub-filters{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px;}
+.print-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6);z-index:500;}
+.print-overlay.open{display:flex;}
+.print-modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 60px var(--shadow);}
+.print-modal-hd{padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.print-modal-title{font-size:15px;font-weight:700;}
+.print-modal-body{padding:0 20px 16px;}
+.print-modal-footer{padding:0 20px 20px;display:flex;gap:8px;justify-content:flex-end;}
+.print-sec-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px;}
+.print-date-row{display:flex;gap:12px;margin-bottom:16px;}
+.print-date-field{flex:1;}
+.print-date-field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;}
+.print-date-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box;}
+.print-date-input:focus{border-color:var(--green);}
+.print-modules{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px;}
+.print-mod{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;transition:border-color .15s;user-select:none;}
+.print-mod:hover{border-color:var(--border2);}
+.print-mod input{accent-color:var(--green);width:14px;height:14px;cursor:pointer;flex-shrink:0;}
+.print-mod-lbl{font-size:12px;color:var(--text);display:flex;align-items:center;gap:5px;}
 </style>
 </head>
 <body>
@@ -334,6 +352,7 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
     <!-- Filters: above both today card + calendar -->
     <div class="hub-filters">
       <button class="btn-eye" id="btn-privacy" onclick="togglePrivacy()" title="Ocultar valores sensíveis"><i class="bi bi-eye-fill"></i></button>
+      <button class="btn-eye" onclick="openPrintModal()" title="Gerar relatório PDF"><i class="bi bi-printer"></i></button>
       <div class="filter-group">
         <button class="filter-btn active" data-f="todos" onclick="setFilter('todos',this)">Todos</button>
         <button class="filter-btn" data-f="hab" onclick="setFilter('hab',this)"><img src="assets/Hábitos.png" alt="Hábitos"></button>
@@ -397,6 +416,37 @@ html.privacy .sensitive{filter:blur(8px);user-select:none;pointer-events:none;tr
   </div>
 </div>
 
+
+<!-- PRINT MODAL -->
+<div class="print-overlay" id="print-overlay" onclick="if(event.target===this)closePrintModal()">
+  <div class="print-modal">
+    <div class="print-modal-hd">
+      <div class="print-modal-title"><i class="bi bi-printer" style="margin-right:6px;"></i>Gerar relatório PDF</div>
+      <button class="btn-close" onclick="closePrintModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="print-modal-body">
+      <div class="print-sec-label">Período</div>
+      <div class="print-date-row">
+        <div class="print-date-field"><label>De</label><input type="date" id="print-start" class="print-date-input"></div>
+        <div class="print-date-field"><label>Até</label><input type="date" id="print-end" class="print-date-input"></div>
+      </div>
+      <div class="print-sec-label" style="margin-bottom:8px;">Módulos</div>
+      <div class="print-modules">
+        <label class="print-mod"><input type="checkbox" id="print-mod-fin" checked><span class="print-mod-lbl"><img src="assets/Finanças.png" style="width:14px;height:14px;object-fit:contain;">Finanças</span></label>
+        <label class="print-mod"><input type="checkbox" id="print-mod-ex" checked><span class="print-mod-lbl"><img src="assets/Exercício.png" style="width:14px;height:14px;object-fit:contain;">Exercícios</span></label>
+        <label class="print-mod"><input type="checkbox" id="print-mod-cas" checked><span class="print-mod-lbl"><img src="assets/Casinha.png" style="width:14px;height:14px;object-fit:contain;">Casa/Tarefas</span></label>
+        <label class="print-mod"><input type="checkbox" id="print-mod-hab" checked><span class="print-mod-lbl"><img src="assets/Hábitos.png" style="width:14px;height:14px;object-fit:contain;">Hábitos</span></label>
+        <label class="print-mod"><input type="checkbox" id="print-mod-ali" checked><span class="print-mod-lbl"><img src="assets/Alimentação.png" style="width:14px;height:14px;object-fit:contain;">Alimentação</span></label>
+        <label class="print-mod"><input type="checkbox" id="print-mod-sau" checked><span class="print-mod-lbl"><img src="assets/Saúde.png" style="width:14px;height:14px;object-fit:contain;">Saúde</span></label>
+        <label class="print-mod"><input type="checkbox" id="print-mod-gcal"><span class="print-mod-lbl">📅 Google Cal</span></label>
+      </div>
+    </div>
+    <div class="print-modal-footer">
+      <button class="btn" onclick="closePrintModal()" style="padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;font-size:13px;cursor:pointer;">Cancelar</button>
+      <button onclick="generateReport()" style="padding:9px 22px;border-radius:8px;border:none;background:var(--green);color:#000;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;"><i class="bi bi-printer"></i>Gerar PDF</button>
+    </div>
+  </div>
+</div>
 
 <!-- PROFILE MODAL -->
 <div class="profile-overlay" id="profile-overlay" onclick="if(event.target===this)_profileDirtyGuard()">
@@ -1367,6 +1417,133 @@ window.addEventListener('beforeunload',function(e){
     return e.returnValue;
   }
 });
+
+// ── RELATÓRIO PDF ────────────────────────────────────────────────────────────
+function openPrintModal(){ document.getElementById('print-overlay').classList.add('open'); }
+function closePrintModal(){ document.getElementById('print-overlay').classList.remove('open'); }
+
+function generateReport(){
+  const start=document.getElementById('print-start').value;
+  const end=document.getElementById('print-end').value;
+  if(!start||!end){ alert('Selecione o período (data inicial e final).'); return; }
+  if(start>end){ alert('A data inicial deve ser anterior à final.'); return; }
+  const mods={};
+  ['fin','ex','cas','hab','ali','sau','gcal'].forEach(m=>{ mods[m]=document.getElementById('print-mod-'+m).checked; });
+  if(!Object.values(mods).some(v=>v)){ alert('Selecione pelo menos um módulo.'); return; }
+  const dates=[];
+  let cur=new Date(start+'T00:00:00');
+  const endD=new Date(end+'T00:00:00');
+  while(cur<=endD){ dates.push(ds(cur)); cur=new Date(cur); cur.setDate(cur.getDate()+1); }
+  if(dates.length>90){ if(!confirm(`Período de ${dates.length} dias. O relatório pode ser longo. Continuar?`))return; }
+  const html=_buildReportHtml(dates,mods);
+  const win=window.open('','_blank');
+  if(!win){ alert('O popup foi bloqueado. Permita popups para este site e tente novamente.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(),600);
+  closePrintModal();
+}
+
+function _esc(s){ const d=document.createElement('span');d.textContent=String(s||'');return d.innerHTML; }
+
+function _buildReportHtml(dates,mods){
+  const DIAS_R=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const MESES_R=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const fmtR=v=>'R$\u00a0'+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const modLabels={fin:'Finanças',ex:'Exercícios',cas:'Casa/Tarefas',hab:'Hábitos',ali:'Alimentação',sau:'Saúde',gcal:'Google Cal'};
+  const selectedMods=Object.entries(mods).filter(([,v])=>v).map(([k])=>modLabels[k]).join(' · ');
+  const[sy,sm,sd]=dates[0].split('-');
+  const[ey,em,ed]=dates[dates.length-1].split('-');
+  const periodLabel=`${Number(sd)}/${Number(sm)}/${sy} – ${Number(ed)}/${Number(em)}/${ey}`;
+  const pages=[];
+  for(let i=0;i<dates.length;i+=5) pages.push(dates.slice(i,i+5));
+  const pagesHtml=pages.map(group=>{
+    while(group.length<5) group.push(null);
+    return`<div class="rp">${group.map(dateStr=>{
+      if(!dateStr) return'<div class="dc empty"></div>';
+      const[y,mo,d]=dateStr.split('-');
+      const dow=new Date(Number(y),Number(mo)-1,Number(d)).getDay();
+      const data=getDayData(dateStr);
+      const{receitas,despesas,parcelados,treinos,tarefas,habitosFeitos,habitosPlanned,refeicoes,pesos,consultas,exames,gcalEvents}=data;
+      let rows=''; const tots=[];
+      if(mods.fin){
+        receitas.forEach(t=>{ rows+=`<div class="rw fin"><span class="rn">+ ${_esc(t.descricao)}${t.categoria?` <em>${_esc(t.categoria)}</em>`:''}</span><span class="rv">${fmtR(t.valor)}</span></div>`; });
+        despesas.forEach(t=>{ rows+=`<div class="rw desp"><span class="rn">- ${_esc(t.descricao)}${t.categoria?` <em>${_esc(t.categoria)}</em>`:''}</span><span class="rv">${fmtR(t.valor)}</span></div>`; });
+        parcelados.forEach(t=>{ rows+=`<div class="rw par"><span class="rn">↩ ${_esc(t.descricao)}${t.nParcelas?` <em>${t.nParcelas}x</em>`:''}</span><span class="rv">${fmtR(t.valorParcela)}/mês</span></div>`; });
+        const tr=receitas.reduce((a,t)=>a+Number(t.valor),0);
+        const td=despesas.reduce((a,t)=>a+Number(t.valor),0)+parcelados.reduce((a,t)=>a+Number(t.valorParcela||0),0);
+        if(tr||td) tots.push(`<div class="tot fin">${tr?'+'+fmtR(tr):''}${tr&&td?' / ':''}${td?'-'+fmtR(td):''}</div>`);
+      }
+      if(mods.ex){
+        treinos.forEach(t=>{ rows+=`<div class="rw ex"><span class="rn">${_esc(t.titulo||'Treino')}${t.local?` <em>${_esc(t.local)}</em>`:''}</span><span class="rv">${t.duracao?t.duracao+'min':t.tipo_cat||''}</span></div>`; });
+        if(treinos.length) tots.push(`<div class="tot ex">${treinos.length} treino${treinos.length!==1?'s':''}</div>`);
+      }
+      if(mods.cas){
+        tarefas.forEach(t=>{ const done=t.status==='concluida'; rows+=`<div class="rw cas"><span class="rn">${done?'✓':'○'} ${_esc(t.titulo)}${t.ambiente?` <em>${_esc(t.ambiente)}</em>`:''}</span></div>`; });
+        if(tarefas.length){ const done=tarefas.filter(t=>t.status==='concluida').length; tots.push(`<div class="tot cas">${done}/${tarefas.length} tarefas</div>`); }
+      }
+      if(mods.hab){
+        habitosPlanned.forEach(h=>{ const done=!!(h.logs&&h.logs[dateStr]); const val=h.tipo==='controle'&&h.logs&&h.logs[dateStr]?String(h.logs[dateStr]):''; rows+=`<div class="rw hab"><span class="rn">${done?'✓':'○'} ${_esc(h.name||'Hábito')}</span>${val?`<span class="rv">${_esc(val)}</span>`:''}</div>`; });
+        if(habitosPlanned.length) tots.push(`<div class="tot hab">${habitosFeitos.length}/${habitosPlanned.length} hábitos</div>`);
+      }
+      if(mods.ali){
+        refeicoes.forEach(r=>{ rows+=`<div class="rw ali"><span class="rn">${r.time?`<em>${_esc(r.time)}</em> `:''}${_esc(r.name||'Refeição')}</span>${r.calories?`<span class="rv">${r.calories} kcal</span>`:''}</div>`; });
+        const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);
+        if(kcal) tots.push(`<div class="tot ali">${kcal} kcal</div>`);
+      }
+      if(mods.sau){
+        pesos.forEach(w=>{ rows+=`<div class="rw sau"><span class="rn">Peso${w.time?` <em>${_esc(w.time)}</em>`:''}</span><span class="rv">${w.weight?w.weight+'kg':'—'}${w.fat?' · '+w.fat+'%':''}</span></div>`; });
+        consultas.forEach(c=>{ rows+=`<div class="rw sau"><span class="rn">🏥 ${_esc(c.doctor||c.specialty||'Consulta')}</span>${c.time?`<span class="rv">${_esc(c.time)}</span>`:''}</div>`; });
+        exames.forEach(e=>{ rows+=`<div class="rw sau"><span class="rn">🔬 ${_esc(e.name||'Exame')}</span></div>`; });
+      }
+      if(mods.gcal){
+        gcalEvents.forEach(e=>{ rows+=`<div class="rw gcal"><span class="rn">${_esc(e.title)}</span>${e.time?`<span class="rv">${_esc(e.time)}</span>`:''}</div>`; });
+        if(gcalEvents.length) tots.push(`<div class="tot gcal">${gcalEvents.length} evento${gcalEvents.length!==1?'s':''}</div>`);
+      }
+      return`<div class="dc"><div class="dh"><span class="dd">${DIAS_R[dow]}</span><span class="ddt">${Number(d)} ${MESES_R[Number(mo)-1]}</span></div><div class="dr">${rows||'<div class="nd">—</div>'}</div>${tots.length?`<div class="dt">${tots.join('')}</div>`:''}</div>`;
+    }).join('')}</div>`;
+  }).join('');
+  return`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Orbi — ${periodLabel}</title><style>
+*{box-sizing:border-box;margin:0;padding:0;}
+@page{size:A4 landscape;margin:8mm;}
+body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:9px;color:#111;background:#fff;}
+.rhd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5mm;padding-bottom:3mm;border-bottom:2px solid #111;}
+.rt{font-size:16px;font-weight:800;letter-spacing:-.3px;}
+.rm{font-size:9px;color:#555;}
+.rp{display:grid;grid-template-columns:repeat(5,1fr);gap:2.5mm;page-break-after:always;}
+.rp:last-child{page-break-after:auto;}
+.dc{border:1px solid #ddd;border-radius:2.5mm;padding:2mm;display:flex;flex-direction:column;min-height:100mm;}
+.dc.empty{border-style:dashed;opacity:.2;}
+.dh{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px solid #222;padding-bottom:1.5mm;margin-bottom:1.5mm;}
+.dd{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#666;}
+.ddt{font-size:11px;font-weight:800;color:#111;}
+.dr{flex:1;}
+.rw{padding:1.2px 0;border-bottom:1px solid #f2f2f2;display:flex;justify-content:space-between;align-items:baseline;gap:1.5mm;line-height:1.4;}
+.rw:last-child{border-bottom:none;}
+.rn{font-size:8px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rn em{font-style:normal;color:#999;font-size:7.5px;}
+.rv{font-size:8px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.nd{color:#ccc;font-style:italic;font-size:8px;padding:2px 0;}
+.rw.fin .rn,.rw.fin .rv{color:#2e7d32;}
+.rw.desp .rn,.rw.desp .rv{color:#c62828;}
+.rw.par .rn,.rw.par .rv{color:#e65100;}
+.rw.ex .rn,.rw.ex .rv{color:#6a1b9a;}
+.rw.cas .rn,.rw.cas .rv{color:#1565c0;}
+.rw.hab .rn,.rw.hab .rv{color:#ad1457;}
+.rw.ali .rn,.rw.ali .rv{color:#558b2f;}
+.rw.sau .rn,.rw.sau .rv{color:#00695c;}
+.rw.gcal .rn,.rw.gcal .rv{color:#1565c0;}
+.dt{margin-top:auto;padding-top:1.5mm;border-top:1.5px solid #222;}
+.tot{font-size:8px;font-weight:700;padding:.4px 0;}
+.tot.fin{color:#2e7d32;}.tot.ex{color:#6a1b9a;}.tot.cas{color:#1565c0;}
+.tot.hab{color:#ad1457;}.tot.ali{color:#558b2f;}.tot.sau{color:#00695c;}.tot.gcal{color:#1565c0;}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style></head><body>
+<div class="rhd"><div class="rt">Orbi</div><div class="rm">${_esc(periodLabel)} · ${_esc(selectedMods)}</div></div>
+${pagesHtml}
+</body></html>`;
+}
 </script>
 </body>
 </html>
