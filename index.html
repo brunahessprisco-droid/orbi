@@ -640,6 +640,7 @@ function hubIsPlannedForDate(h,dateStr){
   return true;
 }
 function loadAlimentacao(){ try{return JSON.parse(_lsGet('alimentacao_meals_v3_light')||'[]');}catch{return [];} }
+function loadWater(){ try{return JSON.parse(_lsGet('alimentacao_water_hub_v1')||'[]');}catch{return [];} }
 function loadMealPlan(){ try{return JSON.parse(_lsGet('alimentacao_plan_v3_light')||'{}');}catch{return {};} }
 function getMealPlanForDate(dateStr){ const p=loadMealPlan(); for(const week of Object.values(p)){ if(Array.isArray(week)){const row=week.find(x=>x.date===dateStr); if(row)return row.slots||null;} } return null; }
 function fmt(v){return 'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -654,7 +655,7 @@ async function hubBootstrap(){
   let skipGcalIndicatorUpdate=false;
   const h=url=>fetch(`${base}${url}`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.ok?r.json():null).catch(()=>null);
   try{
-    const[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC]=await Promise.all([
+    const[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC,rWater]=await Promise.all([
       h(`/treinos?usuario_id=${uid}`),
       h(`/casinha/tarefas?usuario_id=${uid}`),
       h(`/habitos?usuario_id=${uid}`),
@@ -663,6 +664,7 @@ async function hubBootstrap(){
       h('/health/weights'),
       h(`/saude/exames?usuario_id=${uid}`),
       h(`/saude/consultas?usuario_id=${uid}`),
+      h('/alimentacao/water'),
     ]);
     const treinos=(Array.isArray(rTre)?rTre:[]).map(r=>{const rawObs=r.obs||'';const planejado=rawObs.startsWith('[PLAN]');const naoFeito=rawObs.startsWith('[SKIP]');const obs=planejado?rawObs.slice(6):naoFeito?rawObs.slice(6):rawObs;return{id:r.client_id,_dbId:r.id,data:(r.data||'').slice(0,10),hora_inicio:r.hora_inicio||'',titulo:r.titulo||'',nome:r.titulo||'',tipo_ex:r.tipo_ex||'',tipo_cat:r.tipo_cat||'cardio',local:r.local_nome||'',duracao:r.duracao,obs,planejado,naoFeito};});
     const tarefas=(Array.isArray(rTar)?rTar:[]).map(r=>({id:r.client_id,_dbId:r.id,titulo:r.titulo||'',status:r.status||'',ambiente:r.ambiente||'',pessoa:r.responsavel||'',prioridade:r.prioridade||'',tipo:r.tipo||'',dataVenc:r.data_venc||'',horario:r.horario||'',dataConclusao:r.data_conclusao||''}));
@@ -686,9 +688,13 @@ async function hubBootstrap(){
       _lsSet('habitos_app_v5',JSON.stringify(habitos.filter(h=>!_delHab.has(h._dbId))));
     }
     if(rAli!==null){
-      // Filtra refeições pendentes de deleção local (DELETE pode ainda não ter chegado à API)
       const _delAlim=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_alimentacao_deleted_ids_v1')||'[]'));
       _lsSet('alimentacao_meals_v3_light',JSON.stringify(meals.filter(m=>!_delAlim.has(m.id))));
+    }
+    if(rWater!==null){
+      const _delWater=new Set(JSON.parse(localStorage.getItem('u_'+uid+'_alimentacao_water_deleted_v1')||'[]'));
+      const waterLogs=(Array.isArray(rWater)?rWater:[]).map(r=>({id:r.id,date:(r.date||'').slice(0,10),ml:Number(r.ml)||0})).filter(w=>!_delWater.has(w.id));
+      _lsSet('alimentacao_water_hub_v1',JSON.stringify(waterLogs));
     }
     if(rCfg!==null) _lsSet('alimentacao_plan_v3_light',JSON.stringify(plan));
     if(rW!==null&&rE!==null&&rC!==null){
@@ -704,7 +710,7 @@ async function hubBootstrap(){
       }));
     }
     rendTodaySummary(); rendCal();
-    const hubFetchAllOk=[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC].every(function(v){return v!==null;});
+    const hubFetchAllOk=[rTre,rTar,rHab,rAli,rCfg,rW,rE,rC,rWater].every(function(v){return v!==null;});
     const _hubLsid='u_'+(localStorage.getItem('hub_user_id')||'anon')+'_hub_lastsync_v1';
     const _hubLbl=document.getElementById('hub-sync-label');
     if(hubFetchAllOk){
@@ -866,7 +872,8 @@ function getDayData(dateStr){
   const refeicoes=sortT(loadAlimentacao().filter(m=>m.date===dateStr),'time');
   const planSlots=getMealPlanForDate(dateStr);
   const gcalEvents=sortT(loadGoogleEvents().filter(e=>e.date===dateStr),'time');
-  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosPlanned,habitosAtivos,refeicoes,planSlots,gcalEvents};
+  const waterMl=loadWater().filter(w=>w.date===dateStr).reduce((a,w)=>a+w.ml,0);
+  return{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosPlanned,habitosAtivos,refeicoes,planSlots,gcalEvents,waterMl};
 }
 
 let calFilter='todos';
@@ -1197,6 +1204,7 @@ function rendTodaySummary(){
   }
   if(f==='todos'||f==='ali'){
     refeicoes.forEach(r=>item(r.time,'var(--ali-c)',r.name||'Refeição','',r.calories?fmtNum(r.calories)+' kcal':'','sage',{module:'Alimentacao.html'}));
+    if(waterMl>0) item(null,'var(--ali-c)','💧 Água','',waterMl>=1000?(waterMl/1000).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' L':waterMl+' ml','blue',{module:'Alimentacao.html'});
     if(planSlots){
       const SLOT_ICONS={cafe:'☕',almoco:'🍽️',lanche:'🥨',jantar:'🌙',ceia:'⭐'};
       const SLOT_LABELS={cafe:'Café da manhã',almoco:'Almoço',lanche:'Lanche',jantar:'Jantar',ceia:'Ceia'};
@@ -1256,7 +1264,7 @@ function rendTodaySummary(){
   if((f==='todos'||f==='cas')&&tarefas.length) chips.push(`<div class="popup-sum-chip cas">${_ci(_MI.cas)}${tarefas.length} tarefa${tarefas.length!==1?'s':''}</div>`);
   if((f==='todos'||f==='sau')&&(pesos.length||consultas.length||exames.length)){const p=[];if(pesos.length&&pesos[0].weight)p.push(`<span class="sensitive">${pesos[0].weight}kg</span>`);if(consultas.length)p.push(`${consultas.length} consulta${consultas.length!==1?'s':''}`);chips.push(`<div class="popup-sum-chip sau">${_ci(_MI.sau)}${p.join(' · ')||'Saúde'}</div>`);}
   if((f==='todos'||f==='hab')&&habitosPlanned.length) chips.push(`<div class="popup-sum-chip hab">${_ci(_MI.hab)}${habitosFeitos.length}/${habitosPlanned.length} hábito${habitosFeitos.length!==1?'s':''}</div>`);
-  if((f==='todos'||f==='ali')&&refeicoes.length){const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);chips.push(`<div class="popup-sum-chip ali">${_ci(_MI.ali)}${refeicoes.length} refeição${refeicoes.length!==1?'ões':''} · ${fmtNum(kcal)} kcal</div>`);}
+  if((f==='todos'||f==='ali')&&(refeicoes.length||waterMl>0)){const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);const waterStr=waterMl>0?(waterMl>=1000?' · 💧'+(waterMl/1000).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'L':' · 💧'+waterMl+'ml'):'';chips.push(`<div class="popup-sum-chip ali">${_ci(_MI.ali)}${refeicoes.length?refeicoes.length+' ref'+(refeicoes.length!==1?'':''):''} ${kcal?fmtNum(kcal)+' kcal':''}${waterStr}</div>`);}
   if((f==='todos'||f==='gcal')&&gcalEvents.length) chips.push(`<div class="popup-sum-chip" style="background:var(--gcal-bg);color:var(--gcal-c);border:1px solid var(--gcal-border);">📅 ${gcalEvents.length} evento${gcalEvents.length!==1?'s':''}</div>`);
   const chipsHtml=chips.length?`<div class="popup-summary" style="margin-bottom:12px;">${chips.join('')}</div>`:'';
 
@@ -1489,8 +1497,12 @@ function _buildReportHtml(dates,mods){
       }
       if(mods.ali){
         refeicoes.forEach(r=>{ rows+=`<div class="rw ali"><span class="rn">${r.time?`<em>${_esc(r.time)}</em> `:''}${_esc(r.name||'Refeição')}</span>${r.calories?`<span class="rv">${r.calories} kcal</span>`:''}</div>`; });
+        if(waterMl>0){ const wStr=waterMl>=1000?(waterMl/1000).toFixed(1).replace('.',',')+'L':waterMl+'ml'; rows+=`<div class="rw ali"><span class="rn">💧 Água</span><span class="rv">${wStr}</span></div>`; }
         const kcal=refeicoes.reduce((a,r)=>a+Number(r.calories||0),0);
-        if(kcal) tots.push(`<div class="tot ali">${kcal} kcal</div>`);
+        const totParts=[];
+        if(kcal) totParts.push(`${kcal} kcal`);
+        if(waterMl>0) totParts.push(`💧 ${waterMl>=1000?(waterMl/1000).toFixed(1).replace('.',',')+'L':waterMl+'ml'}`);
+        if(totParts.length) tots.push(`<div class="tot ali">${totParts.join(' · ')}</div>`);
       }
       if(mods.sau){
         pesos.forEach(w=>{ rows+=`<div class="rw sau"><span class="rn">Peso${w.time?` <em>${_esc(w.time)}</em>`:''}</span><span class="rv">${w.weight?w.weight+'kg':'—'}${w.fat?' · '+w.fat+'%':''}</span></div>`; });
