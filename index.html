@@ -1484,7 +1484,7 @@ function _buildReportHtml(dates,mods){
         if(tarefas.length){ const done=tarefas.filter(t=>t.status==='concluida').length; tots.push(`<div class="tot cas">${done}/${tarefas.length} tarefas</div>`); }
       }
       if(mods.hab){
-        habitosPlanned.forEach(h=>{ const done=!!(h.logs&&h.logs[dateStr]); const val=h.tipo==='controle'&&h.logs&&h.logs[dateStr]?String(h.logs[dateStr]):''; rows+=`<div class="rw hab"><span class="rn">${done?'✓':'○'} ${_esc(h.name||'Hábito')}</span>${val?`<span class="rv">${_esc(val)}</span>`:''}</div>`; });
+        habitosPlanned.forEach(h=>{ const done=!!(h.logs&&h.logs[dateStr]); if(!done) return; const val=h.tipo==='controle'&&h.logs&&h.logs[dateStr]?String(h.logs[dateStr]):''; rows+=`<div class="rw hab"><span class="rn">✓ ${_esc(h.name||'Hábito')}</span>${val?`<span class="rv">${_esc(val)}</span>`:''}</div>`; });
         if(habitosPlanned.length) tots.push(`<div class="tot hab">${habitosFeitos.length}/${habitosPlanned.length} hábitos</div>`);
       }
       if(mods.ali){
