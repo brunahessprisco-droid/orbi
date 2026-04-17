@@ -20,7 +20,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://orbi-api-b9ev.onrender.com https://*.onrender.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://www.strava.com; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' data: blob: https:; connect-src 'self' https://orbi-api-b9ev.onrender.com https://*.onrender.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://www.strava.com; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
         }
       ]
     }

@@ -767,6 +767,8 @@ async function fetchFinancas(){
       data:(t.data_lancamento||'').slice(0,10),
       valor:Number(t.valor)||0,
       valorParcela:t.valor_parcela!=null?Number(t.valor_parcela):null,
+      nParcelas:t.n_parcelas||null,
+      groupId:t.grupo_parcela_id||null,
       descricao:t.descricao||'',
       categoria:t.categoria_nome||'',
       tipo:t.tipo,
@@ -787,7 +789,9 @@ function getDayData(dateStr){
   const txs=allTxs.filter(t=>t.data===dateStr&&t.tipo!=='receita');
   const receitas=allTxs.filter(t=>t.data===dateStr&&t.tipo==='receita');
   const despesas=txs.filter(t=>t.valorParcela==null);
-  const parcelados=txs.filter(t=>t.valorParcela!=null);
+  const _parceladosRaw=txs.filter(t=>t.valorParcela!=null);
+  const _seenPar=new Set();
+  const parcelados=_parceladosRaw.filter(t=>{const k=t.groupId||t.descricao;if(_seenPar.has(k))return false;_seenPar.add(k);return true;});
   const treinos=sortT(loadTreinos().filter(t=>t.data===dateStr&&!t.planejado&&!t.naoFeito),'hora_inicio');
   const treinosPlanejados=sortT(loadTreinos().filter(t=>t.data===dateStr&&t.planejado&&!t.naoFeito),'hora_inicio');
   const todayStr2=ds(new Date());
@@ -1152,7 +1156,7 @@ function rendTodaySummary(){
   if(f==='todos'||f==='fin'){
     receitas.forEach(t=>item(null,'var(--green)',t.descricao,t.categoria||'',`+ <span class="sensitive">${fmt(t.valor)}</span>`,'green',{module:'financas.html'}));
     despesas.forEach(t=>item(null,'var(--red)',t.descricao,t.categoria||'',`- <span class="sensitive">${fmt(t.valor)}</span>`,'red',{module:'financas.html'}));
-    parcelados.forEach(t=>item(null,'var(--fin-c)',t.descricao,t.categoria||'',`- <span class="sensitive">${fmt(t.valorParcela)}</span>`,'amber',{module:'financas.html'}));
+    parcelados.forEach(t=>item(null,'var(--fin-c)',t.descricao,t.nParcelas?`${t.categoria||'Parcelado'} · ${t.nParcelas}x`:t.categoria||'Parcelado',`- <span class="sensitive">${fmt(t.valorParcela)}/mês</span>`,'amber',{module:'financas.html'}));
   }
   if(f==='todos'||f==='gcal'){
     gcalEvents.forEach(e=>{
