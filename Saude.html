@@ -259,13 +259,13 @@
           <div class="card-value purple sensitive" id="sum-var-7">—</div>
           <div class="card-sub" id="sum-var-7-sub">—</div>
           <div class="var-pills">
-            <button class="var-pill" data-v="7" onclick="setVarRef('7')">7d</button>
-            <button class="var-pill" data-v="14" onclick="setVarRef('14')">14d</button>
-            <button class="var-pill" data-v="30" onclick="setVarRef('30')">30d</button>
-            <button class="var-pill" data-v="90" onclick="setVarRef('90')">90d</button>
-            <button class="var-pill" data-v="date" onclick="setVarRef('date')">data</button>
+            <button class="var-pill" data-v="7">7d</button>
+            <button class="var-pill" data-v="14">14d</button>
+            <button class="var-pill" data-v="30">30d</button>
+            <button class="var-pill" data-v="90">90d</button>
+            <button class="var-pill" data-v="date">data</button>
           </div>
-          <input type="date" id="var-ref-date" class="var-date-input" style="display:none;" onchange="renderDashboard()">
+          <input type="date" id="var-ref-date" class="var-date-input" style="display:none;">
         </div>
         <div class="card"><div class="card-label">Última consulta</div><div class="card-value blue" id="sum-last-consult">—</div><div class="card-sub" id="sum-last-consult-sub">—</div></div>
         <div class="card"><div class="card-label">Próximo exame</div><div class="card-value green" id="sum-next-exam">—</div><div class="card-sub" id="sum-next-exam-sub">—</div></div>
@@ -1573,10 +1573,11 @@
 
       function setVarRef(v){
         lsSet('saude_var_ref',v);
-        const dateInput=document.getElementById('var-ref-date');
-        dateInput.style.display=v==='date'?'block':'none';
+        document.getElementById('var-ref-date').style.display=v==='date'?'block':'none';
         renderDashboard();
       }
+      document.querySelectorAll('.var-pill').forEach(b=>b.addEventListener('click',()=>setVarRef(b.dataset.v)));
+      document.getElementById('var-ref-date').addEventListener('change',renderDashboard);
 
       function renderDashboard(){
         const lw=lastWeight();
