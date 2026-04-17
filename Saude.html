@@ -73,6 +73,12 @@
     .card-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
     .card-value{font-family:var(--mono);font-size:21px;font-weight:500}
     .card-sub{font-size:11px;color:var(--hint);margin-top:4px}
+    .var-pills{display:flex;gap:3px;flex-wrap:wrap;margin-top:8px;}
+    .var-pill{font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .15s;}
+    .var-pill:hover{border-color:var(--border2);color:var(--text);}
+    .var-pill.active{background:var(--purple);border-color:var(--purple);color:#fff;}
+    .var-date-input{margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-family:inherit;font-size:11px;outline:none;}
+    .var-date-input:focus{border-color:var(--purple);}
     .health{color:var(--health)} .green{color:var(--green)} .blue{color:var(--blue)} .purple{color:var(--purple)} .red{color:var(--red)}
 
     .section-title{font-size:14px;font-weight:600;margin-bottom:14px}
@@ -248,7 +254,19 @@
     <div id="page-dashboard" class="page active">
       <div class="summary">
         <div class="card"><div class="card-label">Peso atual</div><div class="card-value health sensitive" id="sum-weight">—</div><div class="card-sub" id="sum-weight-sub">sem registros</div></div>
-        <div class="card"><div class="card-label">Variação 7 dias</div><div class="card-value purple sensitive" id="sum-var-7">—</div><div class="card-sub">comparado com 7 dias atrás</div></div>
+        <div class="card">
+          <div class="card-label">Variação de peso</div>
+          <div class="card-value purple sensitive" id="sum-var-7">—</div>
+          <div class="card-sub" id="sum-var-7-sub">—</div>
+          <div class="var-pills">
+            <button class="var-pill" data-v="7" onclick="setVarRef('7')">7d</button>
+            <button class="var-pill" data-v="14" onclick="setVarRef('14')">14d</button>
+            <button class="var-pill" data-v="30" onclick="setVarRef('30')">30d</button>
+            <button class="var-pill" data-v="90" onclick="setVarRef('90')">90d</button>
+            <button class="var-pill" data-v="date" onclick="setVarRef('date')">data</button>
+          </div>
+          <input type="date" id="var-ref-date" class="var-date-input" style="display:none;" onchange="renderDashboard()">
+        </div>
         <div class="card"><div class="card-label">Última consulta</div><div class="card-value blue" id="sum-last-consult">—</div><div class="card-sub" id="sum-last-consult-sub">—</div></div>
         <div class="card"><div class="card-label">Próximo exame</div><div class="card-value green" id="sum-next-exam">—</div><div class="card-sub" id="sum-next-exam-sub">—</div></div>
         <div class="card"><div class="card-label">Médicos em atraso</div><div class="card-value red" id="sum-doctors-late">0</div><div class="card-sub">sem retorno há muito tempo</div></div>
@@ -1553,6 +1571,13 @@
         try{renderConsumos();}catch(e){console.error('renderConsumos',e);}
       }
 
+      function setVarRef(v){
+        lsSet('saude_var_ref',v);
+        const dateInput=document.getElementById('var-ref-date');
+        dateInput.style.display=v==='date'?'block':'none';
+        renderDashboard();
+      }
+
       function renderDashboard(){
         const lw=lastWeight();
         document.getElementById('sum-weight').textContent=lw?asKg(lw.weight):'—';
@@ -1560,9 +1585,21 @@
 
         const sortedWeights=[...state.weights].sort((a,b)=>compareDates(a.date,b.date));
         const current=sortedWeights[sortedWeights.length-1];
-        const ref7=[...sortedWeights].reverse().find(x=>daysBetween(x.date,todayStr())>=7);
-        const delta7=current&&ref7?(current.weight-ref7.weight):null;
-        document.getElementById('sum-var-7').textContent=delta7==null?'—':`${delta7>0?'+':''}${delta7.toFixed(1)} kg`;
+        const varRef=lsGet('saude_var_ref')||'7';
+        document.querySelectorAll('.var-pill').forEach(b=>b.classList.toggle('active',b.dataset.v===varRef));
+        const dateInput=document.getElementById('var-ref-date');
+        dateInput.style.display=varRef==='date'?'block':'none';
+        let refWeight=null;
+        if(varRef==='date'){
+          const d=dateInput.value;
+          if(d) refWeight=[...sortedWeights].reverse().find(x=>x.date<=d);
+        } else {
+          const days=Number(varRef);
+          refWeight=[...sortedWeights].reverse().find(x=>daysBetween(x.date,todayStr())>=days);
+        }
+        const delta=current&&refWeight?(current.weight-refWeight.weight):null;
+        document.getElementById('sum-var-7').textContent=delta==null?'—':`${delta>0?'+':''}${delta.toFixed(1)} kg`;
+        document.getElementById('sum-var-7-sub').textContent=refWeight?`vs ${fmtDate(refWeight.date)}`:'sem referência';
 
         const lastConsult=[...state.consults].filter(c=>c.status==='realizada').sort((a,b)=>compareDates(b.date,a.date))[0];
         document.getElementById('sum-last-consult').textContent=lastConsult?fmtDate(lastConsult.date):'—';
