@@ -1157,7 +1157,7 @@ function rendTodaySummary(){
   const todayStr=ds(new Date());
   const cardStr=ds(cardDate);
   const isToday=cardStr===todayStr;
-  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosPlanned,habitosAtivos,refeicoes,planSlots,gcalEvents}=getDayData(cardStr);
+  const{txs,receitas,despesas,parcelados,treinos,treinosPlanejados,tarefas,pesos,exames,consultas,habitosFeitos,habitosPlanned,habitosAtivos,refeicoes,planSlots,gcalEvents,waterMl}=getDayData(cardStr);
   const f=calFilter;
   const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   const el=document.getElementById('today-summary');
@@ -1473,7 +1473,7 @@ function _buildReportHtml(dates,mods){
       const[y,mo,d]=dateStr.split('-');
       const dow=new Date(Number(y),Number(mo)-1,Number(d)).getDay();
       const data=getDayData(dateStr);
-      const{receitas,despesas,parcelados,treinos,tarefas,habitosFeitos,habitosPlanned,refeicoes,pesos,consultas,exames,gcalEvents}=data;
+      const{receitas,despesas,parcelados,treinos,tarefas,habitosFeitos,habitosPlanned,refeicoes,pesos,consultas,exames,gcalEvents,waterMl}=data;
       let rows=''; const tots=[];
       if(mods.fin){
         receitas.forEach(t=>{ rows+=`<div class="rw fin"><span class="rn">+ ${_esc(t.descricao)}${t.categoria?` <em>${_esc(t.categoria)}</em>`:''}</span><span class="rv">${fmtR(t.valor)}</span></div>`; });
